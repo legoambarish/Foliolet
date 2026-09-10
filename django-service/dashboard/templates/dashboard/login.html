@@ -1,76 +1,138 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Log in - Evidentia</title>
+    <script>
+        (function() {
+            var stored = localStorage.getItem('evidentia-theme');
+            var theme = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #07090e;
-            --surface: #111520;
-            --surface-2: #1b2131;
-            --border: #2a3449;
-            --ink: #e8ecf3;
-            --muted: #919eb5;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
+            --ink: #f3ecdf;
+            --muted: #cdc2ac;
+            --accent: #d3a44c;
+            --accent-hover: #c2933d;
+            --accent-ink: #241a06;
+            --danger: #e06a5c;
+            --danger-dim: rgba(224, 106, 92, 0.16);
+            --card-bg: rgba(17, 15, 12, 0.55);
+            --card-border: rgba(255, 255, 255, 0.14);
+            --input-bg: rgba(255, 255, 255, 0.07);
+            --scrim: linear-gradient(180deg, rgba(8,6,4,0.45), rgba(8,6,4,0.75));
+        }
+        html[data-theme="light"] {
+            --ink: #221c12;
+            --muted: #5b5240;
+            --accent: #b8863a;
+            --accent-hover: #a3752f;
             --accent-ink: #ffffff;
-            --danger: #ef4444;
-            --danger-dim: rgba(239, 68, 68, 0.15);
+            --danger: #c1493c;
+            --danger-dim: rgba(193, 73, 60, 0.12);
+            --card-bg: rgba(255, 253, 248, 0.65);
+            --card-border: rgba(30, 24, 10, 0.12);
+            --input-bg: rgba(255, 255, 255, 0.55);
+            --scrim: linear-gradient(180deg, rgba(255,250,238,0.35), rgba(255,250,238,0.72));
         }
         * { box-sizing: border-box; }
+        html { color-scheme: dark; }
+        html[data-theme="light"] { color-scheme: light; }
         body {
             font-family: "Plus Jakarta Sans", sans-serif;
             margin: 0; padding: 0;
             color: var(--ink);
-            background: var(--bg);
             min-height: 100vh;
             display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
         }
+        .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; background: #0d0b08; }
+        .backdrop img {
+            width: 100%; height: 100%; object-fit: cover; object-position: 50% 35%;
+            filter: blur(4px) saturate(1.05);
+            transform: scale(1.06);
+        }
+        .backdrop::after {
+            content: ""; position: absolute; inset: 0; background: var(--scrim);
+        }
+        .theme-toggle {
+            position: fixed; top: 24px; right: 24px;
+            width: 36px; height: 36px; border-radius: 9px;
+            border: 1px solid var(--card-border); background: var(--card-bg);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--ink);
+            transition: transform 0.15s ease;
+        }
+        .theme-toggle:hover { transform: translateY(-1px); }
+        .theme-toggle svg { width: 17px; height: 17px; }
+        .theme-toggle .icon-sun { display: none; }
+        .theme-toggle .icon-moon { display: block; }
+        html[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+        html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
         .login-box {
-            width: 100%; max-width: 340px; margin: 0 auto;
-            background: var(--surface); border: 1px solid var(--border);
-            border-top: 2px solid var(--accent);
-            padding: 34px; border-radius: 10px;
+            width: 100%; max-width: 350px; margin: 0 auto;
+            background: var(--card-bg);
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--card-border);
+            padding: 36px; border-radius: 14px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+            animation: cardIn 0.5s ease both;
         }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .login-box .brand-row {
-            display: flex; align-items: center; gap: 11px; margin-bottom: 26px;
+            display: flex; align-items: center; gap: 11px; margin-bottom: 28px;
         }
         .login-box .mark {
-            width: 30px; height: 30px; flex-shrink: 0;
-            border: 1.5px solid var(--accent); border-radius: 7px;
+            width: 32px; height: 32px; flex-shrink: 0;
+            border: 1.5px solid var(--accent); border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            font-family: "Fraunces", serif; font-weight: 700; font-size: 14px;
+            font-family: "Fraunces", serif; font-weight: 700; font-size: 15px;
             color: var(--accent);
         }
         .login-box h1 {
             font-family: "Fraunces", serif; font-style: italic; font-weight: 600;
-            font-size: 20px; margin: 0; letter-spacing: 0.01em;
+            font-size: 21px; margin: 0; letter-spacing: 0.01em; color: var(--ink);
         }
         .login-box input {
-            width: 100%; padding: 11px 13px; margin-bottom: 12px; box-sizing: border-box;
+            width: 100%; padding: 12px 14px; margin-bottom: 12px; box-sizing: border-box;
             font-size: 14px; font-family: inherit; color: var(--ink);
-            background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
-            transition: border-color 0.15s ease;
+            background: var(--input-bg); border: 1px solid var(--card-border); border-radius: 8px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .login-box input::placeholder { color: var(--muted); }
-        .login-box input:focus { outline: none; border-color: var(--accent); }
+        .login-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(211, 164, 76, 0.2); }
         .login-box button {
-            width: 100%; padding: 11px; margin-top: 4px;
+            width: 100%; padding: 12px; margin-top: 4px;
             background: var(--accent); color: var(--accent-ink); border: none;
-            border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
-            transition: background 0.15s ease;
+            border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease;
         }
-        .login-box button:hover { background: var(--accent-hover); }
+        .login-box button:hover { background: var(--accent-hover); transform: translateY(-1px); }
         .error {
-            background: var(--danger-dim); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger);
+            background: var(--danger-dim); border: 1px solid var(--danger); border-left-width: 3px; color: var(--danger);
             padding: 10px 12px; font-size: 13px; margin-bottom: 14px; border-radius: 6px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
         }
     </style>
 </head>
 <body>
+<div class="backdrop">
+    <img src="{% static 'dashboard/adrianna-geo-1rBg5YSi00c-unsplash.jpg' %}" alt="greek art piece">
+</div>
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode">
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+</button>
 <div class="login-box">
     <div class="brand-row">
         <span class="mark">E</span>
@@ -86,5 +148,13 @@
         <button type="submit">Log in</button>
     </form>
 </div>
+<script>
+    document.getElementById('themeToggle').addEventListener('click', function () {
+        var root = document.documentElement;
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('evidentia-theme', next);
+    });
+</script>
 </body>
 </html>

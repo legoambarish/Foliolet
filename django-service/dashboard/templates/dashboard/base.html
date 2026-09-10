@@ -3,39 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}Evidentia - Reporting Dashboard{% endblock %}</title>
+    <script>
+        (function() {
+            var stored = localStorage.getItem('evidentia-theme');
+            var theme = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #07090e;
-            --surface: #111520;
-            --surface-2: #1b2131;
-            --border: #2a3449;
-            --border-soft: #1c2336;
-            --ink: #e8ecf3;
-            --muted: #919eb5;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --accent-ink: #ffffff;
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
-            --danger-dim: rgba(239, 68, 68, 0.15);
-            --success: #10b981;
-            --success-dim: rgba(16, 185, 129, 0.15);
-            --warning: #f59e0b;
-            --warning-dim: rgba(245, 158, 11, 0.15);
+            --bg: #0d0b08;
+            --surface: #18140f;
+            --surface-2: #211b14;
+            --border: #3a2f22;
+            --border-soft: #241d15;
+            --ink: #f3ecdf;
+            --muted: #a89a80;
+            --accent: #d3a44c;
+            --accent-hover: #c2933d;
+            --accent-ink: #241a06;
+            --danger: #e06a5c;
+            --danger-hover: #c65a4d;
+            --danger-dim: rgba(224, 106, 92, 0.16);
+            --success: #8caa6e;
+            --success-dim: rgba(140, 170, 110, 0.16);
+            --warning: #c97a3d;
+            --warning-dim: rgba(201, 122, 61, 0.16);
+            --shadow: rgba(0, 0, 0, 0.4);
             --font-display: "Fraunces", serif;
             --font-body: "Plus Jakarta Sans", sans-serif;
         }
+        html[data-theme="light"] {
+            --bg: #faf7f0;
+            --surface: #ffffff;
+            --surface-2: #f3efe4;
+            --border: #e6dfd0;
+            --border-soft: #efeadf;
+            --ink: #241f16;
+            --muted: #6b5d47;
+            --accent: #b8863a;
+            --accent-hover: #a3752f;
+            --accent-ink: #ffffff;
+            --danger: #c1493c;
+            --danger-hover: #a83c30;
+            --danger-dim: rgba(193, 73, 60, 0.1);
+            --success: #5f8a4d;
+            --success-dim: rgba(95, 138, 77, 0.1);
+            --warning: #b5701f;
+            --warning-dim: rgba(181, 112, 31, 0.1);
+            --shadow: rgba(30, 24, 10, 0.12);
+        }
         * { box-sizing: border-box; }
         ::selection { background: var(--accent); color: var(--accent-ink); }
+        html { color-scheme: dark; }
+        html[data-theme="light"] { color-scheme: light; }
         body {
             font-family: var(--font-body);
             margin: 0; padding: 0;
             color: var(--ink);
             background: var(--bg);
             min-height: 100vh;
+            transition: background-color 0.25s ease, color 0.25s ease;
         }
         nav {
             background: var(--surface);
@@ -43,6 +74,7 @@
             padding: 22px 36px;
             display: flex;
             align-items: center;
+            transition: background-color 0.25s ease, border-color 0.25s ease;
         }
         nav .brand {
             display: flex; align-items: center; gap: 11px;
@@ -66,21 +98,43 @@
             letter-spacing: 0.01em;
         }
         nav a {
+            position: relative;
             color: var(--muted); text-decoration: none; margin-right: 26px;
             font-size: 14.5px; font-weight: 500;
             padding-bottom: 4px;
-            border-bottom: 2px solid transparent;
-            transition: color 0.15s ease, border-color 0.15s ease;
+            transition: color 0.15s ease;
         }
-        nav a:hover { color: var(--ink); text-decoration: none; border-bottom-color: var(--accent); }
+        nav a::after {
+            content: ""; position: absolute; left: 0; bottom: 0;
+            width: 0; height: 2px; background: var(--accent);
+            transition: width 0.2s ease;
+        }
+        nav a:hover { color: var(--ink); text-decoration: none; }
+        nav a:hover::after { width: 100%; }
         .nav-right { margin-left: auto; font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 14px; }
         .nav-right a {
             margin: 0; color: var(--ink); border: 1px solid var(--border); padding: 6px 13px;
-            border-radius: 6px; transition: background 0.15s ease, border-color 0.15s ease;
+            border-radius: 6px; transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
         }
-        .nav-right a:hover { background: var(--surface-2); border-color: var(--accent); }
+        .nav-right a::after { display: none; }
+        .nav-right a:hover { background: var(--surface-2); border-color: var(--accent); transform: translateY(-1px); }
 
-        .container { padding: 36px; max-width: 1080px; margin: 0 auto; }
+        .theme-toggle {
+            width: 34px; height: 34px; border-radius: 8px;
+            border: 1px solid var(--border); background: var(--surface-2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--ink); flex-shrink: 0;
+            transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+        }
+        .theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+        .theme-toggle svg { width: 17px; height: 17px; display: block; }
+        .theme-toggle .icon-sun { display: none; }
+        .theme-toggle .icon-moon { display: block; }
+        html[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+        html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+        .container { padding: 36px; max-width: 1080px; margin: 0 auto; animation: fadeInUp 0.4s ease both; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
         h1 { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin: 0 0 4px 0; letter-spacing: -0.01em; }
         h2 { font-family: var(--font-body); font-size: 13px; font-weight: 600; margin-top: 38px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -90,12 +144,18 @@
         table {
             border-collapse: collapse; width: 100%; margin-top: 12px;
             background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+            transition: background-color 0.25s ease, border-color 0.25s ease;
         }
         th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; }
         th { background: var(--surface-2); font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.06em; }
         tr:last-child td { border-bottom: none; }
         tr td { transition: background 0.15s ease, box-shadow 0.15s ease; }
         tr:hover td { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--accent); }
+        tbody tr { animation: rowIn 0.3s ease both; }
+        tbody tr:nth-child(1) { animation-delay: 0.02s; } tbody tr:nth-child(2) { animation-delay: 0.05s; }
+        tbody tr:nth-child(3) { animation-delay: 0.08s; } tbody tr:nth-child(4) { animation-delay: 0.11s; }
+        tbody tr:nth-child(5) { animation-delay: 0.14s; } tbody tr:nth-child(n+6) { animation-delay: 0.16s; }
+        @keyframes rowIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         td.actions a { margin-right: 15px; font-size: 13px; }
         a.danger-link { color: var(--danger); }
         a.danger-link:hover { text-decoration: underline; }
@@ -106,33 +166,37 @@
         .badge-open { background: var(--warning-dim); color: var(--warning); }
         .badge-closed { background: var(--success-dim); color: var(--success); }
 
-        .stub-notice { background: var(--warning-dim); border: 1px solid rgba(245, 158, 11, 0.3); color: var(--warning); padding: 12px 15px; font-size: 13px; margin-bottom: 18px; border-radius: 6px; }
-        .restricted-notice { background: var(--danger-dim); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger); padding: 12px 15px; font-size: 13px; margin-bottom: 18px; border-radius: 6px; }
-        .message-success { background: var(--success-dim); border: 1px solid rgba(16, 185, 129, 0.3); color: var(--success); padding: 12px 15px; font-size: 13px; margin-bottom: 18px; border-radius: 6px; }
-        .message-error { background: var(--danger-dim); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger); padding: 12px 15px; font-size: 13px; margin-bottom: 18px; border-radius: 6px; }
-        .message-warning { background: var(--warning-dim); border: 1px solid rgba(245, 158, 11, 0.3); color: var(--warning); padding: 12px 15px; font-size: 13px; margin-bottom: 18px; border-radius: 6px; }
+        .stub-notice, .restricted-notice, .message-success, .message-error, .message-warning {
+            padding: 12px 15px; font-size: 13px; margin-bottom: 18px; border-radius: 6px;
+            animation: fadeInUp 0.3s ease both;
+        }
+        .stub-notice { background: var(--warning-dim); border: 1px solid var(--warning); border-left-width: 3px; color: var(--warning); }
+        .restricted-notice { background: var(--danger-dim); border: 1px solid var(--danger); border-left-width: 3px; color: var(--danger); }
+        .message-success { background: var(--success-dim); border: 1px solid var(--success); border-left-width: 3px; color: var(--success); }
+        .message-error { background: var(--danger-dim); border: 1px solid var(--danger); border-left-width: 3px; color: var(--danger); }
+        .message-warning { background: var(--warning-dim); border: 1px solid var(--warning); border-left-width: 3px; color: var(--warning); }
 
         .filters { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
         .filters input, .filters select {
             padding: 8px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 5px;
             background: var(--surface-2); color: var(--ink); font-family: var(--font-body);
-            transition: border-color 0.15s ease;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        .filters input:focus, .filters select:focus { outline: none; border-color: var(--accent); }
+        .filters input:focus, .filters select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
         .filters button {
             padding: 8px 17px; font-size: 13px; font-weight: 600; border: none; border-radius: 5px;
             background: var(--accent); color: var(--accent-ink); cursor: pointer;
-            transition: background 0.15s ease;
+            transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
         }
-        .filters button:hover { background: var(--accent-hover); }
+        .filters button:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px var(--shadow); }
 
         .button, button[type="submit"] {
             display: inline-block; padding: 9px 19px; font-size: 13.5px; font-weight: 600;
             background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px;
             cursor: pointer; text-decoration: none;
-            transition: background 0.15s ease;
+            transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
         }
-        .button:hover, button[type="submit"]:hover { background: var(--accent-hover); text-decoration: none; }
+        .button:hover, button[type="submit"]:hover { background: var(--accent-hover); text-decoration: none; transform: translateY(-1px); box-shadow: 0 4px 12px var(--shadow); }
         button.danger { background: var(--danger); color: #ffffff; }
         button.danger:hover { background: var(--danger-hover); }
 
@@ -142,10 +206,14 @@
         .edit-form input, .edit-form select {
             width: 100%; padding: 9px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 5px;
             background: var(--surface-2); color: var(--ink); font-family: var(--font-body);
-            transition: border-color 0.15s ease;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        .edit-form input:focus, .edit-form select:focus { outline: none; border-color: var(--accent); }
+        .edit-form input:focus, .edit-form select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
         .edit-form button { margin-top: 22px; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -157,12 +225,16 @@
     <a href="{% url 'dashboard:index' %}">Case Overview</a>
     <a href="{% url 'dashboard:document_list' %}">Documents</a>
     <a href="{% url 'dashboard:audit_log' %}">Audit Log</a>
-    {% if current_username %}
-        <span class="nav-right">
-        {{ current_username }} ({{ current_role }})
-        <a href="{% url 'dashboard:logout' %}">Log out</a>
+    <span class="nav-right">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        {% if current_username %}
+            {{ current_username }} ({{ current_role }})
+            <a href="{% url 'dashboard:logout' %}">Log out</a>
+        {% endif %}
     </span>
-    {% endif %}
 </nav>
 <div class="container">
     {% if using_stub %}
@@ -180,5 +252,13 @@
     {% endfor %}
     {% block content %}{% endblock %}
 </div>
+<script>
+    document.getElementById('themeToggle').addEventListener('click', function () {
+        var root = document.documentElement;
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        localStorage.setItem('evidentia-theme', next);
+    });
+</script>
 </body>
 </html>
