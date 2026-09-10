@@ -1,0 +1,69 @@
+{% extends "dashboard/base.html" %}
+{% block title %}AI Document Analysis - Evidentia{% endblock %}
+
+{% block content %}
+    <h1>AI Document Analysis</h1>
+    <p>Document ID: {{ document_id }}</p>
+
+    {% if error %}
+        <div class="message-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">{% if analysis %}Re-run Analysis{% else %}Run Analysis{% endif %}</button>
+    </form>
+
+    {% if analysis %}
+        <div class="ai-analysis-results">
+
+            <h2>Summary</h2>
+            <p>{{ analysis.summary }}</p>
+
+            <h2>Key Dates</h2>
+            {% if analysis.keyDates %}
+                <table>
+                    <thead><tr><th>Date</th><th>Context</th></tr></thead>
+                    <tbody>
+                    {% for item in analysis.keyDates %}
+                        <tr><td>{{ item.date }}</td><td>&ldquo;{{ item.context }}&rdquo;</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="ai-empty">No dates flagged.</p>
+            {% endif %}
+
+            <h2>Key Parties</h2>
+            {% if analysis.keyParties %}
+                <table>
+                    <thead><tr><th>Name</th><th>Context</th></tr></thead>
+                    <tbody>
+                    {% for item in analysis.keyParties %}
+                        <tr><td>{{ item.name }}</td><td>&ldquo;{{ item.context }}&rdquo;</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="ai-empty">No parties flagged.</p>
+            {% endif %}
+
+            <h2>Flagged Details / Fine Print</h2>
+            {% if analysis.flaggedClauses %}
+                <table>
+                    <thead><tr><th>Quote</th><th>Why it matters</th></tr></thead>
+                    <tbody>
+                    {% for item in analysis.flaggedClauses %}
+                        <tr><td>&ldquo;{{ item.quote }}&rdquo;</td><td>{{ item.concern }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="ai-empty">Nothing flagged.</p>
+            {% endif %}
+
+        </div>
+    {% else %}
+        <p class="ai-empty">No analysis has been run yet for this document.</p>
+    {% endif %}
+{% endblock %}

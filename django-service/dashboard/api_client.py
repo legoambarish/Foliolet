@@ -323,6 +323,51 @@ def upload_document(file, case_id, document_type, auth=None):
         data={"caseId": case_id, "documentType": document_type},
         auth=auth,
     )
+AI_ANALYSIS_TIMEOUT_SECONDS = 60  # LLM calls take longer than ordinary CRUD calls
+
+
+def analyze_document(document_id, auth=None):
+    """
+    Triggers a fresh AI analysis run against Spring Boot for this document.
+    Synchronous, the request blocks until the LLM call completes.
+    """
+    if USE_STUB:
+        return {
+            "documentId": document_id,
+            "summary": "Stub mode: this is a placeholder summary, no real analysis was run.",
+            "keyDates": [],
+            "keyParties": [],
+            "flaggedClauses": [],
+            "analyzedAt": None,
+        }
+
+    url = f"{BASE_URL}/api/documents/{document_id}/analyze"
+    resolved_auth = tuple(auth) if auth else _FALLBACK_AUTH
+    try:
+        response = requests.post(url, timeout=AI_ANALYSIS_TIMEOUT_SECONDS, auth=resolved_auth)
+        if response.status_code == 403:
+            raise SpringBootPermissionError("Not authorized to perform this action")
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        raise SpringBootAPIError(f"Failed calling {url}: {exc}") from exc
+
+
+def get_document_analysis(document_id, auth=None):
+    """Returns the most recent stored analysis, or None if never analyzed."""
+    if USE_STUB:
+        return None
+
+    url = f"{BASE_URL}/api/documents/{document_id}/analysis"
+    resolved_auth = tuple(auth) if auth else _FALLBACK_AUTH
+    try:
+        response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS, auth=resolved_auth)
+        if response.status_code == 204:
+            return None
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        raise SpringBootAPIError(f"Failed calling {url}: {exc}") from exc
 
 
 def update_document(document_id, case_id=None, document_type=None, auth=None):

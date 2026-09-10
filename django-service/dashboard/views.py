@@ -295,3 +295,38 @@ def verify_document(request, document_id):
         messages.error(request, "Could not reach the document service. Is Spring Boot running?")
 
     return redirect("dashboard:document_list")
+
+@spring_login_required
+def ai_document_analysis(request, document_id):
+    """
+    AI Document Analysis page for a single document. GET shows the most
+    recent stored analysis if one exists. POST (the "Run Analysis" button)
+    triggers a fresh run and blocks until the LLM call completes.
+    """
+    auth = request.session.get("sb_auth")
+    error = None
+    analysis = None
+
+    if request.method == "POST":
+        try:
+            analysis = api_client.analyze_document(document_id, auth=auth)
+            messages.success(request, "Analysis complete.")
+        except api_client.SpringBootPermissionError:
+            error = "You do not have permission to analyze this document."
+        except api_client.SpringBootAPIError:
+            error = "Could not reach the document service, or the AI call failed. Is Spring Boot running, and is the OpenRouter key configured?"
+    else:
+        try:
+            analysis = api_client.get_document_analysis(document_id, auth=auth)
+        except api_client.SpringBootAPIError:
+            error = "Could not reach the document service. Is Spring Boot running?"
+
+    context = {
+        "document_id": document_id,
+        "analysis": analysis,
+        "error": error,
+        "using_stub": api_client.USE_STUB,
+        "current_username": request.session.get("sb_username"),
+        "current_role": request.session.get("sb_role"),
+    }
+    return render(request, "dashboard/document_analysis.html", context)

@@ -156,7 +156,23 @@
         tbody tr:nth-child(3) { animation-delay: 0.08s; } tbody tr:nth-child(4) { animation-delay: 0.11s; }
         tbody tr:nth-child(5) { animation-delay: 0.14s; } tbody tr:nth-child(n+6) { animation-delay: 0.16s; }
         @keyframes rowIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        td.actions a { margin-right: 15px; font-size: 13px; }
+        td.actions { white-space: nowrap; }
+        td.actions a { margin-right: 15px; font-size: 13px; white-space: nowrap; }
+        td.actions a.ai-analysis-btn {
+            display: inline-block;
+            padding: 4px 11px;
+            border: 1px solid var(--accent);
+            border-radius: 5px;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 11.5px;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        td.actions a.ai-analysis-btn:hover {
+            background: var(--accent);
+            color: var(--accent-ink);
+            text-decoration: none;
+        }
         a.danger-link { color: var(--danger); }
         a.danger-link:hover { text-decoration: underline; }
         a { color: var(--accent); text-decoration: none; }
@@ -210,6 +226,9 @@
         }
         .edit-form input:focus, .edit-form select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
         .edit-form button { margin-top: 22px; }
+
+        .ai-analysis-results h2 { margin-top: 24px; font-size: 15px; }
+        .ai-empty { color: var(--muted); font-size: 13px; }
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation: none !important; transition: none !important; }

@@ -22,3 +22,6 @@ spring.servlet.multipart.max-request-size=20MB
 blockchain.rpc-url=http://127.0.0.1:8545
 blockchain.private-key = <enter your private key obtained from ganache>
 blockchain.contract-address = <enter contact address displayed by the spring-boot-app upon startup>
+
+openrouter.api-key=sk-or-v1-....
+openrouter.model=inclusionai/ling-3.0-flash-vl:free #current best for text analysis and NLP
