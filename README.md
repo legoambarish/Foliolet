@@ -100,6 +100,27 @@ This is a genuinely separate mechanism from the blockchain layer, no Ethereum, n
 - Only files that pass through the watched folder get a candidate record. A file uploaded from anywhere else has no earlier fingerprint to compare against, `preUploadWarning` stays `null` in that case, meaning "no claim either way," not "verified clean"
 - `POST /api/documents/candidate-hash` is currently open with no authentication, acceptable for a local single-machine demo, not something to expose as-is beyond the prototype
 
+## AI-powered single-document analysis
+
+The prototype now includes an AI analysis layer. This is separate from the tamper-evidence and recovery mechanisms above, it reads and summarizes a single document rather than checking its integrity.
+
+How it works:
+
+- `POST /api/documents/{id}/analyze` loads the document's stored file, extracts its text (PDFBox for PDFs, a plain text read for anything else), and sends that text to an LLM via OpenRouter
+- The model is asked to return a summary, a list of key dates, a list of key parties, and a list of flagged clauses worth a reviewer's attention, all as structured JSON
+- Every date, party, and clause the model returns is checked against the actual extracted text before being trusted, anything the model claims that is not a genuine verbatim match is silently dropped, this is the main guard against the model inventing details
+- Results are stored in a new `ai_insights` table and logged as an `AI_ANALYSIS_RUN` audit entry, `GET /api/documents/{id}/analysis` returns the most recent stored result without calling the LLM again
+- The Django dashboard has an "AI Analysis" button next to each document, showing the summary and tables of dates, parties, and flagged clauses, with a "Run Analysis" or "Re-run Analysis" button
+
+**Honest limitations:**
+- This only analyzes one document at a time, there is no cross-document search or comparison, that is future work
+- Analysis quality depends entirely on how cleanly text extracts from the source file, scanned or image-only PDFs will not extract usefully without OCR, which is not implemented
+- Free-tier OpenRouter models are shared and can return `429 Too Many Requests` under load, this is not a bug in the app, retrying shortly or switching `openrouter.model` to a different free model resolves it
+
+**Known bugs and fixes, if setting this up fresh:**
+- `LocalDateTime` failing to serialize with a "Java 8 date/time type not supported" error: add the `jackson-datatype-jsr310` dependency to `pom.xml`, and register `new JavaTimeModule()` on the `ObjectMapper` used in `AiAnalysisService`
+- `Cannot resolve symbol 'datatype'` shown in the IDE after adding the import: the dependency is missing from `pom.xml`, add it explicitly rather than relying on a transitive include, then reload the Maven project
+
 ## How the two services talk to each other
 
 Communication is one directional. The Django dashboard calls the Spring Boot REST API over HTTP. Django has no direct database access to Spring Boot's data, and Spring Boot has no dependency on Django at all, it can run and be fully tested on its own.
@@ -122,6 +143,8 @@ Django's `api_client.py` was originally built against a stubbed version of this 
 | `GET /api/cases/{caseId}` | Single case detail | ADMIN |
 | `GET /api/audit-log` | Full or filtered audit trail | ADMIN |
 | `GET /api/documents/{id}/verify` | Verify current file against the on-chain hash | Authenticated, owner or ADMIN |
+| `POST /api/documents/{id}/analyze` | Run AI analysis on a document | Authenticated, owner or ADMIN |
+| `GET /api/documents/{id}/analysis` | Retrieve the most recent AI analysis result | Authenticated, owner or ADMIN |
 | `POST /api/documents/candidate-hash` | Report a pre-upload file hash from the local watcher | Open |
 
 Field names in every response are chosen to match what `dashboard/api_client.py` and the Django templates already expect (`documentId`, `title`, `uploadedBy`, `auditId`, `performedBy`, `performedAt`, etc), not Spring Boot's internal naming, so no translation layer is needed on the Django side.
@@ -205,6 +228,18 @@ Runs on `http://localhost:8080`.
    python watch.py ~/dms-intake
 ```
 Drop a file into `~/dms-intake`, then upload that same file through the dashboard or API. If it was edited after being dropped in but before upload, the upload response includes a `preUploadWarning` and a `PRE_UPLOAD_TAMPER_DETECTED` audit log entry is recorded.
+
+12. Set up AI-powered document analysis (optional, but needed to demo that layer):
+- Export your OpenRouter API key in the terminal before starting Spring Boot:
+```bash
+   export OPENROUTER_API_KEY=sk-or-v1-...
+```
+- In `application.properties`, set the model to use:
+```properties
+   openrouter.model=meta-llama/llama-3.1-8b-instruct:free
+```
+Check OpenRouter's current model list if this exact free model is no longer being served, free-tier availability shifts over time
+- `openrouter.api-key=${OPENROUTER_API_KEY:}` should already be present in `application.properties.example`, this reads the key from the environment variable rather than storing it in the properties file directly
 
 ### 2. Django dashboard (reporting/oversight layer)
 
@@ -316,7 +351,6 @@ curl -X POST http://localhost:8080/api/documents/candidate-hash \
 
 - No real `Case` entity, `title` and `status` on case summaries are placeholders
 - Blockchain integration currently uses a local Ganache network for the prototype; a distributed multi-validator deployment is not implemented
-- No AI document analysis layer yet (deferred to after the presentation round)
 - The Django session stores the raw password for reuse as Basic Auth on later calls, acceptable for a localhost prototype, not something to carry into a real deployment
 - `POST /api/auth/login`'s "token" is a Basic Auth string, not a real bearer token, a deliberate simplification given the timeline
 - Pre-upload tamper detection only covers files that pass through the watched intake folder, a document uploaded from anywhere else has no candidate hash to compare against
@@ -342,5 +376,5 @@ curl -X POST http://localhost:8080/api/documents/candidate-hash \
 - [x] Pre-upload tamper warning surfaced on the upload page, distinct from the normal success message
 
 ### Later, after the presentation round
-- [ ] LLM-based document analysis (summarization, detail extraction)
+- [x] LLM-based document analysis (summarization, detail extraction)
 - [ ] Document version history
