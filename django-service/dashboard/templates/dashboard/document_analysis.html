@@ -1,8 +1,8 @@
 {% extends "dashboard/base.html" %}
-{% block title %}AI Document Analysis - Evidentia{% endblock %}
+{% block title %}Evidentia Mind - Evidentia{% endblock %}
 
 {% block content %}
-    <h1>AI Document Analysis</h1>
+    <h1>Evidentia Mind</h1>
     <p>Document ID: {{ document_id }}</p>
 
     {% if error %}
@@ -11,11 +11,11 @@
 
     <form method="post">
         {% csrf_token %}
-        <button type="submit">{% if analysis %}Re-run Analysis{% else %}Run Analysis{% endif %}</button>
+        <button type="submit" class="mind">{% if analysis %}Re-run Analysis{% else %}Run Analysis{% endif %}</button>
     </form>
 
     {% if analysis %}
-        <div class="ai-analysis-results">
+        <div class="mind-results">
 
             <h2>Summary</h2>
             <p>{{ analysis.summary }}</p>
@@ -31,7 +31,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <p class="ai-empty">No dates flagged.</p>
+                <p class="mind-empty">No dates flagged.</p>
             {% endif %}
 
             <h2>Key Parties</h2>
@@ -45,7 +45,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <p class="ai-empty">No parties flagged.</p>
+                <p class="mind-empty">No parties flagged.</p>
             {% endif %}
 
             <h2>Flagged Details / Fine Print</h2>
@@ -59,11 +59,11 @@
                     </tbody>
                 </table>
             {% else %}
-                <p class="ai-empty">Nothing flagged.</p>
+                <p class="mind-empty">Nothing flagged.</p>
             {% endif %}
 
         </div>
     {% else %}
-        <p class="ai-empty">No analysis has been run yet for this document.</p>
+        <p class="mind-empty">No analysis has been run yet for this document.</p>
     {% endif %}
 {% endblock %}

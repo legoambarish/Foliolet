@@ -2,27 +2,27 @@
 {% block title %}Documents - Evidentia{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Documents</h1>
-    <a href="{% url 'dashboard:upload_document' %}" class="button">Upload Document</a>
-</div>
+    <div class="page-header">
+        <h1>Documents</h1>
+        <a href="{% url 'dashboard:upload_document' %}" class="button">Upload Document</a>
+    </div>
 
-<form method="get" class="filters">
-    <input type="text" name="case_id" placeholder="Case ID" value="{{ filters.case_id }}">
-    <select name="type">
-        <option value="">All Types</option>
-        <option value="FIR" {% if filters.type == "FIR" %}selected{% endif %}>FIR</option>
-        <option value="WITNESS_STATEMENT" {% if filters.type == "WITNESS_STATEMENT" %}selected{% endif %}>Witness Statement</option>
-        <option value="CHARGE_SHEET" {% if filters.type == "CHARGE_SHEET" %}selected{% endif %}>Charge Sheet</option>
-        <option value="FORENSIC_REPORT" {% if filters.type == "FORENSIC_REPORT" %}selected{% endif %}>Forensic Report</option>
-    </select>
-    <input type="date" name="from" value="{{ filters.from }}">
-    <input type="date" name="to" value="{{ filters.to }}">
-    <button type="submit">Filter</button>
-</form>
+    <form method="get" class="filters">
+        <input type="text" name="case_id" placeholder="Case ID" value="{{ filters.case_id }}">
+        <select name="type">
+            <option value="">All Types</option>
+            <option value="FIR" {% if filters.type == "FIR" %}selected{% endif %}>FIR</option>
+            <option value="WITNESS_STATEMENT" {% if filters.type == "WITNESS_STATEMENT" %}selected{% endif %}>Witness Statement</option>
+            <option value="CHARGE_SHEET" {% if filters.type == "CHARGE_SHEET" %}selected{% endif %}>Charge Sheet</option>
+            <option value="FORENSIC_REPORT" {% if filters.type == "FORENSIC_REPORT" %}selected{% endif %}>Forensic Report</option>
+        </select>
+        <input type="date" name="from" value="{{ filters.from }}">
+        <input type="date" name="to" value="{{ filters.to }}">
+        <button type="submit">Filter</button>
+    </form>
 
-<table>
-    <thead>
+    <table>
+        <thead>
         <tr>
             <th>Document ID</th>
             <th>Case ID</th>
@@ -32,26 +32,26 @@
             <th>Uploaded At</th>
             <th>Actions</th>
         </tr>
-    </thead>
-    <tbody>
+        </thead>
+        <tbody>
         {% for doc in documents %}
-        <tr>
-            <td>{{ doc.documentId }}</td>
-            <td><a href="{% url 'dashboard:case_detail' doc.caseId %}">{{ doc.caseId }}</a></td>
-            <td>{{ doc.title }}</td>
-            <td>{{ doc.documentType }}</td>
-            <td>{{ doc.uploadedBy }}</td>
-            <td>{{ doc.uploadedAt }}</td>
-            <td class="actions">
-                <a href="{% url 'dashboard:edit_document' doc.documentId %}">Edit</a>
-                <a href="{% url 'dashboard:verify_document' doc.documentId %}">Verify</a>
-                <a href="{% url 'dashboard:ai_document_analysis' doc.documentId %}" class="ai-analysis-btn">AI Analysis</a>
-                <a href="{% url 'dashboard:delete_document' doc.documentId %}" class="danger-link">Delete</a>
-            </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7">No documents match the current filters.</td></tr>
+            <tr>
+                <td>{{ doc.documentId }}</td>
+                <td><a href="{% url 'dashboard:case_detail' doc.caseId %}">{{ doc.caseId }}</a></td>
+                <td>{{ doc.title }}</td>
+                <td>{{ doc.documentType }}</td>
+                <td>{{ doc.uploadedBy }}</td>
+                <td>{{ doc.uploadedAt }}</td>
+                <td class="actions">
+                    <a href="{% url 'dashboard:edit_document' doc.documentId %}">Edit</a>
+                    <a href="{% url 'dashboard:verify_document' doc.documentId %}">Verify</a>
+                    <a href="{% url 'dashboard:ai_document_analysis' doc.documentId %}" class="mind-btn">Evidentia Mind</a>
+                    <a href="{% url 'dashboard:delete_document' doc.documentId %}" class="danger-link">Delete</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">No documents match the current filters.</td></tr>
         {% endfor %}
-    </tbody>
-</table>
+        </tbody>
+    </table>
 {% endblock %}

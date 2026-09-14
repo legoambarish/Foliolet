@@ -14,6 +14,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        @view-transition { navigation: auto; }
+        ::view-transition-old(root), ::view-transition-new(root) {
+            animation-duration: 0.32s;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         :root {
             --bg: #0d0b08;
             --surface: #18140f;
@@ -25,6 +31,10 @@
             --accent: #d3a44c;
             --accent-hover: #c2933d;
             --accent-ink: #241a06;
+            --accent-2: #7a94ac;
+            --accent-2-hover: #6a839c;
+            --accent-2-ink: #0f161c;
+            --accent-2-dim: rgba(122, 148, 172, 0.16);
             --danger: #e06a5c;
             --danger-hover: #c65a4d;
             --danger-dim: rgba(224, 106, 92, 0.16);
@@ -47,6 +57,10 @@
             --accent: #b8863a;
             --accent-hover: #a3752f;
             --accent-ink: #ffffff;
+            --accent-2: #5c7690;
+            --accent-2-hover: #4d6480;
+            --accent-2-ink: #ffffff;
+            --accent-2-dim: rgba(92, 118, 144, 0.10);
             --danger: #c1493c;
             --danger-hover: #a83c30;
             --danger-dim: rgba(193, 73, 60, 0.1);
@@ -68,22 +82,29 @@
             min-height: 100vh;
             transition: background-color 0.25s ease, color 0.25s ease;
         }
+
         nav {
             background: var(--surface);
             border-bottom: 1px solid var(--border);
-            padding: 22px 36px;
+            padding: 16px 36px;
             display: flex;
             align-items: center;
+            position: relative;
             transition: background-color 0.25s ease, border-color 0.25s ease;
+        }
+        nav::after {
+            content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent) 35%, var(--accent-2) 65%, transparent);
+            opacity: 0.5;
         }
         nav .brand {
             display: flex; align-items: center; gap: 11px;
-            margin-right: 40px;
+            margin-right: 32px; text-decoration: none;
         }
         nav .brand .mark {
-            width: 26px; height: 26px; flex-shrink: 0;
+            width: 30px; height: 30px; flex-shrink: 0;
             border: 1.5px solid var(--accent);
-            border-radius: 6px;
+            border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-family: var(--font-display);
             font-weight: 700; font-size: 13px;
@@ -94,56 +115,53 @@
             font-style: italic;
             font-weight: 600;
             color: var(--ink);
-            font-size: 21px;
+            font-size: 20px;
             letter-spacing: 0.01em;
         }
-        nav a {
-            position: relative;
-            color: var(--muted); text-decoration: none; margin-right: 26px;
-            font-size: 14.5px; font-weight: 500;
-            padding-bottom: 4px;
-            transition: color 0.15s ease;
+        .nav-links { display: flex; align-items: center; gap: 2px; }
+        .nav-links a {
+            color: var(--muted); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            padding: 8px 16px; border-radius: 999px;
+            transition: background 0.18s ease, color 0.18s ease;
         }
-        nav a::after {
-            content: ""; position: absolute; left: 0; bottom: 0;
-            width: 0; height: 2px; background: var(--accent);
-            transition: width 0.2s ease;
-        }
-        nav a:hover { color: var(--ink); text-decoration: none; }
-        nav a:hover::after { width: 100%; }
-        .nav-right { margin-left: auto; font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 14px; }
+        .nav-links a:hover { color: var(--ink); background: var(--surface-2); }
+        .nav-links a.active { color: var(--accent); font-weight: 600; background: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+        .nav-right { margin-left: auto; font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 12px; }
+        .nav-right .user-chip { color: var(--ink); }
         .nav-right a {
-            margin: 0; color: var(--ink); border: 1px solid var(--border); padding: 6px 13px;
-            border-radius: 6px; transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+            color: var(--ink); border: 1px solid var(--border); padding: 6px 13px;
+            border-radius: 999px; text-decoration: none; font-size: 13px;
+            transition: background 0.15s ease, border-color 0.15s ease;
         }
-        .nav-right a::after { display: none; }
-        .nav-right a:hover { background: var(--surface-2); border-color: var(--accent); transform: translateY(-1px); }
+        .nav-right a:hover { background: var(--surface-2); border-color: var(--accent); }
 
         .theme-toggle {
-            width: 34px; height: 34px; border-radius: 8px;
+            width: 34px; height: 34px; border-radius: 50%;
             border: 1px solid var(--border); background: var(--surface-2);
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; color: var(--ink); flex-shrink: 0;
-            transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+            transition: background 0.15s ease, border-color 0.15s ease;
         }
-        .theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
+        .theme-toggle:hover { border-color: var(--accent); }
         .theme-toggle svg { width: 17px; height: 17px; display: block; }
         .theme-toggle .icon-sun { display: none; }
         .theme-toggle .icon-moon { display: block; }
         html[data-theme="light"] .theme-toggle .icon-sun { display: block; }
         html[data-theme="light"] .theme-toggle .icon-moon { display: none; }
 
-        .container { padding: 36px; max-width: 1080px; margin: 0 auto; animation: fadeInUp 0.4s ease both; }
+        .container { padding: 40px 36px; max-width: 1080px; margin: 0 auto; animation: fadeInUp 0.4s ease both; }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-        h1 { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin: 0 0 4px 0; letter-spacing: -0.01em; }
+        h1 { font-family: var(--font-display); font-weight: 700; font-size: 25px; margin: 0 0 4px 0; letter-spacing: -0.01em; }
         h2 { font-family: var(--font-body); font-size: 13px; font-weight: 600; margin-top: 38px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 
-        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
 
         table {
             border-collapse: collapse; width: 100%; margin-top: 12px;
-            background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
             transition: background-color 0.25s ease, border-color 0.25s ease;
         }
         th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; }
@@ -158,19 +176,19 @@
         @keyframes rowIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         td.actions { white-space: nowrap; }
         td.actions a { margin-right: 15px; font-size: 13px; white-space: nowrap; }
-        td.actions a.ai-analysis-btn {
+        td.actions a.mind-btn {
             display: inline-block;
             padding: 4px 11px;
-            border: 1px solid var(--accent);
+            border: 1px solid var(--accent-2);
             border-radius: 5px;
-            color: var(--accent);
+            color: var(--accent-2);
             font-weight: 600;
             font-size: 11.5px;
             transition: background 0.15s ease, color 0.15s ease;
         }
-        td.actions a.ai-analysis-btn:hover {
-            background: var(--accent);
-            color: var(--accent-ink);
+        td.actions a.mind-btn:hover {
+            background: var(--accent-2);
+            color: var(--accent-2-ink);
             text-decoration: none;
         }
         a.danger-link { color: var(--danger); }
@@ -192,15 +210,15 @@
         .message-error { background: var(--danger-dim); border: 1px solid var(--danger); border-left-width: 3px; color: var(--danger); }
         .message-warning { background: var(--warning-dim); border: 1px solid var(--warning); border-left-width: 3px; color: var(--warning); }
 
-        .filters { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .filters { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
         .filters input, .filters select {
-            padding: 8px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 5px;
+            padding: 8px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px;
             background: var(--surface-2); color: var(--ink); font-family: var(--font-body);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .filters input:focus, .filters select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
         .filters button {
-            padding: 8px 17px; font-size: 13px; font-weight: 600; border: none; border-radius: 5px;
+            padding: 8px 17px; font-size: 13px; font-weight: 600; border: none; border-radius: 999px;
             background: var(--accent); color: var(--accent-ink); cursor: pointer;
             transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
         }
@@ -208,27 +226,80 @@
 
         .button, button[type="submit"] {
             display: inline-block; padding: 9px 19px; font-size: 13.5px; font-weight: 600;
-            background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px;
+            background: var(--accent); color: var(--accent-ink); border: none; border-radius: 999px;
             cursor: pointer; text-decoration: none;
             transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
         }
         .button:hover, button[type="submit"]:hover { background: var(--accent-hover); text-decoration: none; transform: translateY(-1px); box-shadow: 0 4px 12px var(--shadow); }
         button.danger { background: var(--danger); color: #ffffff; }
         button.danger:hover { background: var(--danger-hover); }
+        button.mind { background: var(--accent-2); color: var(--accent-2-ink); }
+        button.mind:hover { background: var(--accent-2-hover); }
 
-        .edit-form { background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: 8px; padding: 24px; max-width: 420px; margin-top: 14px; }
+        .edit-form { background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: 10px; padding: 24px; max-width: 420px; margin-top: 14px; }
         .edit-form label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin: 15px 0 5px; text-transform: uppercase; letter-spacing: 0.05em; }
         .edit-form label:first-child { margin-top: 0; }
         .edit-form input, .edit-form select {
-            width: 100%; padding: 9px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 5px;
+            width: 100%; padding: 9px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 6px;
             background: var(--surface-2); color: var(--ink); font-family: var(--font-body);
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .edit-form input:focus, .edit-form select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
         .edit-form button { margin-top: 22px; }
 
-        .ai-analysis-results h2 { margin-top: 24px; font-size: 15px; }
-        .ai-empty { color: var(--muted); font-size: 13px; }
+        .mind-results h2 { margin-top: 24px; font-size: 15px; }
+        .mind-empty { color: var(--muted); font-size: 13px; }
+
+        /* Hub tiles */
+        .hub-hero {
+            position: relative; border-radius: 14px; overflow: hidden;
+            padding: 40px 32px; margin-bottom: 32px;
+            border: 1px solid var(--border);
+        }
+        .hub-hero::before {
+            content: ""; position: absolute; inset: 0;
+            background-image: url("/static/dashboard/adrianna-geo-1rBg5YSi00c-unsplash.jpg");
+            background-size: cover; background-position: 50% 30%;
+            opacity: 0.16; filter: saturate(0.85);
+        }
+        html[data-theme="light"] .hub-hero::before { opacity: 0.10; }
+        .hub-hero::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(180deg, transparent, var(--surface) 130%);
+        }
+        .hub-hero-content { position: relative; }
+        .hub-hero .eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+        .hub-hero h1 { font-size: 30px; margin-bottom: 8px; }
+        .hub-hero p { color: var(--muted); font-size: 14.5px; margin: 0; max-width: 480px; }
+
+        .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+        @media (max-width: 760px) { .tile-grid { grid-template-columns: 1fr; } }
+        .tile {
+            display: block; text-decoration: none; color: var(--ink);
+            background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+            padding: 24px; transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            animation: fadeInUp 0.4s ease both;
+        }
+        .tile:nth-child(2) { animation-delay: 0.05s; }
+        .tile:nth-child(3) { animation-delay: 0.1s; }
+        .tile:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 10px 28px var(--shadow); }
+        .tile .tile-icon { width: 30px; height: 30px; margin-bottom: 16px; color: var(--accent); }
+        .tile .tile-icon svg { width: 100%; height: 100%; }
+        .tile h3 { font-family: var(--font-display); font-size: 17px; margin: 0 0 6px; font-weight: 600; }
+        .tile p { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.5; }
+        .tile .tile-arrow { display: inline-flex; align-items: center; gap: 4px; margin-top: 14px; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+        .tile .tile-arrow svg { width: 13px; height: 13px; transition: transform 0.2s ease; }
+        .tile:hover .tile-arrow svg { transform: translateX(3px); }
+
+        .activity-strip { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .activity-strip .row {
+            display: flex; align-items: baseline; gap: 14px; padding: 12px 18px;
+            border-bottom: 1px solid var(--border-soft); font-size: 13px;
+        }
+        .activity-strip .row:last-child { border-bottom: none; }
+        .activity-strip .row .when { color: var(--muted); font-size: 11.5px; min-width: 90px; }
+        .activity-strip .row .what { font-weight: 500; }
+        .activity-strip .empty { padding: 18px; color: var(--muted); font-size: 13px; }
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -237,20 +308,23 @@
 </head>
 <body>
 <nav>
-    <div class="brand">
+    <a class="brand" href="{% url 'dashboard:index' %}">
         <span class="mark">E</span>
         <span class="word">Evidentia</span>
+    </a>
+    <div class="nav-links">
+        <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Home</a>
+        <a href="{% url 'dashboard:case_registry' %}" class="{% if request.resolver_match.url_name == 'case_registry' or request.resolver_match.url_name == 'case_detail' %}active{% endif %}">Case Registry</a>
+        <a href="{% url 'dashboard:document_list' %}" class="{% if request.resolver_match.url_name in 'document_list upload_document edit_document delete_document ai_document_analysis' %}active{% endif %}">Documents</a>
+        <a href="{% url 'dashboard:audit_log' %}" class="{% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}">Audit Log</a>
     </div>
-    <a href="{% url 'dashboard:index' %}">Case Overview</a>
-    <a href="{% url 'dashboard:document_list' %}">Documents</a>
-    <a href="{% url 'dashboard:audit_log' %}">Audit Log</a>
     <span class="nav-right">
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode">
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
             <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
         {% if current_username %}
-            {{ current_username }} ({{ current_role }})
+            <span class="user-chip">{{ current_username }} ({{ current_role }})</span>
             <a href="{% url 'dashboard:logout' %}">Log out</a>
         {% endif %}
     </span>

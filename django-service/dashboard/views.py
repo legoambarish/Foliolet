@@ -39,14 +39,42 @@ def logout_view(request):
 
 
 @spring_login_required
-def index(request):
+def hub(request):
     """
-    Case overview page: list of cases with document counts, plus the most
-    recent activity across all cases pulled from the audit log.
+    Home/landing hub: a quiet entry point with tiles into Case Registry,
+    Documents, and Audit Log, plus a small recent-activity glance. The
+    full case table used to live here — it now has its own page at
+    /cases/ so the root URL isn't doing double duty as a data table.
+    """
+    auth = request.session.get("sb_auth")
+    restricted = False
+    case_count = 0
+    recent_activity = []
 
-    /api/cases and /api/audit-log are ADMIN-only on the Spring Boot side,
-    so an OFFICER session will get rejected here, that is handled below
-    rather than left to crash the page.
+    try:
+        cases = api_client.get_cases(auth=auth)
+        case_count = len(cases)
+        recent_activity = api_client.get_audit_log(auth=auth)[:3]
+    except api_client.SpringBootAPIError:
+        restricted = True
+
+    context = {
+        "case_count": case_count,
+        "recent_activity": recent_activity,
+        "restricted": restricted,
+        "using_stub": api_client.USE_STUB,
+        "current_username": request.session.get("sb_username"),
+        "current_role": request.session.get("sb_role"),
+    }
+    return render(request, "dashboard/hub.html", context)
+
+
+@spring_login_required
+def case_registry(request):
+    """
+    Case Registry: list of cases with document counts, plus recent
+    activity across all cases. This is what used to render at the root
+    URL — same logic, new home at /cases/.
     """
     auth = request.session.get("sb_auth")
     restricted = False
@@ -67,8 +95,7 @@ def index(request):
         "current_username": request.session.get("sb_username"),
         "current_role": request.session.get("sb_role"),
     }
-    return render(request, "dashboard/index.html", context)
-
+    return render(request, "dashboard/case_registry.html", context)
 
 @spring_login_required
 def case_detail(request, case_id):
