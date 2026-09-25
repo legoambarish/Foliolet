@@ -104,7 +104,12 @@ This is a genuinely separate mechanism from the blockchain layer, no Ethereum, n
 
 The prototype now includes an AI analysis layer. This is separate from the tamper-evidence and recovery mechanisms above, it reads and summarizes a single document rather than checking its integrity.
 
-How it works:
+<img src="./images/EvidentiaMind.png" alt="Evidentia Mind showing the analysis result of a sample FIR written in kannada">
+
+The image displays the analysis result of an FIR written in Kannada.
+
+
+### How it works:
 
 - `POST /api/documents/{id}/analyze` loads the document's stored file, extracts its text (PDFBox for PDFs, a plain text read for anything else), and sends that text to an LLM via OpenRouter
 - The model is asked to return a summary, a list of key dates, a list of key parties, and a list of flagged clauses worth a reviewer's attention, all as structured JSON
