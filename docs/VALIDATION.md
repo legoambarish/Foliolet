@@ -8,6 +8,8 @@ These are local measurements of Foliolet's custodial commitment-verification imp
 
 Publication review covered the candidate source tree and 250 distinct historical blobs across 30 inherited commits. No provider-token or private-key-block findings remained; runtime keys, local databases, vault files, credentials, environment overrides and local validation screenshots are excluded. This is a bounded publication scan, not proof that arbitrary secrets can never occur in source.
 
+The submission deck retains the supplied template's seven-slide structure and 20 × 11.25-inch canvas. Package integrity, slide count, geometry and reference-font checks passed; all seven final slides were rendered and visually reviewed. The only geometry warning is the supplied cover's intentional background bleed. Speaker notes are included and the three screenshot slots are intentionally empty. Native PowerPoint playback/font rendering was not tested. Presentation packaging changes no application behavior.
+
 | Audit finding | Reproduction before its fix | Result |
 |---|---|---|
 | HIGH: extracted suggestions in signed sessions | Enrollment left private extracted values in decoded Django session data | Removed the session write. Draft review regenerates suggestions from the encrypted original; confirmation stops returning them. Migration purges retained copies, including expired rows; middleware purges legacy copies on access. |

@@ -18,7 +18,8 @@ statement, not a zero-knowledge inequality proof or proof of issuer truth.
 
 [Run guide](docs/RUN_GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) ·
 [Proof format](docs/PROTOCOL.md) · [Security](docs/SECURITY.md) ·
-[Validation](docs/VALIDATION.md)
+[Validation](docs/VALIDATION.md) ·
+[HackSprint presentation](submission/Foliolet-HackSprint-PS32.pptx)
 
 ## How it works
 
