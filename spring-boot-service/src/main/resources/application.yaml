@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: foliolet
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:55432/wallet_dev}
+    username: ${SPRING_DATASOURCE_USERNAME:wallet}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    properties:
+      hibernate.hbm2ddl.halt_on_error: true
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+dms:
+  storage:
+    location: ${DMS_STORAGE_LOCATION:../.local-data/legacy/files}
+  backup:
+    location: ${DMS_BACKUP_LOCATION:../.local-data/legacy/backups}
+blockchain:
+  rpc-url: ${BLOCKCHAIN_RPC_URL:http://127.0.0.1:8545}
+  expected-chain-id: ${BLOCKCHAIN_CHAIN_ID:1337}
+  private-key: ${BLOCKCHAIN_PRIVATE_KEY}
+  contract-address: ${BLOCKCHAIN_CONTRACT_ADDRESS:}
+  selective-contract-address: ${SELECTIVE_CONTRACT_ADDRESS:}
+wallet:
+  data-dir: ${WALLET_DATA_DIR:../.local-data}
+  encryption-key: ${WALLET_ENCRYPTION_KEY:}
+  share-base-url: ${WALLET_SHARE_BASE_URL:http://localhost:8000}
+openrouter:
+  api-key: ${OPENROUTER_API_KEY:}
+  model: ${OPENROUTER_MODEL:inclusionai/ling-3.0-flash-vl:free}

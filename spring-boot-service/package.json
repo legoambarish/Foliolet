@@ -1,5 +1,11 @@
 {
   "dependencies": {
-    "solc": "^0.8.19"
-  }
+    "solc": "0.8.19"
+  },
+  "devDependencies": {
+    "ethers": "6.15.0",
+    "ganache": "7.9.2"
+  },
+  "name": "foliolet-contract-tools",
+  "private": true
 }

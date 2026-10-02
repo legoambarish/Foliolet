@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "qrcode-generator": "1.4.4"
+  },
+  "private": true,
+  "scripts": {
+    "assets:build": "node tools/build-frontend-assets.cjs",
+    "contracts:build": "node spring-boot-service/scripts/compile-contracts.cjs",
+    "evm": "node spring-boot-service/scripts/local-evm.cjs",
+    "test:contracts": "node spring-boot-service/scripts/test-contracts.cjs",
+    "test:verifier": "node --test spring-boot-service/scripts/test-proof-security.cjs spring-boot-service/scripts/test-verifier-ui.cjs"
+  },
+  "name": "foliolet-workspace"
+}

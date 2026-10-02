@@ -33,6 +33,9 @@ public class AuditLog {
 //    we dont use a foreign key on audit log to link it to Document because when a document is deleted, the audit log must survive
     private Long documentId;
 
+    private String credentialId;
+    private String disclosureId;
+
     private String caseId;
 
     private String action;

@@ -50,50 +50,20 @@ public class BlockchainService {
     private final Web3j web3j;
     private final Credentials credentials;
     private final ContractGasProvider gasProvider;
-    private final RawTransactionManager transactionManager;
+    private final EvmGateway gateway;
 
     private String contractAddress;
 
     public BlockchainService(Web3j web3j, Credentials credentials, ContractGasProvider gasProvider,
-                              @Value("${blockchain.contract-address:}") String configuredAddress) throws Exception {
-        this.web3j = web3j;
-        this.credentials = credentials;
-        this.gasProvider = gasProvider;
-        long chainId = web3j.ethChainId().send().getChainId().longValue();
-        this.transactionManager = new RawTransactionManager(web3j, credentials, chainId);
-        this.contractAddress = configuredAddress;
+                              EvmGateway gateway, @Value("${blockchain.contract-address:}") String configuredAddress) {
+        this.web3j=web3j; this.credentials=credentials; this.gasProvider=gasProvider;
+        this.gateway=gateway; this.contractAddress=configuredAddress;
     }
 
     @PostConstruct
     public void init() throws Exception {
-        if (contractAddress == null || contractAddress.isBlank()) {
-            contractAddress = deployContract();
-            System.out.println("DocumentRegistry deployed at: " + contractAddress);
-            System.out.println("Set blockchain.contract-address=" + contractAddress
-                    + " in application.properties to reuse this deployment next time.");
-        }
-    }
-
-    private String deployContract() throws Exception {
-        String data = Numeric.prependHexPrefix(readContractBinary());
-
-        EthSendTransaction sendResponse = transactionManager.sendTransaction(
-                gasProvider.getGasPrice(), gasProvider.getGasLimit(), null, data, BigInteger.ZERO);
-
-        if (sendResponse.hasError()) {
-            throw new RuntimeException("Contract deployment failed: " + sendResponse.getError().getMessage());
-        }
-
-        TransactionReceipt receipt = new PollingTransactionReceiptProcessor(web3j, 1000, 40)
-                .waitForTransactionReceipt(sendResponse.getTransactionHash());
-
-        return receipt.getContractAddress();
-    }
-
-    private String readContractBinary() throws Exception {
-        try (InputStream is = new ClassPathResource("solidity/DocumentRegistry/DocumentRegistry.bin").getInputStream()) {
-            return new String(is.readAllBytes(), StandardCharsets.UTF_8).trim();
-        }
+        contractAddress=gateway.deployment("DocumentRegistry",contractAddress);
+        System.out.println("DocumentRegistry at: " + contractAddress);
     }
 
     public String storeDocumentHash(Long documentId, byte[] fileBytes, String caseId) throws Exception {
@@ -107,17 +77,7 @@ public class BlockchainService {
 
         String encodedFunction = FunctionEncoder.encode(function);
 
-        EthSendTransaction sendResponse = transactionManager.sendTransaction(
-                gasProvider.getGasPrice(), gasProvider.getGasLimit(), contractAddress, encodedFunction, BigInteger.ZERO);
-
-        if (sendResponse.hasError()) {
-            throw new RuntimeException("storeDocumentHash failed: " + sendResponse.getError().getMessage());
-        }
-
-        TransactionReceipt receipt = new PollingTransactionReceiptProcessor(web3j, 1000, 40)
-                .waitForTransactionReceipt(sendResponse.getTransactionHash());
-
-        return receipt.getTransactionHash();
+        return gateway.send(contractAddress, encodedFunction).getTransactionHash();
     }
 
     public boolean verifyDocumentHash(Long documentId, byte[] currentFileBytes) throws Exception {

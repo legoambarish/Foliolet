@@ -1,8 +1,8 @@
 {% extends "dashboard/base.html" %}
-{% block title %}{{ case.caseId }} - Evidentia{% endblock %}
+{% block title %}{{ case.caseId }} - Foliolet{% endblock %}
 
 {% block content %}
-<p><a href="{% url 'dashboard:index' %}">&larr; Back to Case Overview</a></p>
+<p><a href="{% url 'legacy:index' %}">&larr; Back to Case Overview</a></p>
 <h1>{{ case.title }}</h1>
 <p><strong>Case ID:</strong> {{ case.caseId }} &nbsp;|&nbsp; <strong>Status:</strong> {{ case.status }}</p>
 

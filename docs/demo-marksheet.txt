@@ -1,0 +1,5 @@
+Name: Demo Student
+CGPA: 9.17
+Institution: Example Institute
+Course: Computer Science
+Date of birth: 2004-01-02

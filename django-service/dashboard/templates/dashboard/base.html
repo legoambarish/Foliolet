@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Evidentia - Reporting Dashboard{% endblock %}</title>
+    <title>{% block title %}Foliolet - Reporting Dashboard{% endblock %}</title>
     <script>
         (function() {
             var stored = localStorage.getItem('evidentia-theme');
@@ -308,15 +308,15 @@
 </head>
 <body>
 <nav>
-    <a class="brand" href="{% url 'dashboard:index' %}">
+    <a class="brand" href="{% url 'legacy:index' %}">
         <span class="mark">E</span>
-        <span class="word">Evidentia</span>
+        <span class="word">Foliolet</span>
     </a>
     <div class="nav-links">
-        <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Home</a>
-        <a href="{% url 'dashboard:case_registry' %}" class="{% if request.resolver_match.url_name == 'case_registry' or request.resolver_match.url_name == 'case_detail' %}active{% endif %}">Case Registry</a>
-        <a href="{% url 'dashboard:document_list' %}" class="{% if request.resolver_match.url_name in 'document_list upload_document edit_document delete_document ai_document_analysis' %}active{% endif %}">Documents</a>
-        <a href="{% url 'dashboard:audit_log' %}" class="{% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}">Audit Log</a>
+        <a href="{% url 'legacy:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Home</a>
+        <a href="{% url 'legacy:case_registry' %}" class="{% if request.resolver_match.url_name == 'case_registry' or request.resolver_match.url_name == 'case_detail' %}active{% endif %}">Case Registry</a>
+        <a href="{% url 'legacy:document_list' %}" class="{% if request.resolver_match.url_name in 'document_list upload_document edit_document delete_document ai_document_analysis' %}active{% endif %}">Documents</a>
+        <a href="{% url 'legacy:audit_log' %}" class="{% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}">Audit Log</a>
     </div>
     <span class="nav-right">
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode">
@@ -325,7 +325,7 @@
         </button>
         {% if current_username %}
             <span class="user-chip">{{ current_username }} ({{ current_role }})</span>
-            <a href="{% url 'dashboard:logout' %}">Log out</a>
+            <a href="{% url 'legacy:logout' %}">Log out</a>
         {% endif %}
     </span>
 </nav>

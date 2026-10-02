@@ -24,7 +24,7 @@ def login_view(request):
             request.session["sb_auth"] = (username, password)
             request.session["sb_role"] = result.get("role")
             request.session["sb_username"] = result.get("username", username)
-            return redirect("dashboard:index")
+            return redirect("legacy:index")
         except api_client.SpringBootAuthError:
             error = "Invalid username or password."
         except api_client.SpringBootAPIError:
@@ -35,7 +35,7 @@ def login_view(request):
 
 def logout_view(request):
     request.session.flush()
-    return redirect("dashboard:login")
+    return redirect("legacy:login")
 
 
 @spring_login_required
@@ -228,7 +228,7 @@ def upload_document(request):
                     messages.warning(request, f"Uploaded, but with a concern: {warning}")
                 else:
                     messages.success(request, f"Uploaded '{uploaded_file.name}' to case {case_id}.")
-                return redirect("dashboard:document_list")
+                return redirect("legacy:document_list")
             except api_client.SpringBootAPIError:
                 error = "Could not reach the document service. Is Spring Boot running?"
 
@@ -257,7 +257,7 @@ def edit_document(request, document_id):
         try:
             api_client.update_document(document_id, case_id=case_id, document_type=document_type, auth=auth)
             messages.success(request, f"Updated document {document_id}.")
-            return redirect("dashboard:document_list")
+            return redirect("legacy:document_list")
         except api_client.SpringBootPermissionError:
             error = "You do not have permission to edit this document."
         except api_client.SpringBootAPIError:
@@ -289,7 +289,7 @@ def delete_document(request, document_id):
             messages.error(request, "You do not have permission to delete this document.")
         except api_client.SpringBootAPIError:
             messages.error(request, "Could not reach the document service. Is Spring Boot running?")
-        return redirect("dashboard:document_list")
+        return redirect("legacy:document_list")
 
     context = {
         "document_id": document_id,
@@ -321,7 +321,7 @@ def verify_document(request, document_id):
     except api_client.SpringBootAPIError:
         messages.error(request, "Could not reach the document service. Is Spring Boot running?")
 
-    return redirect("dashboard:document_list")
+    return redirect("legacy:document_list")
 
 @spring_login_required
 def ai_document_analysis(request, document_id):

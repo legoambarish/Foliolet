@@ -48,4 +48,28 @@ spring-boot-service/src/main/resources/application.properties
 .vscode/
 .DS_Store
 
-./spring-boot-service/node_modules
+spring-boot-service/node_modules/
+
+.venv/
+/node_modules/
+.local-data/
+.local-tools/
+**/__pycache__/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.sqlite
+*.sqlite3-*
+*.db
+.codex-finalizer/
+# Local validation captures may contain temporary account or bearer-link details.
+/docs/screenshots/
+tools/local-watcher/*state*.json
+tools/local-watcher/*config*.json
+*.sqlite3
+tools/local-watcher/agent-state.json

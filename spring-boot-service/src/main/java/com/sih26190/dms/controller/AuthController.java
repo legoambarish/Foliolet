@@ -30,8 +30,14 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
+        if (request.getRole() == null || request.getRole() == com.sih26190.dms.model.Role.ADMIN) {
+            return ResponseEntity.badRequest().body("Privileged roles cannot be self-registered");
+        }
+        if (!request.getUsername().matches("[a-zA-Z0-9_.-]{3,60}") || request.getPassword().length() < 12 || request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
+            return ResponseEntity.badRequest().body("Use a 3-60 character username and a 12-72 character password");
+        }
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            return ResponseEntity.badRequest().body("Username already exists");
+            return ResponseEntity.status(409).body("Username already exists");
         }
 
         User user = new User();
@@ -39,7 +45,15 @@ public class AuthController {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
 
-        userRepository.save(user);
+        try {
+            // The database arbitrates concurrent registrations; the precheck is only UX.
+            userRepository.saveAndFlush(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+            if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+                return ResponseEntity.status(409).body("Username already exists");
+            }
+            throw conflict;
+        }
 
         return ResponseEntity.ok("User registered");
     }

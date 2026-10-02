@@ -28,6 +28,17 @@ public class TextExtractionService {
         return text;
     }
 
+    public String extractBytes(byte[] bytes, String filename) throws IOException {
+        String lower=filename==null ? "" : filename.toLowerCase(java.util.Locale.ROOT);
+        String text;
+        if(lower.endsWith(".pdf")) {
+            try(PDDocument doc=Loader.loadPDF(bytes)) { text=new PDFTextStripper().getText(doc); }
+        } else if(lower.endsWith(".txt") || lower.endsWith(".csv")) {
+            text=new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        } else return "";
+        return text.substring(0,Math.min(text.length(),MAX_CHARS_FOR_LLM));
+    }
+
     private String extractFromPdf(Path filePath) throws IOException {
         try (PDDocument document = Loader.loadPDF(filePath.toFile())) {
             return new PDFTextStripper().getText(document);

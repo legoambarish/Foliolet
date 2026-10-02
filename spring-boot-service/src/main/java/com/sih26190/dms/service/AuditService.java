@@ -17,6 +17,12 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
+    public void logWallet(User user, String credentialId, String disclosureId, String action) {
+        AuditLog entry=new AuditLog(); entry.setUser(user); entry.setCredentialId(credentialId);
+        entry.setDisclosureId(disclosureId); entry.setAction(action); entry.setTimestamp(LocalDateTime.now());
+        auditLogRepository.save(entry);
+    }
+
     public void log(User user, DocumentRecord document, String action) {
         AuditLog entry = new AuditLog();
         entry.setUser(user);

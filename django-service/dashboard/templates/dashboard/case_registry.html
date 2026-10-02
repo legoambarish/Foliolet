@@ -1,5 +1,5 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Case Registry - Evidentia{% endblock %}
+{% block title %}Case Registry - Foliolet{% endblock %}
 
 {% block content %}
     <h1>Case Registry</h1>
@@ -16,7 +16,7 @@
         <tbody>
         {% for case in cases %}
             <tr>
-                <td><a href="{% url 'dashboard:case_detail' case.caseId %}">{{ case.caseId }}</a></td>
+                <td><a href="{% url 'legacy:case_detail' case.caseId %}">{{ case.caseId }}</a></td>
                 <td>{{ case.title }}</td>
                 <td>
                     {% if case.status == "OPEN" %}
@@ -51,7 +51,7 @@
                 <td>{{ entry.action }}</td>
                 <td>{{ entry.performedBy }}</td>
                 <td>{{ entry.documentId }}</td>
-                <td><a href="{% url 'dashboard:case_detail' entry.caseId %}">{{ entry.caseId }}</a></td>
+                <td><a href="{% url 'legacy:case_detail' entry.caseId %}">{{ entry.caseId }}</a></td>
             </tr>
             {% empty %}
             <tr><td colspan="5">No recent activity.</td></tr>

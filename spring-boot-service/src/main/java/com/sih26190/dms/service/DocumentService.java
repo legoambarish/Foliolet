@@ -60,7 +60,7 @@ public class DocumentService {
             Path directory = Paths.get(storageLocation);
             Files.createDirectories(directory);
 
-            String storedFileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            String storedFileName = UUID.randomUUID().toString();
             Path destination = directory.resolve(storedFileName);
             Files.write(destination, fileBytes);
 
@@ -105,7 +105,7 @@ public class DocumentService {
      * case no claim either way can be made).
      */
     private String checkAgainstCandidateHash(String filename, byte[] uploadedBytes, DocumentRecord saved, User uploader) {
-        Optional<CandidateHash> candidate = candidateHashRepository.findFirstByFilenameOrderByCapturedAtAsc(filename);
+        Optional<CandidateHash> candidate = candidateHashRepository.findFirstByFilenameAndOwnerIdOrderByCapturedAtAsc(filename, uploader.getId());
 
         if (candidate.isEmpty()) {
             return null;
@@ -139,8 +139,10 @@ public class DocumentService {
         }
     }
 
-    public void recordCandidateHash(String filename, String sha256Hash) {
+    public void recordCandidateHash(String filename, String sha256Hash, User owner) {
         CandidateHash candidateHash = new CandidateHash();
+        if (filename == null || filename.isBlank() || sha256Hash == null || !sha256Hash.matches("[0-9a-fA-F]{64}")) throw new IllegalArgumentException("Invalid fingerprint");
+        candidateHash.setOwnerId(owner.getId());
         candidateHash.setFilename(filename);
         candidateHash.setSha256Hash(sha256Hash);
         candidateHash.setCapturedAt(LocalDateTime.now());
@@ -208,6 +210,11 @@ public class DocumentService {
             message = "File matches the hash recorded on-chain at upload time.";
         } else if (document.getBackupFilePath() != null) {
             try {
+                byte[] backupBytes = Files.readAllBytes(Paths.get(document.getBackupFilePath()));
+                try {
+                    if (!blockchainService.verifyDocumentHash(id, backupBytes)) throw new IOException("Backup does not match anchor");
+                } catch (IOException e) { throw e; }
+                catch (Exception e) { throw new IOException("Cannot validate backup", e); }
                 Files.copy(
                         Paths.get(document.getBackupFilePath()),
                         Paths.get(document.getFilePath()),

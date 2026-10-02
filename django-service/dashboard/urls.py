@@ -1,20 +1,25 @@
 from django.urls import path, include
-from . import views
-
-app_name='dashboard'
-
-
+from django.conf import settings
+from . import wallet_views as views
+app_name = 'dashboard'
 urlpatterns = [
-    path('', views.hub, name='index'),
-    path('cases/', views.case_registry, name='case_registry'),
-    path("login/", views.login_view, name="login"),
-    path("logout/", views.logout_view, name="logout"),
-    path("cases/<str:case_id>/", views.case_detail, name="case_detail"),
-    path("documents/", views.document_list, name="document_list"),
-    path("documents/upload/", views.upload_document, name="upload_document"),
-    path("documents/<str:document_id>/edit/", views.edit_document, name="edit_document"),
-    path("documents/<str:document_id>/delete/", views.delete_document, name="delete_document"),
-    path("audit-log/", views.audit_log, name="audit_log"),
-    path("documents/<str:document_id>/verify/", views.verify_document, name="verify_document"),
-    path("documents/<str:document_id>/analysis/", views.ai_document_analysis, name="ai_document_analysis"),
+ path('', views.home, name='index'),
+ path('login/', views.login, name='login'),
+ path('register/', views.register, name='register'),
+ path('logout/', views.logout, name='logout'),
+ path('wallet/enroll/', views.enroll, name='enroll'),
+ path('wallet/<str:credential_id>/', views.detail, name='detail'),
+ path('wallet/<str:credential_id>/share/', views.compose, name='compose'),
+ path('wallet/<str:credential_id>/file/', views.original, name='original'),
+ path('wallet/<str:credential_id>/<str:action>/', views.document_action, name='document_action'),
+ path('versions/<str:previous_id>/', views.enroll, name='version'),
+ path('sharing/', views.sharing, name='sharing'),
+ path('sharing/<str:grant_id>/revoke/', views.revoke_share, name='revoke_share'),
+ path('integrity/', views.integrity, name='integrity'),
+ path('integrity/<str:agent_id>/revoke/', views.revoke_agent, name='revoke_agent'),
+ path('verify/<str:token>/', views.verify, name='verify'),
+ path('proof-status/<str:grant_id>/', views.proof_status, name='proof_status'),
+ path('proof-download/<str:grant_id>/', views.proof_download, name='proof_download'),
 ]
+if settings.ENABLE_LEGACY_UI:
+ urlpatterns.append(path('legacy/', include('dashboard.legacy_urls', namespace='legacy')))

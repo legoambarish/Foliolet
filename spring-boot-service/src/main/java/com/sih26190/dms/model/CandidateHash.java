@@ -32,6 +32,8 @@ public class CandidateHash {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long ownerId;
+
     private String filename;
 
     private String sha256Hash;

@@ -1,27 +1,16 @@
-#dont be dumb, rename this file to application.properties and also make sure you've added actual credentials
-
-spring.application.name=dms
-
-server.port=8080
-
-spring.datasource.url=<jdbc based db access url through postgres>
-spring.datasource.username=$USERNAME
-spring.datasource.password=$PASS
-
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-
-# Local folder where uploaded documents are stored for the prototype
-dms.storage.location=./uploaded-documents
-dms.backup.location=./document-backups
-
-spring.servlet.multipart.max-file-size=20MB
-spring.servlet.multipart.max-request-size=20MB
-
+# Optional legacy-compatible overrides. Normally use application.yaml and environment variables.
+# Copying this file to application.properties overrides YAML settings; review existing configuration first.
+# Do not commit real credentials or copy a development key to a public network.
+spring.datasource.url=jdbc:postgresql://127.0.0.1:55432/wallet_dev
+spring.datasource.username=wallet
+spring.datasource.password=
 blockchain.rpc-url=http://127.0.0.1:8545
-blockchain.private-key = <enter your private key obtained from ganache>
-blockchain.contract-address = <enter contact address displayed by the spring-boot-app upon startup>
-
-openrouter.api-key=sk-or-v1-....
-openrouter.model=inclusionai/ling-3.0-flash-vl:free #current best for text analysis and NLP
+blockchain.expected-chain-id=1337
+blockchain.private-key=${BLOCKCHAIN_PRIVATE_KEY}
+blockchain.contract-address=${BLOCKCHAIN_CONTRACT_ADDRESS:}
+blockchain.selective-contract-address=${SELECTIVE_CONTRACT_ADDRESS:}
+wallet.data-dir=../.local-data
+wallet.encryption-key=${WALLET_ENCRYPTION_KEY:}
+wallet.share-base-url=http://localhost:8000
+openrouter.api-key=${OPENROUTER_API_KEY:}
+openrouter.model=inclusionai/ling-3.0-flash-vl:free

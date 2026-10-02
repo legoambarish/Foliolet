@@ -1,10 +1,10 @@
 {% extends "dashboard/base.html" %}
-{% block title %}Documents - Evidentia{% endblock %}
+{% block title %}Documents - Foliolet{% endblock %}
 
 {% block content %}
     <div class="page-header">
         <h1>Documents</h1>
-        <a href="{% url 'dashboard:upload_document' %}" class="button">Upload Document</a>
+        <a href="{% url 'legacy:upload_document' %}" class="button">Upload Document</a>
     </div>
 
     <form method="get" class="filters">
@@ -37,16 +37,16 @@
         {% for doc in documents %}
             <tr>
                 <td>{{ doc.documentId }}</td>
-                <td><a href="{% url 'dashboard:case_detail' doc.caseId %}">{{ doc.caseId }}</a></td>
+                <td><a href="{% url 'legacy:case_detail' doc.caseId %}">{{ doc.caseId }}</a></td>
                 <td>{{ doc.title }}</td>
                 <td>{{ doc.documentType }}</td>
                 <td>{{ doc.uploadedBy }}</td>
                 <td>{{ doc.uploadedAt }}</td>
                 <td class="actions">
-                    <a href="{% url 'dashboard:edit_document' doc.documentId %}">Edit</a>
-                    <a href="{% url 'dashboard:verify_document' doc.documentId %}">Verify</a>
-                    <a href="{% url 'dashboard:ai_document_analysis' doc.documentId %}" class="mind-btn">Evidentia Mind</a>
-                    <a href="{% url 'dashboard:delete_document' doc.documentId %}" class="danger-link">Delete</a>
+                    <a href="{% url 'legacy:edit_document' doc.documentId %}">Edit</a>
+                    <a href="{% url 'legacy:verify_document' doc.documentId %}">Verify</a>
+                    <a href="{% url 'legacy:ai_document_analysis' doc.documentId %}" class="mind-btn">Foliolet legacy analysis</a>
+                    <a href="{% url 'legacy:delete_document' doc.documentId %}" class="danger-link">Delete</a>
                 </td>
             </tr>
             {% empty %}

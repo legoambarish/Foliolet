@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+import secrets
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +22,32 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-@f^u$zc#lre(k#(ydd9+_qjoypu8acj%c*e#qllrhi)n6teh@6"
+_private_dir = BASE_DIR.parent / '.local-data'
+_private_dir.mkdir(exist_ok=True)
+_key_file = _private_dir / 'django.key'
+if not os.environ.get('DJANGO_SECRET_KEY') and not _key_file.exists():
+    _key_file.write_text(secrets.token_urlsafe(48), encoding='utf-8')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or _key_file.read_text(encoding='utf-8')
+DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+ENABLE_LEGACY_UI = os.environ.get('ENABLE_LEGACY_UI', 'false').lower() == 'true'
+PRODUCT_LABEL = os.environ.get('PRODUCT_LABEL', 'Foliolet')
+PUBLIC_EVM_RPC_URL = os.environ.get('PUBLIC_EVM_RPC_URL', 'http://127.0.0.1:8545')
+# Separately provisioned by the demo operator. Never discover these from Spring or a bundle.
+import json
+_trust_file = Path(os.environ.get('WALLET_TRUST_FILE', _private_dir / 'trusted-deployment.json'))
+try:
+    TRUSTED_DEPLOYMENT = json.loads(_trust_file.read_text(encoding='utf-8'))
+    if not isinstance(TRUSTED_DEPLOYMENT, dict):
+        TRUSTED_DEPLOYMENT = {}
+except (OSError, ValueError):
+    TRUSTED_DEPLOYMENT = {}
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -43,6 +65,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "dashboard.wallet_security.PrivateResponseMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -76,7 +99,7 @@ WSGI_APPLICATION = "hermes.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": _private_dir / "django.sqlite3",
     }
 }
 
@@ -105,7 +128,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
 
@@ -130,4 +153,4 @@ import os
 
 # Spring Boot API integration (see dashboard/api_client.py)
 SPRING_BOOT_API_BASE_URL = os.environ.get("SPRING_BOOT_API_BASE_URL", "http://localhost:8080")
-USE_STUB_API = os.environ.get("DJANGO_USE_STUB_API", "true").lower() == "true"
+USE_STUB_API = os.environ.get("DJANGO_USE_STUB_API", "false").lower() == "true"

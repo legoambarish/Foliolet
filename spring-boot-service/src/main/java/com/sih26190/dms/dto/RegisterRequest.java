@@ -17,7 +17,6 @@ public class RegisterRequest {
     @NotBlank
     private String password;
 
-    @NotNull
-    private Role role;
+    private Role role = Role.HOLDER;
 
 }
