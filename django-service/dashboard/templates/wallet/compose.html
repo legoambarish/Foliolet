@@ -1,1 +1,78 @@
-{% extends 'wallet/base.html' %}{% load claim_kind %}{% block content %}{% if document %}<a class="back" href="{% url 'dashboard:detail' document.id %}">← {{ document.displayName }}</a><span class="eyebrow">SELECTIVE DISCLOSURE</span><h1>Share only what they need.</h1><p class="lead">Choose the facts. Set the context. Keep the rest in your wallet.</p>{% if document.status != 'ACTIVE' %}<div class="notice warning">Anchor an active document before sharing. <a href="{% url 'dashboard:detail' document.id %}">Review document</a></div>{% else %}<form method="post" id="compose-form"><div class="split">{% csrf_token %}<section class="panel"><h2>What do you want to disclose?</h2><div class="choice-list">{% for c in document.claims %}<label class="fact-choice"><input type="checkbox" name="claims" value="{{ c.id }}"><span><strong>{{ c.label }}</strong><small>{% if c|recognized_threshold %}Platform-derived from a holder-confirmed value. No ZK range proof.{% else %}Holder-authored statement; custom label{% endif %}</small><small>{{ c.path }} · {{ c.type }} · derivation: {{ c.derivedFrom|default:"none" }}</small></span><span class="fact-value">{{ c.value }}</span></label>{% endfor %}</div><label for="verifier">Intended verifier</label><input id="verifier" name="verifier_label" maxlength="150" placeholder="e.g. Acme Internship Team" required><label for="purpose">Purpose</label><input id="purpose" name="purpose" maxlength="250" placeholder="e.g. Internship eligibility" required><label for="expiry">Link validity</label><select id="expiry" name="expires_minutes"><option value="30">30 minutes</option><option value="60">1 hour</option><option value="1440">24 hours</option><option value="10080">7 days</option></select><label class="checkline"><input type="checkbox" name="one_time" value="yes">One-time release</label><p class="small muted">A one-time link releases facts once. The viewer can retain them. The verifier label records intent; it does not authenticate the recipient.</p><button class="button" id="create-proof" disabled>Create proof link →</button></section><aside class="panel preview-panel"><span class="eyebrow">DISCLOSURE PREVIEW</span><h2><span id="disclosed-count">0</span> fact<span id="plural">s</span> disclosed</h2><p><strong id="private-count">{{ document.claimCount }}</strong> facts stay private.</p><div class="privacy-bars" aria-hidden="true">{% for c in document.claims %}<span></span>{% endfor %}</div><div id="selected-preview" class="small muted">Select a fact to preview what the verifier receives.</div><hr><p class="small">The original file, unselected values and their salts are never sent to the verifier.</p><p class="small muted">The shared root and leaf count can correlate repeated presentations. This prototype does not provide unlinkability.</p></aside></div></form>{% endif %}{% endif %}{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_ui %}
+{% block title %}Share a proof · {{ product_label }}{% endblock %}
+{% block content %}
+{% if document %}
+<a class="crumb" href="{% url 'dashboard:detail' document.id %}">{{ document.displayName }}</a>
+<div class="page-head">
+  <div>
+    <h1>Share a proof</h1>
+    <p class="lede">Pick the facts this verifier needs. They receive those facts and a proof that each one is in your anchored document. They never receive the file or any fact you leave unchecked.</p>
+  </div>
+</div>
+{% if document.status != 'ACTIVE' %}
+<div class="notice warning"><strong>This document can't be shared yet</strong>Only an anchored, current version can be shared. <a href="{% url 'dashboard:detail' document.id %}">Go to the document</a></div>
+{% else %}
+<form method="post" id="compose-form" class="work">
+  {% csrf_token %}
+  <div class="stack-lg">
+    <fieldset class="sheet">
+      <legend class="sr-only">Facts to disclose</legend>
+      <div class="sheet-head"><h2>1. Choose facts</h2><span class="meta">{{ document.claimCount }} in this document</span></div>
+      <div class="choices">
+        {% for c in document.claims %}
+        <label class="choice">
+          <input type="checkbox" name="claims" value="{{ c.id }}" data-claim="{{ forloop.counter0 }}" {% if c.id in selected %}checked{% endif %}>
+          <span class="line">{% include 'wallet/_fact_line.html' %}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset class="sheet">
+      <legend class="sr-only">Disclosure terms</legend>
+      <div class="sheet-head"><h2>2. Set the terms</h2></div>
+      <div class="field section-tight">
+        <label for="verifier">Who is it for?</label>
+        <input id="verifier" name="verifier_label" maxlength="150" required aria-describedby="verifier-help" value="{{ form.verifier_label|default:'' }}">
+        <span class="help" id="verifier-help">E.g. “Acme internship team”. This records your intent and appears on the proof. It doesn't stop someone else from opening the link.</span>
+      </div>
+      <div class="field">
+        <label for="purpose">Why are you sharing it?</label>
+        <input id="purpose" name="purpose" maxlength="250" required value="{{ form.purpose|default:'' }}">
+      </div>
+      <fieldset class="field">
+        <legend>Link stays open for</legend>
+        <div class="segmented">
+          {% with chosen=form.expires_minutes|default:'1440' %}
+          <label><input type="radio" name="expires_minutes" value="30" {% if chosen == '30' %}checked{% endif %}>30 minutes</label>
+          <label><input type="radio" name="expires_minutes" value="60" {% if chosen == '60' %}checked{% endif %}>1 hour</label>
+          <label><input type="radio" name="expires_minutes" value="1440" {% if chosen == '1440' %}checked{% endif %}>24 hours</label>
+          <label><input type="radio" name="expires_minutes" value="10080" {% if chosen == '10080' %}checked{% endif %}>7 days</label>
+          {% endwith %}
+        </div>
+      </fieldset>
+      <label class="check section-tight"><input type="checkbox" name="one_time" value="yes" {% if form.one_time == 'yes' %}checked{% endif %}><span><strong>Release only once</strong>The first person to open the link sees the facts, and it closes after that. They can still keep what they saw.</span></label>
+    </fieldset>
+  </div>
+
+  <aside class="sticky stack" aria-labelledby="preview-title">
+    <h2 id="preview-title">What the verifier receives</h2>
+    <div class="slip" id="slip">
+      <div class="slip-to"><span>For</span><strong id="slip-to">{{ form.verifier_label|default:'(who it is for)' }}</strong><span id="slip-purpose">{{ form.purpose }}</span></div>
+      <ul class="lines" id="slip-lines">
+        {% for c in document.claims %}<li class="line" data-claim="{{ forloop.counter0 }}" hidden>{% include 'wallet/_fact_line.html' %}</li>{% endfor %}
+      </ul>
+      <p class="slip-empty" id="slip-empty">No facts chosen yet.</p>
+      <div class="tray">
+        <p class="tray-caption" id="withheld-caption" role="status"><strong id="private-count">{{ document.claimCount }}</strong> of {{ document.claimCount }} facts withheld</p>
+        <div class="redactions" aria-hidden="true">{% for w in document.claimCount|redactions %}<span class="redacted {{ w }}"></span>{% endfor %}</div>
+      </div>
+    </div>
+    <p class="help">Not sent: the original file, unchecked values and their salts. The verifier can see <em>how many</em> facts are committed, and repeat proofs from this version share a root, so they can be linked to each other.</p>
+    <button class="btn seal wide" id="create-proof">Create proof link</button>
+    <p class="help" id="create-help"><span id="disclosed-count">0</span> fact<span id="plural">s</span> selected.</p>
+  </aside>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,1 @@
+{% load wallet_ui %}<ol class="lifecycle" aria-label="Document lifecycle">{% for step in document|lifecycle %}<li class="{{ step.1 }}"{% if step.1 == 'now' %} aria-current="step"{% endif %}><span>{{ step.0 }}</span></li>{% endfor %}</ol>

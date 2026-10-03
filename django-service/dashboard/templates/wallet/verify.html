@@ -1,5 +1,174 @@
-{% extends 'wallet/base.html' %}{% load wallet_time claim_kind %}{% block title %}Verify disclosed facts · {{ product_label }}{% endblock %}{% block content %}<div class="verifier"><span class="eyebrow">A PROOF, WITHOUT THE ORIGINAL</span>{% if result %}<h1>Disclosed facts</h1><p class="lead">The service checked this presentation. Independently check the proof and chain below.</p><section class="panel revealed"><div class="topline"><span class="badge good">Service verification passed</span><span class="small muted">{{ result.bundle.claims|length }} fact{{ result.bundle.claims|length|pluralize }}</span></div>{% for c in result.bundle.claims %}<div class="revealed-fact"><span class="badge">{% if c.leaf|recognized_threshold %}Platform-derived threshold{% else %}Holder-authored statement{% endif %}</span><h2>{% if c.leaf|recognized_threshold %}CGPA at least 8.5{% else %}Custom label: {{ c.leaf.label }}{% endif %}</h2><strong>{{ c.leaf.value }}</strong><p class="small">Canonical path: <code>{{ c.leaf.path }}</code> · Type: <code>{{ c.leaf.type }}</code><br>Derivation: <code>{{ c.leaf.derivedFrom|default:"none (holder-authored)" }}</code></p>{% if c.leaf|recognized_threshold %}<p class="small muted">Precomputed by the platform from a holder-confirmed value. This proves inclusion of the boolean, not a zero-knowledge inequality or issuer truth.</p>{% endif %}</div>{% endfor %}<p class="privacy-line">◇ The original document was not shared.</p></section>
-<div class="split"><section class="panel"><h2>Disclosure context</h2><dl class="context"><dt>Intended for</dt><dd>{{ result.bundle.presentation.verifierLabel }}</dd><dt>Purpose</dt><dd>{{ result.bundle.presentation.purpose }}</dd><dt>Expires</dt><dd>{{ result.bundle.presentation.expiresAt|wallet_time }}</dd><dt>Release policy</dt><dd>{% if result.bundle.presentation.oneTime %}One-time service release{% else %}Reusable until expiry{% endif %}</dd><dt>Credential</dt><dd>Version {{ result.bundle.credentialVersion }}</dd></dl><p class="small muted">This is a bearer link. The verifier label describes the holder's intent; it does not establish your identity or prevent copying.</p></section><section class="panel tinted"><h2>Source assurance</h2><span class="badge">{% if result.bundle.provenance.level == 'FIRST_SEEN_TRACKED' %}First-seen tracked{% else %}Self-enrolled{% endif %}</span><p>{{ result.bundle.provenance.explanation }}</p>{% if result.bundle.provenance.firstReceivedAt %}<p class="small">First server observation: {{ result.bundle.provenance.firstReceivedAt|wallet_time }}<br>{{ result.bundle.provenance.observations }} received observations</p>{% endif %}<p class="small muted">First-seen tracking is a limited continuity/provenance signal, not independent issuer authenticity. A valid Merkle proof does not establish document truth or faithful extraction.</p></section></div>
-<section class="panel" id="independent-check"><h2>Verify independently</h2><p class="small muted">This browser recomputes the salted leaves, checks the platform's signed envelope and reads the registry directly from your chosen EVM RPC. Use a network endpoint you trust.</p><label for="rpc-url">EVM RPC URL</label><input id="rpc-url" type="url" value="{{ rpc_url }}"><label for="expected-contract">Trusted registry address</label><input id="expected-contract" value="{{ network.contract }}" required><label for="expected-operator">Trusted platform operator</label><input id="expected-operator" value="{{ network.operator }}" required><label for="expected-chain">Expected chain ID</label><input id="expected-chain" type="number" value="{{ network.chainId }}" required><p class="small muted">These pins come from separately provisioned Django-side configuration, never from Spring or this bundle. All three pins are required. Use independently trusted deployment addresses and an RPC you trust; missing or malformed pins fail closed.</p><div class="actions"><button type="button" id="verify-independent" class="button">Check proof and chain</button><a id="download-bundle" class="secondary" href="{% url 'dashboard:proof_download' result.bundle.presentation.grantId %}">Download proof bundle</a></div><div id="independent-result" role="status" class="notice">Independent check not run.</div><div id="policy-result" role="status" class="small muted"></div><p class="small muted">This is a custodial commitment-verification system. Independent verification checks cryptographic membership and pinned on-chain credential state. It does not independently establish holder authorization if the custodial platform is malicious. Disclosure authorization and policy remain enforced by the custodial service. A downloaded proof remains copyable; link expiry/revocation controls further service releases.</p></section>
-<details class="panel"><summary>Technical proof</summary><dl class="technical"><dt>Merkle root</dt><dd>{{ result.bundle.merkleRoot }}</dd><dt>Registry contract</dt><dd>{{ result.bundle.anchor.contract }}</dd><dt>Chain ID</dt><dd>{{ result.bundle.anchor.chainId }}</dd><dt>Anchor transaction</dt><dd>{{ result.bundle.anchor.txHash|default:'Recovered anchor: receipt hash unavailable' }}</dd><dt>Platform operator</dt><dd>{{ result.bundle.anchor.operator }}</dd></dl><pre id="proof-details"></pre></details>{{ result.bundle|json_script:'proof-bundle' }}
-{% else %}<h1>Someone shared a fact with you.</h1><p class="lead">Open their selective disclosure to see only the facts they chose, with a proof against an anchored commitment.</p>{% if not error %}<section class="panel"><h2>Ready to verify?</h2><p>No account is required. If this is a one-time link, the facts are released only after you press the button.</p><form method="post">{% csrf_token %}<button class="button">Open disclosed facts →</button></form><p class="small muted">You will not receive the original document.</p></section>{% else %}<p>The link could not be verified or released. No facts have been shown. Ask the holder for a current proof if needed.</p>{% endif %}{% endif %}</div>{% endblock %}{% block scripts %}{% if result %}{% load static %}<script src="{% static 'wallet/vendor/ethers.umd.min.js' %}" defer></script><script src="{% static 'wallet/proof-core.js' %}" defer></script><script src="{% static 'wallet/verify.js' %}" defer></script>{% endif %}{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_time wallet_ui static %}
+{% block title %}Verify disclosed facts · {{ product_label }}{% endblock %}
+{% block content %}
+{% if result %}{% with b=result.bundle v=result.verification p=result.bundle.presentation %}
+<div class="page-head">
+  <div>
+    <span class="kicker">Selective disclosure · credential version {{ b.credentialVersion }}</span>
+    <h1>{{ b.claims|length }} fact{{ b.claims|length|pluralize }} disclosed to you</h1>
+    <p class="lede">You received only the facts below, each with a proof that it is part of a committed document. The document itself was not shared. Read the checks to see what has been established, and by whom.</p>
+  </div>
+</div>
+
+<div class="work">
+  <section aria-labelledby="slip-title">
+    <h2 id="slip-title" class="sr-only">Disclosed facts</h2>
+    <div class="slip">
+      <div class="slip-to"><span>For</span><strong>{{ p.verifierLabel }}</strong><span id="slip-purpose">{{ p.purpose }}</span></div>
+      <ul class="lines">
+        {% for claim in b.claims %}{% with c=claim.leaf verifier=True %}<li class="line">{% include 'wallet/_fact_line.html' %}</li>{% endwith %}{% endfor %}
+      </ul>
+      {% with withheld=b|withheld %}
+      <div class="tray">
+        <p class="tray-caption">{{ withheld }} of {{ b.leafCount }} committed fact{{ b.leafCount|pluralize }} withheld. You can see how many, but not what they say.</p>
+        <div class="redactions" aria-hidden="true">{% for w in withheld|redactions %}<span class="redacted {{ w }}"></span>{% endfor %}</div>
+      </div>
+      {% endwith %}
+    </div>
+  </section>
+
+  <aside class="stack-lg">
+    <section class="stack" aria-labelledby="terms-title">
+      <h2 id="terms-title">Terms set by the holder</h2>
+      <dl class="kv">
+        <dt>Intended for</dt><dd>{{ p.verifierLabel }}</dd>
+        <dt>Purpose</dt><dd>{{ p.purpose }}</dd>
+        <dt>Created</dt><dd>{{ p.createdAt|wallet_time }}</dd>
+        <dt>Expires</dt><dd>{{ p.expiresAt|wallet_time }}</dd>
+        <dt>Release</dt><dd>{% if p.oneTime %}One-time: this was the release{% else %}Repeatable until expiry{% endif %}</dd>
+      </dl>
+      <p class="help">The “intended for” label records the holder's intent. It doesn't identify you, and it doesn't stop the link from being forwarded.</p>
+    </section>
+    <section class="stack" aria-labelledby="source-title">
+      <h2 id="source-title">Source assurance</h2>
+      {% with level=b.provenance.level %}{% include 'wallet/_ladder.html' with vertical=True %}{% endwith %}
+      <p class="help">{{ b.provenance.explanation }}</p>
+      {% if b.provenance.firstReceivedAt %}<p class="help">First observed by the service {{ b.provenance.firstReceivedAt|wallet_time }}, across {{ b.provenance.observations }} observation{{ b.provenance.observations|pluralize }}.</p>{% endif %}
+    </section>
+  </aside>
+</div>
+
+<section class="section" aria-labelledby="checks-title">
+  <div class="section-head">
+    <h2 id="checks-title">What has been checked</h2>
+    <p><span class="mark pass">Service verification passed</span>. <span id="ledger-summary">Your browser has not run its own check yet.</span></p>
+  </div>
+  <table class="ledger" id="ledger">
+    <thead><tr><th scope="col">Check</th><th scope="col">{{ product_label }} service</th><th scope="col">This browser</th></tr></thead>
+    <tbody>
+      <tr>
+        <th scope="row"><span class="check-name">Each fact belongs to the committed document</span><span class="check-desc">The salted fact hashes up to the document's Merkle root.</span></th>
+        <td><span class="cell-label">Service</span>{% if v.proofValid %}<span class="mark pass">Passed</span>{% else %}<span class="mark fail">Failed</span>{% endif %}</td>
+        <td><span class="cell-label">Browser</span><span class="mark quiet" data-browser-check>Not run</span></td>
+      </tr>
+      <tr>
+        <th scope="row"><span class="check-name">Presentation signed by the platform, unaltered and unexpired</span><span class="check-desc">Covers the terms, source assurance and expiry time above.</span></th>
+        <td><span class="cell-label">Service</span>{% if v.signatureValid %}<span class="mark pass">Passed</span>{% else %}<span class="mark fail">Failed</span>{% endif %}</td>
+        <td><span class="cell-label">Browser</span><span class="mark quiet" data-browser-check>Not run</span></td>
+      </tr>
+      <tr>
+        <th scope="row"><span class="check-name">Registry, operator and chain match trusted pins</span><span class="check-desc">Pins come from separately provisioned configuration, never from this proof or the service.</span></th>
+        <td><span class="cell-label">Service</span><span class="mark none">Can't vouch for itself</span></td>
+        <td><span class="cell-label">Browser</span><span class="mark quiet" data-browser-check>Not run</span></td>
+      </tr>
+      <tr>
+        <th scope="row"><span class="check-name">Commitment matches the on-chain record</span><span class="check-desc">Root, document commitment, assurance and version as stored in the registry contract.</span></th>
+        <td><span class="cell-label">Service</span>{% if v.anchorMatches %}<span class="mark pass">Passed</span>{% else %}<span class="mark fail">Failed</span>{% endif %}</td>
+        <td><span class="cell-label">Browser</span><span class="mark quiet" data-browser-check>Not run</span></td>
+      </tr>
+      <tr>
+        <th scope="row"><span class="check-name">Credential version is current</span><span class="check-desc">Not revoked and not superseded by a newer version on-chain.</span></th>
+        <td><span class="cell-label">Service</span>{% if v.current %}<span class="mark pass">Passed</span>{% else %}<span class="mark fail">Failed</span>{% endif %}</td>
+        <td><span class="cell-label">Browser</span><span class="mark quiet" data-browser-check>Not run</span></td>
+      </tr>
+      <tr class="limit">
+        <th scope="row"><span class="check-name">Link is open: not expired, not revoked, release allowed</span><span class="check-desc">Release policy is enforced by the custodial service.</span></th>
+        <td><span class="cell-label">Service</span>{% if v.policyActive %}<span class="mark pass">Passed</span>{% else %}<span class="mark fail">Failed</span>{% endif %}</td>
+        <td><span class="cell-label">Browser</span><span class="mark quiet" id="policy-cell">Not run</span></td>
+      </tr>
+      <tr class="limit">
+        <th scope="row"><span class="check-name">The holder authorized this disclosure</span><span class="check-desc">The custodial service enforces this. A browser can't prove it if the platform itself misbehaves.</span></th>
+        <td><span class="cell-label">Service</span><span class="mark caution">Enforced, not provable</span></td>
+        <td><span class="cell-label">Browser</span><span class="mark none">Not established</span></td>
+      </tr>
+      <tr class="limit">
+        <th scope="row"><span class="check-name">The facts are true / the document is genuine</span><span class="check-desc">No issuer signature is checked. See source assurance for what is known.</span></th>
+        <td><span class="cell-label">Service</span><span class="mark none">Not established</span></td>
+        <td><span class="cell-label">Browser</span><span class="mark none">Not established</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="section" id="independent-check" aria-labelledby="indep-title">
+  <div class="section-head"><h2 id="indep-title">Check it yourself</h2><p>Runs in this browser. It doesn't rely on the {{ product_label }} service.</p></div>
+  <div class="work">
+    <div class="sheet stack">
+      <p class="help">Your browser recomputes every salted fact, checks the platform's signature, and reads the registry directly over the RPC endpoint below. Check the three pins against a deployment record you trust before running it.</p>
+      <div class="field"><label for="rpc-url">EVM RPC endpoint</label><input id="rpc-url" type="url" value="{{ rpc_url }}" spellcheck="false"></div>
+      <div class="field"><label for="expected-contract">Trusted registry address</label><input id="expected-contract" value="{{ network.contract }}" required spellcheck="false" class="mono"></div>
+      <div class="field"><label for="expected-operator">Trusted platform operator</label><input id="expected-operator" value="{{ network.operator }}" required spellcheck="false" class="mono"></div>
+      <div class="field"><label for="expected-chain">Expected chain ID</label><input id="expected-chain" type="number" value="{{ network.chainId }}" required></div>
+      <div class="form-foot">
+        <button type="button" id="verify-independent" class="btn seal">Check proof and chain</button>
+        <a id="download-bundle" class="btn line" href="{% url 'dashboard:proof_download' p.grantId %}">Download proof (JSON)</a>
+      </div>
+      <div id="independent-result" role="status" class="notice">Independent check not run.</div>
+      <div id="policy-result" role="status" class="small muted"></div>
+    </div>
+    <aside class="stack">
+      <h3>Where the pins come from</h3>
+      <p class="help">The pins are prefilled from configuration that the operator of this verifier page provisioned separately. They are never read from the proof or from the {{ product_label }} API. If you have your own deployment record, replace them. A missing or malformed pin makes the check fail closed.</p>
+      <h3>Offline verification</h3>
+      <p class="help">The downloaded proof can be checked with the standalone Node verifier. That needs no account, no service and no original file. A downloaded proof can be copied, so link expiry only stops <em>new</em> releases.</p>
+      <h3>What this can't show</h3>
+      <p class="help">{{ product_label }} is a custodial commitment system. A passing independent check establishes membership, signature and current pinned chain state. It does not establish that the holder approved this release if the platform itself is malicious.</p>
+    </aside>
+  </div>
+</section>
+
+<details class="record section">
+  <summary>Technical record</summary>
+  <dl class="kv">
+    <dt>Format</dt><dd class="mono">{{ b.format }}</dd>
+    <dt>Credential ID</dt><dd class="mono">{{ b.credentialId }}</dd>
+    <dt>Merkle root</dt><dd class="mono">{{ b.merkleRoot }}</dd>
+    <dt>Leaf count</dt><dd class="mono">{{ b.leafCount }}</dd>
+    <dt>Registry contract</dt><dd class="mono">{{ b.anchor.contract }}</dd>
+    <dt>Platform operator</dt><dd class="mono">{{ b.anchor.operator }}</dd>
+    <dt>Chain ID</dt><dd class="mono">{{ b.anchor.chainId }}</dd>
+    <dt>Anchor transaction</dt><dd class="mono">{{ b.anchor.txHash|default:'Recovered anchor: receipt hash unavailable' }}</dd>
+    <dt>Anchored</dt><dd>{{ b.anchor.anchoredAt|wallet_time }}</dd>
+    <dt>Envelope hash</dt><dd class="mono">{{ b.envelopeHash }}</dd>
+    <dt>Service message</dt><dd>{{ v.message }}</dd>
+  </dl>
+  <pre class="json" id="proof-details" tabindex="0" aria-label="Full proof JSON"></pre>
+</details>
+{{ b|json_script:'proof-bundle' }}
+{% endwith %}
+
+{% else %}
+<div class="page-narrow">
+  <div class="page-head">
+    <div>
+      <span class="kicker">Selective disclosure</span>
+      <h1>Someone shared facts with you</h1>
+      <p class="lede">The holder chose specific facts from one of their documents. You'll see only those facts, each with a proof against an anchored commitment. You won't receive the document itself.</p>
+    </div>
+  </div>
+  {% if not error %}
+  <section class="sheet stack" aria-labelledby="open-title">
+    <h2 id="open-title">Open the disclosure</h2>
+    <p class="help">No account needed. Nothing has been released yet. If this is a one-time link, opening it uses it up, so open it when you're ready to record the facts.</p>
+    <form method="post">{% csrf_token %}<button class="btn seal">Open disclosed facts</button></form>
+  </section>
+  {% else %}
+  <section class="sheet stack">
+    <h2>This disclosure can't be opened</h2>
+    <p>The link could not be verified or released. No facts have been shown. It may have expired, been revoked or already been used. Ask the holder for a new proof link if you still need it.</p>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if result %}<script src="{% asset 'wallet/vendor/ethers.umd.min.js' %}" defer></script><script src="{% asset 'wallet/proof-core.js' %}" defer></script><script src="{% asset 'wallet/verify.js' %}" defer></script>{% endif %}{% endblock %}

@@ -178,10 +178,15 @@ def compose(request, credential_id):
                 "credentialId": credential_id, "claimIds": request.POST.getlist("claims"),
                 "verifierLabel": request.POST.get("verifier_label", ""), "purpose": request.POST.get("purpose", ""),
                 "expiresInMinutes": minutes, "oneTime": request.POST.get("one_time") == "yes"})
-            return page(request, "share_ready", share=result)
+            terms = {"verifier": request.POST.get("verifier_label", ""), "purpose": request.POST.get("purpose", ""),
+                     "one_time": request.POST.get("one_time") == "yes"}
+            return page(request, "share_ready", share=result, terms=terms)
     except (api.WalletAPIError, ValueError) as exc:
         error = str(exc) if isinstance(exc, api.WalletAPIError) else "Choose a valid expiry."
-    return page(request, "compose", document=doc, error=error)
+    # Re-render submitted choices after a failure; GET shows a clean composer.
+    form = request.POST if request.method == "POST" else {}
+    selected = request.POST.getlist("claims") if request.method == "POST" else []
+    return page(request, "compose", document=doc, error=error, form=form, selected=selected)
 
 
 @spring_login_required
@@ -192,7 +197,18 @@ def sharing(request):
         events = api.call("GET", "/api/wallet/activity", request.session["sb_auth"])
     except api.WalletAPIError as exc:
         error = str(exc)
-    return page(request, "sharing", grants=grants, events=events, error=error)
+    try:
+        # Display names only; a failure here leaves the raw grant list usable.
+        names = {d["id"]: d["displayName"] for d in api.call("GET", "/api/wallet/documents", request.session["sb_auth"])}
+    except (api.WalletAPIError, TypeError, KeyError):
+        names = {}
+    for g in grants:
+        g["documentName"] = names.get(g.get("credentialId"))
+    for e in events:
+        e["documentName"] = names.get(e.get("credentialId"))
+    open_grants = [g for g in grants if g.get("status") == "ACTIVE"]
+    closed_grants = [g for g in grants if g.get("status") != "ACTIVE"]
+    return page(request, "sharing", grants=grants, open_grants=open_grants, closed_grants=closed_grants, events=events, error=error)
 
 
 @spring_login_required

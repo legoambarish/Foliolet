@@ -1,1 +1,30 @@
-{% extends 'wallet/base.html' %}{% block title %}Sign in · {{ product_label }}{% endblock %}{% block content %}<div class="auth-layout"><section><div class="eyebrow">A little less disclosure.</div><h1 class="hero-title">Keep your documents.<br>Share what matters.</h1><p class="lead">A private place for your documents, with verifiable proofs for the facts you choose to share.</p><div class="mini-flow"><span>Document</span><span>→</span><span>Selected fact</span><span>→</span><span>Verified commitment</span></div></section><section class="panel auth-panel"><h2>Welcome back</h2><p class="muted">Sign in to your private wallet.</p><form method="post">{% csrf_token %}<label for="username">Username</label><input id="username" name="username" autocomplete="username" required autofocus><label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password" required><button class="button wide" type="submit">Sign in</button></form><p class="small">New here? <a href="{% url 'dashboard:register' %}">Create an account</a></p></section></div>{% endblock %}
+{% extends 'wallet/base.html' %}
+{% block title %}Sign in · {{ product_label }}{% endblock %}
+{% block content %}
+<div class="auth">
+  <section class="auth-intro">
+    <h1>Prove one fact. <em class="accent">Keep the document.</em></h1>
+    <p class="lede">{{ product_label }} keeps your documents private. When someone needs a single fact from one, you send them that fact and a proof, not the whole file.</p>
+    {% include 'wallet/_example_slip.html' %}
+  </section>
+  <section class="sheet auth-form" aria-labelledby="signin-title">
+    <h2 id="signin-title">Sign in</h2>
+    <p class="help">Your documents and sharing controls.</p>
+    <form method="post" class="stack">
+      {% csrf_token %}
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required autofocus value="{{ request.POST.username|default:'' }}">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" autocomplete="current-password" required>
+      </div>
+      <div class="form-foot">
+        <button class="btn" type="submit">Sign in</button>
+        <span class="help">No account? <a href="{% url 'dashboard:register' %}">Create one</a></span>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

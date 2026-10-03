@@ -1,0 +1,16 @@
+{# Static illustration of the product's own output. Clearly labelled as an example. #}
+<figure class="slip auth-demo" aria-labelledby="example-caption">
+  <div class="slip-to"><span>Example disclosure · for an internship team</span><strong>Semester marksheet</strong></div>
+  <ul class="lines">
+    <li class="line">
+      <span class="line-label">CGPA at least 8.5</span>
+      <span class="line-value">true</span>
+      <span class="line-meta"><span class="origin derived">Platform-derived</span><span>from a holder-confirmed CGPA</span></span>
+    </li>
+  </ul>
+  <div class="tray">
+    <p class="tray-caption">5 facts withheld. The verifier sees how many, never what they say.</p>
+    <div class="redactions" aria-hidden="true">{% for w in "123456"|make_list|slice:":5" %}<span class="redacted w{{ w }}"></span>{% endfor %}</div>
+  </div>
+  <figcaption id="example-caption" class="help slip-note">What a verifier receives: one fact, its proof, and nothing else from the file.</figcaption>
+</figure>

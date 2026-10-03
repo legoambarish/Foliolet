@@ -1,4 +1,51 @@
-{% extends 'wallet/base.html' %}{% block content %}<div class="topline"><span class="eyebrow">YOUR PRIVATE SPACE</span><a class="button" href="{% url 'dashboard:enroll' %}">+ Enroll a document</a></div><h1>Your document wallet</h1><p class="lead">Everything you need to prove. Only what you choose to reveal.</p>
-<div class="stats"><div><strong>{{ document_count }}</strong><span>Documents enrolled</span></div><div><strong>{{ active_count }}</strong><span>Active commitments</span></div><div><strong>{{ fact_count }}</strong><span>Confirmed facts</span></div></div>
-<form method="get" class="searchbar"><label class="sr-only" for="search">Search documents</label><input id="search" name="q" placeholder="Search your documents" value="{{ query }}"><label class="sr-only" for="category">Category</label><select id="category" name="category"><option value="">Every category</option>{% for c in categories %}<option {% if category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select><button class="secondary">Filter</button></form>
-<div class="document-grid">{% for d in documents %}<article class="document-card"><div class="card-top"><span class="doc-icon" aria-hidden="true">▤</span><span class="badge {% if d.status == 'ACTIVE' %}good{% endif %}">{{ d.status }}</span></div><span class="eyebrow muted">{{ d.category }}</span><h2><a href="{% url 'dashboard:detail' d.id %}">{{ d.displayName }}</a></h2><p class="small muted">Version {{ d.version }} · {{ d.claimCount }} fact{{ d.claimCount|pluralize }}</p><p class="assurance">{% if d.provenanceLevel == 'FIRST_SEEN_TRACKED' %}◇ First-seen tracked{% else %}◌ Self-enrolled{% endif %}</p><div class="card-actions"><a href="{% url 'dashboard:detail' d.id %}">{% if d.status == 'DRAFT' %}Confirm facts{% else %}View facts{% endif %} →</a>{% if d.status == 'ACTIVE' %}<a class="secondary" href="{% url 'dashboard:compose' d.id %}">Share proof</a>{% endif %}</div></article>{% empty %}<section class="empty"><span class="doc-icon">▤</span><h2>{% if query or category %}No matching documents{% else %}Your first proof starts here{% endif %}</h2><p>Enroll a document, confirm its facts and anchor the commitment. You choose what to share later.</p><a class="button" href="{% url 'dashboard:enroll' %}">Enroll a document</a></section>{% endfor %}</div>{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_ui %}
+{% block title %}Documents · {{ product_label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Your documents</h1>
+    <p class="lede">{% if document_count %}{{ document_count }} document{{ document_count|pluralize }}, {{ active_count }} ready to share, {{ fact_count }} confirmed fact{{ fact_count|pluralize }} in total.{% else %}Documents you enroll stay encrypted here. You decide later which facts from them to share.{% endif %}</p>
+  </div>
+  <a class="btn" href="{% url 'dashboard:enroll' %}">Enroll a document</a>
+</div>
+
+{% if document_count %}
+<form method="get" class="toolbar" role="search" aria-label="Filter documents">
+  <div class="field"><label for="search">Search by name</label><input id="search" name="q" value="{{ query }}" type="search"></div>
+  <div class="field narrow"><label for="category">Category</label>
+    <select id="category" name="category"><option value="">All categories</option>{% for c in categories %}<option {% if category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+  </div>
+  <button class="btn line">Apply</button>
+  {% if query or category %}<a class="btn quiet" href="{% url 'dashboard:index' %}">Clear</a>{% endif %}
+</form>
+{% endif %}
+
+{% if documents %}
+<div class="register-head" aria-hidden="true"><span>Document</span><span>State</span><span>Source assurance</span><span></span></div>
+<ul class="register" aria-label="Documents">
+  {% for d in documents %}{% with state=d|doc_state %}
+  <li class="cat-{{ d.category|lower }}">
+    <div class="register-name">
+      <a href="{% url 'dashboard:detail' d.id %}">{{ d.displayName }}</a>
+      <span class="meta">{{ d.category }} · version {{ d.version }} · {{ d.claimCount }} fact{{ d.claimCount|pluralize }}</span>
+    </div>
+    <div class="register-col"><span class="k">State</span><span class="mark {{ state.1 }}">{{ state.0 }}</span></div>
+    <div class="register-col"><span class="k">Source assurance</span>{% if d.provenanceLevel|first_seen %}<span class="mark seal">First-seen tracked</span>{% else %}<span class="mark none">Self-enrolled</span>{% endif %}</div>
+    <div class="register-act">
+      {% if d.status == 'ACTIVE' %}<a class="btn small seal" href="{% url 'dashboard:compose' d.id %}">Share a proof</a>
+      {% elif d.status == 'DRAFT' or d.status == 'ANCHOR_PENDING' %}<a class="btn small line" href="{% url 'dashboard:detail' d.id %}">{{ state.2 }}</a>
+      {% else %}<a class="btn small quiet" href="{% url 'dashboard:detail' d.id %}">Open</a>{% endif %}
+    </div>
+  </li>
+  {% endwith %}{% endfor %}
+</ul>
+{% elif query or category %}
+<section class="empty"><h2>No documents match</h2><p>Nothing is named “{{ query|default:'…' }}”{% if category %} in {{ category }}{% endif %}.</p><a class="btn line" href="{% url 'dashboard:index' %}">Show all documents</a></section>
+{% elif not error %}
+<section class="empty">
+  <h2>No documents yet</h2>
+  <p>Start with a document you are often asked to show, like a marksheet, payslip or invoice. You will check the facts in it before anything is committed.</p>
+  <a class="btn" href="{% url 'dashboard:enroll' %}">Enroll your first document</a>
+</section>
+{% endif %}
+{% endblock %}

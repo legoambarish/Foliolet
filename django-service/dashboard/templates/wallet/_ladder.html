@@ -1,0 +1,15 @@
+{# Assurance ladder (DESIGN.md §9). Expects `level`: SELF_ENROLLED | FIRST_SEEN_TRACKED | None (explainer). #}
+<ol class="ladder{% if vertical %} vertical{% endif %}" aria-label="Source assurance levels">
+  <li class="{% if level == 'SELF_ENROLLED' %}here{% elif level == 'FIRST_SEEN_TRACKED' %}done{% endif %}"{% if level == 'SELF_ENROLLED' %} aria-current="step"{% endif %}>
+    <span class="rung">Self-enrolled</span>
+    <p>The holder confirmed the facts. The commitment proves they were committed, not that they are true.</p>
+  </li>
+  <li class="{% if level == 'FIRST_SEEN_TRACKED' %}here{% endif %}"{% if level == 'FIRST_SEEN_TRACKED' %} aria-current="step"{% endif %}>
+    <span class="rung">First-seen tracked</span>
+    <p>Enrolled bytes matched what the holder's own paired agent recorded earlier. This shows continuity, not that the issuer is genuine.</p>
+  </li>
+  <li class="unavailable">
+    <span class="rung">Issuer-verified</span>
+    <p>Not available in this version. It would require validating the issuer's signature on the source.</p>
+  </li>
+</ol>

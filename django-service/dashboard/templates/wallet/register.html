@@ -1,1 +1,40 @@
-{% extends 'wallet/base.html' %}{% block content %}<div class="auth-layout"><section><div class="eyebrow">Your wallet, your choices</div><h1 class="hero-title">Start with a document.<br>Share a proof.</h1><p class="lead">Education, purchases, employment and more. No document category is tied to a case or profession.</p></section><section class="panel auth-panel"><h2>Create your account</h2><form method="post">{% csrf_token %}<label for="username">Username</label><input id="username" name="username" pattern="[a-zA-Z0-9_.-]{3,60}" maxlength="60" autocomplete="username" required><label for="password">Password</label><input id="password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" required><p class="small muted">12–72 characters. Use a unique password.</p><label for="confirm">Confirm password</label><input id="confirm" type="password" name="confirm_password" autocomplete="new-password" required><button class="button wide">Create account</button></form><p><a href="{% url 'dashboard:login' %}">Already have an account?</a></p></section></div>{% endblock %}
+{% extends 'wallet/base.html' %}
+{% block title %}Create account · {{ product_label }}{% endblock %}
+{% block content %}
+<div class="auth">
+  <section class="auth-intro">
+    <h1>A private place for documents you <em class="accent">prove things with.</em></h1>
+    <p class="lede">Marksheets, payslips, invoices, letters. Enroll a document once and confirm the facts in it. After that, each time someone asks, you can share just the fact they need.</p>
+    <ol class="explain auth-demo">
+      <li><span class="n">1</span><div><strong>Enroll</strong><p>Your file is encrypted in private storage. It never goes on-chain.</p></div></li>
+      <li><span class="n">2</span><div><strong>Confirm facts</strong><p>You check each suggested fact against the original before it is committed.</p></div></li>
+      <li><span class="n">3</span><div><strong>Share a proof</strong><p>Pick the facts, who they are for and how long the link lasts.</p></div></li>
+    </ol>
+  </section>
+  <section class="sheet auth-form" aria-labelledby="register-title">
+    <h2 id="register-title">Create your account</h2>
+    <p class="help">No email needed. Keep your password somewhere safe; it can't be recovered here.</p>
+    <form method="post" class="stack">
+      {% csrf_token %}
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" pattern="[a-zA-Z0-9_.-]{3,60}" maxlength="60" autocomplete="username" required aria-describedby="username-help" value="{{ request.POST.username|default:'' }}">
+        <span class="help" id="username-help">3–60 characters: letters, numbers, dot, dash or underscore.</span>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" required aria-describedby="password-help">
+        <span class="help" id="password-help">12–72 characters. Use one you don't use anywhere else.</span>
+      </div>
+      <div class="field">
+        <label for="confirm">Confirm password</label>
+        <input id="confirm" type="password" name="confirm_password" minlength="12" maxlength="72" autocomplete="new-password" required>
+      </div>
+      <div class="form-foot">
+        <button class="btn" type="submit">Create account</button>
+        <span class="help">Have one? <a href="{% url 'dashboard:login' %}">Sign in</a></span>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

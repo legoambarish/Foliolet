@@ -1,1 +1,41 @@
-{% extends 'wallet/base.html' %}{% load wallet_time %}{% block content %}<span class="eyebrow">DISCLOSURE CONTROL</span><h1>Sharing activity</h1><p class="lead">Who each proof was intended for, why it was shared and when the service released it.</p>{% for g in grants %}<article class="panel grant"><div class="topline"><h2>{{ g.verifierLabel }}</h2><span class="badge {% if g.status == 'ACTIVE' %}good{% endif %}">{{ g.status }}</span></div><p>{{ g.purpose }}</p><p class="small muted">{{ g.views }} release{{ g.views|pluralize }} · {% if g.oneTime %}One-time{% else %}Reusable until expiry{% endif %} · Expires {{ g.expiresAt|wallet_time }}</p><div class="actions"><a href="{% url 'dashboard:detail' g.credentialId %}">Source document →</a>{% if g.status != 'REVOKED' %}<form method="post" action="{% url 'dashboard:revoke_share' g.id %}">{% csrf_token %}<button class="secondary">Revoke link</button></form>{% endif %}</div>{% if g.receipts %}<details><summary>Verification receipts</summary>{% for r in g.receipts %}<p class="small">{{ r.verifiedAt|wallet_time }} · {{ r.result }}</p>{% endfor %}</details>{% endif %}</article>{% empty %}<section class="empty"><h2>You have not shared a proof yet.</h2><p>Open an active document to choose a fact and create a scoped link.</p><a class="button" href="{% url 'dashboard:index' %}">Open wallet</a></section>{% endfor %}<section class="panel"><h2>Wallet audit history</h2><p class="small muted">Application audit records. These records are stored in PostgreSQL; they are not an immutable blockchain audit log.</p><div class="event-list">{% for e in events %}<div><span>{{ e.action }}</span><time>{{ e.timestamp|wallet_time }}</time></div>{% empty %}<p class="muted">No activity recorded.</p>{% endfor %}</div></section>{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_time wallet_ui %}
+{% block title %}Shared · {{ product_label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Shared</h1>
+    <p class="lede">Every proof link you've created: who it's for, why, and whether it can still release facts. Closing a link stops new releases. It can't take back facts already seen.</p>
+  </div>
+</div>
+
+{% if not open_grants and not closed_grants and not error %}
+<section class="empty">
+  <h2>You haven't shared anything yet</h2>
+  <p>Open an anchored document and choose “Share a proof”. You'll pick the facts, who they're for and how long the link lasts.</p>
+  <a class="btn" href="{% url 'dashboard:index' %}">Go to documents</a>
+</section>
+{% endif %}
+
+{% if open_grants %}
+<section aria-labelledby="open-title">
+  <div class="section-head"><h2 id="open-title">Open links</h2><p>{{ open_grants|length }} can still release facts</p></div>
+  <ul class="grants">{% for g in open_grants %}{% include 'wallet/_grant.html' %}{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if closed_grants %}
+<section class="section" aria-labelledby="closed-title">
+  <div class="section-head"><h2 id="closed-title">Closed links</h2><p>Used, expired, revoked, or their source credential is no longer current. These can't release facts again.</p></div>
+  <ul class="grants">{% for g in closed_grants %}{% include 'wallet/_grant.html' %}{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="section" aria-labelledby="history-title">
+  <div class="section-head"><h2 id="history-title">Account history</h2><p>Kept in the application database, not on-chain.</p></div>
+  {% if events %}
+  <ol class="timeline">
+    {% for e in events %}<li><time datetime="{{ e.timestamp }}">{{ e.timestamp|wallet_time }}</time><span>{{ e.action|event_label }}{% if e.documentName %} · <a href="{% url 'dashboard:detail' e.credentialId %}">{{ e.documentName }}</a>{% endif %}</span></li>{% endfor %}
+  </ol>
+  {% else %}<p class="help">No activity recorded yet.</p>{% endif %}
+</section>
+{% endblock %}

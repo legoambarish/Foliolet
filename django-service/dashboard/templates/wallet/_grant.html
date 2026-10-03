@@ -1,0 +1,25 @@
+{% load wallet_time wallet_ui %}{% with state=g.status|grant_state %}
+<li class="grant{% if g.status != 'ACTIVE' %} inactive{% endif %}">
+  <div class="stack-sm">
+    <p class="grant-to">{{ g.verifierLabel }}</p>
+    <p class="grant-purpose">{{ g.purpose }}</p>
+  </div>
+  <div class="grant-side">
+    <span class="mark {{ state.1 }}">{{ state.0 }}</span>
+    {% if g.status == 'ACTIVE' %}<form method="post" action="{% url 'dashboard:revoke_share' g.id %}">{% csrf_token %}<button class="btn danger small">Revoke link</button></form>{% endif %}
+  </div>
+  <div class="grant-terms">
+    <span><b>From</b> {% if g.documentName %}<a href="{% url 'dashboard:detail' g.credentialId %}">{{ g.documentName }}</a>{% else %}<a href="{% url 'dashboard:detail' g.credentialId %}">source document</a>{% endif %}</span>
+    <span><b>Created</b> {{ g.createdAt|wallet_time }}</span>
+    <span><b>{% if g.status == 'EXPIRED' %}Expired{% else %}Expires{% endif %}</b> {{ g.expiresAt|wallet_time }}</span>
+    <span><b>Release</b> {% if g.oneTime %}once{% else %}repeatable{% endif %}</span>
+    <span><b>Opened</b> {{ g.views }} time{{ g.views|pluralize }}</span>
+  </div>
+  {% if g.receipts %}
+  <details>
+    <summary>Release receipts ({{ g.receipts|length }})</summary>
+    <ol class="timeline">{% for r in g.receipts %}<li><time datetime="{{ r.verifiedAt }}">{{ r.verifiedAt|wallet_time }}</time><span>{% if r.result == 'VERIFIED_RELEASE' %}Facts released after the service's checks passed{% else %}{{ r.result }}{% endif %}</span></li>{% endfor %}</ol>
+  </details>
+  {% endif %}
+</li>
+{% endwith %}

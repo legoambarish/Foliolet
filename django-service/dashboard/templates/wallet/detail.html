@@ -1,7 +1,122 @@
-{% extends 'wallet/base.html' %}{% load claim_kind %}{% block content %}<a class="back" href="{% url 'dashboard:index' %}">← Wallet</a>{% if document %}<div class="topline"><span class="eyebrow">{{ document.category }} · VERSION {{ document.version }}</span><span class="badge {% if document.status == 'ACTIVE' %}good{% endif %}">{{ document.status }}</span></div><h1>{{ document.displayName }}</h1><p class="lead">Your original document stays private. These are the facts available for disclosure.</p>
-<div class="notice {% if document.provenanceLevel == 'FIRST_SEEN_TRACKED' %}success{% else %}warning{% endif %}"><strong>{% if document.provenanceLevel == 'FIRST_SEEN_TRACKED' %}First-seen tracked{% else %}Self-enrolled{% endif %}</strong><p>{{ document.provenance.explanation }}</p></div>
-{% if document.status == 'DRAFT' %}{% if document.merkleRoot %}<details class="panel"><summary>Edit confirmed draft facts</summary>{% endif %}<section class="panel"><div class="eyebrow">STEP 2 OF 3</div><h2>Review and confirm facts</h2><p class="muted">Suggestions are editable conveniences. Check them against your original. A Merkle proof associates these statements with the file commitment; it does not prove they were extracted faithfully.</p><form method="post" id="claim-form">{% csrf_token %}<div class="fact-rows" id="fact-rows">{% for c in claim_rows %}<div class="fact-row"><label>Fact path<input name="claim_path" value="{{ c.path }}" placeholder="education.cgpa" maxlength="100"></label><label>Display label<input name="claim_label" value="{{ c.label }}" placeholder="CGPA" maxlength="100"></label><label>Type<select name="claim_type"><option value="string" {% if c.type == 'string' %}selected{% endif %}>Text</option><option value="decimal" {% if c.type == 'decimal' %}selected{% endif %}>Decimal</option><option value="date" {% if c.type == 'date' %}selected{% endif %}>Date</option><option value="boolean" {% if c.type == 'boolean' %}selected{% endif %}>Boolean</option></select></label><label>Value<input name="claim_value" value="{{ c.value }}" maxlength="1000"></label><button type="button" class="remove-fact" aria-label="Remove fact">×</button></div>{% endfor %}</div><button type="button" class="secondary" id="add-fact">+ Add fact</button><p class="small muted">Use education.cgpa with type Decimal to generate “CGPA at least 8.5”. The platform computes and commits this boolean; it is not a zero-knowledge range proof.</p><label class="checkline"><input type="checkbox" name="confirm" value="yes" required>I reviewed these values against my document and understand their assurance.</label><button class="button">Confirm facts and build commitment</button></form></section>{% if document.merkleRoot %}</details>{% endif %}{% endif %}
-{% if document.claims %}<section class="panel"><h2>Confirmed facts</h2><div class="fact-list">{% for c in document.claims %}<div><span>{{ c.label }}{% if c|recognized_threshold %}<small class="badge">Platform-derived threshold</small>{% else %}<small class="badge">Holder-authored statement</small>{% endif %}<small> · {{ c.path }} · {{ c.type }} · derivation: {{ c.derivedFrom|default:"none" }}</small></span><strong>{{ c.value }}</strong></div>{% endfor %}</div></section>{% endif %}
-{% if document.merkleRoot %}<section class="panel"><div class="eyebrow">{% if document.status == 'DRAFT' or document.status == 'ANCHOR_PENDING' %}STEP 3 OF 3{% else %}COMMITMENT DETAILS{% endif %}</div><h2>{% if document.status == 'DRAFT' %}Ready to anchor{% elif document.status == 'ANCHOR_PENDING' %}Anchoring pending — retry safely{% else %}Anchored document state{% endif %}</h2><p class="small muted">Each leaf has its own random 32-byte salt. Values and salts stay off-chain.</p><dl class="technical"><dt>Merkle root</dt><dd>{{ document.merkleRoot }}</dd><dt>Contract</dt><dd>{{ document.contract|default:'Not yet deployed for this document' }}</dd><dt>Transaction</dt><dd>{{ document.anchorTx|default:'Not available yet' }}</dd><dt>Network ID</dt><dd>{{ document.chainId }}</dd></dl>{% if document.status == 'DRAFT' or document.status == 'ANCHOR_PENDING' %}<form method="post" action="{% url 'dashboard:document_action' document.id 'anchor' %}">{% csrf_token %}<button class="button">{% if document.status == 'ANCHOR_PENDING' %}Retry anchor{% else %}Anchor commitment{% endif %}</button></form>{% endif %}</section>{% endif %}
-<div class="actions">{% if document.status == 'ACTIVE' %}<a class="button" href="{% url 'dashboard:compose' document.id %}">Share a proof →</a><form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<button class="secondary">Check file integrity</button></form><form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<input type="hidden" name="restore" value="yes"><button class="secondary">Check and recover</button></form><a class="secondary" href="{% url 'dashboard:version' document.id %}">New version</a>{% endif %}<a class="secondary" href="{% url 'dashboard:original' document.id %}">Download private original</a></div>
-{% if document.status == 'ACTIVE' %}<details class="panel danger-zone"><summary>Revoke this credential</summary><p>Revocation is permanent for this version and recorded on-chain. Any proof for this version will fail the current-state check.</p><form method="post" action="{% url 'dashboard:document_action' document.id 'revoke' %}">{% csrf_token %}<button class="danger">Revoke on-chain</button></form></details>{% endif %}{% if document.supersededBy %}<p>This version was superseded. <a href="{% url 'dashboard:detail' document.supersededBy %}">View its replacement →</a></p>{% endif %}{% endif %}{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_ui wallet_time %}
+{% block title %}{% if document %}{{ document.displayName }}{% else %}Document{% endif %} · {{ product_label }}{% endblock %}
+{% block content %}
+<a class="crumb" href="{% url 'dashboard:index' %}">Documents</a>
+{% if document %}{% with state=document|doc_state %}
+<div class="page-head">
+  <div>
+    <span class="kicker cat-{{ document.category|lower }}"><span class="cat-dot" aria-hidden="true"></span>{{ document.category }} · version {{ document.version }}</span>
+    <h1 class="wrap-any">{{ document.displayName }}</h1>
+    <p class="lede"><span class="mark {{ state.1 }}">{{ state.0 }}</span></p>
+  </div>
+  {% if document.status == 'ACTIVE' %}<a class="btn seal" href="{% url 'dashboard:compose' document.id %}">Share a proof</a>{% endif %}
+</div>
+{% include 'wallet/_lifecycle.html' %}
+
+<div class="work section">
+  <div class="stack-lg">
+    {% if document.status == 'DRAFT' %}
+    {% if document.merkleRoot %}<details class="sheet"><summary>Change the confirmed facts</summary>{% endif %}
+    <section class="{% if not document.merkleRoot %}sheet{% endif %}" aria-labelledby="review-title">
+      {% if not document.merkleRoot %}<span class="kicker">Step 2 of 3 · Confirm facts</span>{% endif %}
+      <h2 id="review-title">{% if document.merkleRoot %}Edit facts{% else %}Check these facts against your document{% endif %}</h2>
+      <p class="help">Suggestions are a convenience and can be wrong. Each row you keep becomes a fact you state about this document. A proof later shows that a fact was committed. It does not show that the fact was read correctly from the file.</p>
+      <form method="post" id="claim-form" class="section-tight">
+        {% csrf_token %}
+        <div class="editor" id="fact-rows">
+          {% for c in claim_rows %}
+          <div class="edit-row">
+            <div class="field"><label>Label<input name="claim_label" value="{{ c.label }}" maxlength="100"></label></div>
+            <div class="field"><label>Value<input name="claim_value" value="{{ c.value }}" maxlength="1000"></label></div>
+            <div class="field"><label>Type<select name="claim_type"><option value="string" {% if c.type == 'string' %}selected{% endif %}>Text</option><option value="decimal" {% if c.type == 'decimal' %}selected{% endif %}>Decimal</option><option value="date" {% if c.type == 'date' %}selected{% endif %}>Date</option><option value="boolean" {% if c.type == 'boolean' %}selected{% endif %}>Yes / no</option></select></label></div>
+            <div class="field"><label>Field path<input name="claim_path" value="{{ c.path }}" maxlength="100" spellcheck="false" autocapitalize="off"></label></div>
+            <button type="button" class="remove-fact" aria-label="Remove this fact">Remove</button>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="cluster section-tight">
+          <button type="button" class="btn line small" id="add-fact">Add a fact</button>
+          <span class="help">Paths are lowercase words joined by dots, e.g. <code>education.cgpa</code>. Dates use YYYY-MM-DD.</span>
+        </div>
+        <div class="notice info section-tight"><strong>About “CGPA at least 8.5”</strong>If you confirm <code>education.cgpa</code> as a decimal, the platform also commits a yes/no fact, “CGPA at least 8.5”. The platform computes it from your value. It is not a zero-knowledge range proof.</div>
+        <label class="check section-tight"><input type="checkbox" name="confirm" value="yes" required><span><strong>I checked these values against my document</strong>I understand they are my statements, not verified by an issuer.</span></label>
+        <div class="form-foot"><button class="btn">Confirm facts</button><span class="help">You can still change them until you anchor.</span></div>
+      </form>
+    </section>
+    {% if document.merkleRoot %}</details>{% endif %}
+    {% endif %}
+
+    {% if document.claims %}
+    <section class="sheet" aria-labelledby="facts-title">
+      <div class="sheet-head"><h2 id="facts-title">Committed facts</h2><span class="meta">{{ document.claims|length }} fact{{ document.claims|length|pluralize }} · each salted separately</span></div>
+      <ul class="lines">{% for c in document.claims %}<li class="line">{% include 'wallet/_fact_line.html' %}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="stack-lg rail-first" aria-label="Status and actions">
+    {% if document.status == 'DRAFT' and document.merkleRoot or document.status == 'ANCHOR_PENDING' %}
+    <section class="sheet stack">
+      <span class="kicker">Step 3 of 3 · Anchor</span>
+      <h2>{% if document.status == 'ANCHOR_PENDING' %}Anchoring didn't finish{% else %}Anchor the commitment{% endif %}</h2>
+      <p class="help">{% if document.status == 'ANCHOR_PENDING' %}The registry transaction was not confirmed. Retrying is safe: it won't create a second credential.{% else %}This writes the Merkle root and status to the registry contract. Values, salts and the file stay off-chain. After anchoring, the facts can't be edited; enroll a new version instead.{% endif %}</p>
+      <form method="post" action="{% url 'dashboard:document_action' document.id 'anchor' %}">{% csrf_token %}<button class="btn seal wide">{% if document.status == 'ANCHOR_PENDING' %}Retry anchoring{% else %}Anchor commitment{% endif %}</button></form>
+    </section>
+    {% elif document.status == 'ACTIVE' %}
+    <section class="sheet stack">
+      <h2>Anchored and current</h2>
+      <p class="help">Use “Share a proof” to choose which facts a verifier receives. The others stay private, and so does the file. Facts can't be edited after anchoring. If the document changes, upload a new version; this one stays valid until the new one is anchored.</p>
+      <a class="btn line small" href="{% url 'dashboard:version' document.id %}">Upload a new version</a>
+    </section>
+    {% elif document.status == 'REVOKED' %}
+    <div class="notice error"><strong>This credential is revoked</strong>The revocation is recorded on-chain. Every proof from this version now fails the current-state check.</div>
+    {% elif document.status == 'SUPERSEDED' %}
+    <div class="notice warning"><strong>Replaced by a newer version</strong>Proofs from this version fail the current-state check. {% if document.supersededBy %}<a href="{% url 'dashboard:detail' document.supersededBy %}">Open the current version</a>{% endif %}</div>
+    {% endif %}
+
+    <section class="stack" aria-labelledby="assurance-title">
+      <h2 id="assurance-title">Source assurance</h2>
+      {% with level=document.provenanceLevel %}{% include 'wallet/_ladder.html' with vertical=True %}{% endwith %}
+      {% if document.provenance.explanation %}<p class="help">{{ document.provenance.explanation }}</p>{% endif %}
+    </section>
+
+    <section class="stack" aria-labelledby="file-title">
+      <h2 id="file-title">Private file</h2>
+      <p class="help">Encrypted in your vault. Only you can download it.</p>
+      <div class="actions">
+        <a class="btn line small" href="{% url 'dashboard:original' document.id %}">Download original</a>
+        {% if document.status == 'ACTIVE' %}
+        <form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<button class="btn line small">Check integrity</button></form>
+        <form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<input type="hidden" name="restore" value="yes"><button class="btn line small">Check and recover</button></form>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if document.merkleRoot %}
+    <details class="record">
+      <summary>Technical record</summary>
+      <dl class="kv">
+        <dt>Credential ID</dt><dd class="mono">{{ document.id }}</dd>
+        <dt>Registry status</dt><dd class="mono">{{ document.status }}</dd>
+        <dt>Merkle root</dt><dd class="mono">{{ document.merkleRoot }}</dd>
+        <dt>Registry contract</dt><dd class="mono">{{ document.contract|default:'Not anchored yet' }}</dd>
+        <dt>Anchor transaction</dt><dd class="mono">{{ document.anchorTx|default:'Not available yet' }}</dd>
+        <dt>Chain ID</dt><dd class="mono">{{ document.chainId|default:'—' }}</dd>
+        {% if document.anchoredAt %}<dt>Anchored</dt><dd>{{ document.anchoredAt|wallet_time }}</dd>{% endif %}
+        {% if document.previousId %}<dt>Previous version</dt><dd><a class="mono" href="{% url 'dashboard:detail' document.previousId %}">{{ document.previousId|truncatechars:20 }}</a></dd>{% endif %}
+      </dl>
+      <p class="help section-tight">Each fact is a Merkle leaf with its own random 32-byte salt. Values and salts never leave this service unless you disclose that fact.</p>
+    </details>
+    {% endif %}
+
+    {% if document.status == 'ACTIVE' %}
+    <details class="danger-zone">
+      <summary>Revoke this credential</summary>
+      <p class="help">This is permanent for version {{ document.version }} and is recorded on-chain. Every proof from this version will then fail the current-state check, including links you've already sent.</p>
+      <form method="post" action="{% url 'dashboard:document_action' document.id 'revoke' %}">{% csrf_token %}<button class="btn danger small">Revoke on-chain</button></form>
+    </details>
+    {% endif %}
+  </aside>
+</div>
+{% endwith %}{% endif %}
+{% endblock %}

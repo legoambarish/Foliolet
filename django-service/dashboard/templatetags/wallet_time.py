@@ -12,6 +12,9 @@ def wallet_time(value):
         return "—"
     try:
         clock = datetime.fromisoformat(value.replace("Z", "+00:00")) if isinstance(value, str) else value
+        if timezone.is_naive(clock):
+            # Audit clocks are server-local without an offset; show them as-is rather than guess a zone.
+            return clock.strftime("%d %b %Y, %H:%M")
         return timezone.localtime(clock).strftime("%d %b %Y, %H:%M %Z")
     except (TypeError, ValueError, AttributeError):
         return value

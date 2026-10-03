@@ -1,1 +1,69 @@
-{% extends 'wallet/base.html' %}{% load wallet_time %}{% block content %}<span class="eyebrow">FIRST-SEEN INTEGRITY</span><h1>Continuity starts before enrollment.</h1><p class="lead">Pair a local agent to record fingerprints before you upload a document.</p><div class="notice warning">An authenticated agent is controlled by its holder. It can report sampled byte continuity; it cannot establish issuer truth, creation time, or detect changes while offline.</div>{% if paired %}<section class="panel"><h2>Save your agent credentials now</h2><p class="small">This secret is shown once. Put it in your agent configuration outside Git.</p><dl class="technical"><dt>Agent ID</dt><dd>{{ paired.agentId }}</dd><dt>Secret</dt><dd>{{ paired.secret }}</dd></dl><p class="small muted">Use tools/local-watcher/watch.py with the agent configuration described in the run guide.</p></section>{% endif %}<div class="split"><section class="panel"><h2>Pair an integrity agent</h2><form method="post">{% csrf_token %}<label for="label">Device label</label><input id="label" name="label" placeholder="My laptop" maxlength="100" required><button class="button">Create agent credentials</button></form><hr>{% for a in agents %}<div class="agent-row"><div><strong>{{ a.label }}</strong><p class="small muted">{% if a.active %}Active{% else %}Revoked{% endif %}</p></div>{% if a.active %}<form method="post" action="{% url 'dashboard:revoke_agent' a.id %}">{% csrf_token %}<button class="secondary">Revoke</button></form>{% endif %}</div>{% endfor %}</section><section class="panel tinted"><h2>Assurance is explicit</h2><p><strong>Self-enrolled</strong><br><span class="small muted">Holder-confirmed facts associated with an anchored file state.</span></p><p><strong>First-seen tracked</strong><br><span class="small muted">Enrollment bytes match every received, authenticated observation for the selected file.</span></p><p><strong>Issuer-verified — future integration</strong><br><span class="small muted">Requires source signature validation and a verified link between issuer facts and the commitment. Not available in this prototype.</span></p></section></div><section class="panel"><h2>Received observations</h2><div class="table-scroll"><table><thead><tr><th>File</th><th>Received by server</th><th>Fingerprint</th></tr></thead><tbody>{% for o in observations %}<tr><td>{{ o.filename }}</td><td>{{ o.receivedAt|wallet_time }}</td><td><code>{{ o.sha256|slice:':16' }}…</code></td></tr>{% empty %}<tr><td colspan="3">No authenticated observations yet.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_time %}
+{% block title %}First-seen · {{ product_label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>First-seen records</h1>
+    <p class="lede">A small agent on your own computer can fingerprint files as they arrive. If you later enroll the same unchanged bytes, the document is marked <strong>first-seen tracked</strong> instead of self-enrolled.</p>
+  </div>
+</div>
+
+{% if paired %}
+<section class="sheet stack" aria-labelledby="paired-title">
+  <div class="notice warning" role="status"><strong id="paired-title">Save these agent credentials now</strong>The secret is shown only this once. Put it in the agent's configuration file, outside the watched folder and outside Git.</div>
+  <dl class="kv">
+    <dt>Agent ID</dt><dd class="mono">{{ paired.agentId }}</dd>
+    <dt>Secret</dt><dd class="mono">{{ paired.secret }}</dd>
+  </dl>
+  <p class="help">Run <code>tools/local-watcher/watch.py</code> with this configuration, as described in the run guide.</p>
+</section>
+{% endif %}
+
+<section class="section" aria-labelledby="ladder-title">
+  <div class="section-head"><h2 id="ladder-title">What each level means</h2><p>Every document sits on one of these. None of them proves the facts are true.</p></div>
+  {% with level=None %}{% include 'wallet/_ladder.html' %}{% endwith %}
+  <p class="help section-tight">Your agent is under your control. It can show that bytes stayed the same between its first sighting and enrollment. It cannot show who issued a file, when the file was created, or what happened while the agent was offline.</p>
+</section>
+
+<div class="work section">
+  <section aria-labelledby="agents-title">
+    <div class="section-head"><h2 id="agents-title">Paired agents</h2></div>
+    {% if agents %}
+    <ul class="register">
+      {% for a in agents %}
+      <li>
+        <div class="register-name"><span class="grant-to">{{ a.label }}</span><span class="meta mono">{{ a.id }}</span></div>
+        <div class="register-col">{% if a.active %}<span class="mark pass">Active</span>{% else %}<span class="mark quiet">Revoked</span>{% endif %}</div>
+        <div></div>
+        <div class="register-act">{% if a.active %}<form method="post" action="{% url 'dashboard:revoke_agent' a.id %}">{% csrf_token %}<button class="btn danger small">Revoke</button></form>{% endif %}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="help">No agents paired yet.</p>{% endif %}
+  </section>
+  <form method="post" class="sheet" aria-labelledby="pair-title">
+    {% csrf_token %}
+    <h2 id="pair-title">Pair a new agent</h2>
+    <div class="field section-tight">
+      <label for="label">Device name</label>
+      <input id="label" name="label" maxlength="100" required aria-describedby="label-help">
+      <span class="help" id="label-help">So you can tell your agents apart, e.g. “Work laptop”.</span>
+    </div>
+    <div class="form-foot"><button class="btn">Create agent credentials</button></div>
+  </form>
+</div>
+
+<section class="section" aria-labelledby="obs-title">
+  <div class="section-head"><h2 id="obs-title">Received observations</h2><p>Fingerprints your agents have reported, newest first</p></div>
+  {% if observations %}
+  <div class="scroll-x">
+    <table class="table">
+      <thead><tr><th scope="col">File</th><th scope="col">Received by the service</th><th scope="col">SHA-256 fingerprint</th></tr></thead>
+      <tbody>{% for o in observations %}<tr><td class="wrap-any">{{ o.filename }}</td><td>{{ o.receivedAt|wallet_time }}</td><td><code title="{{ o.sha256 }}">{{ o.sha256|slice:':16' }}…</code></td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="help">Nothing received yet. Once an agent is running, files placed in its watched folder appear here.</p>
+  {% endif %}
+</section>
+{% endblock %}

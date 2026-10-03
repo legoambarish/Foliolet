@@ -1,0 +1,10 @@
+{% load claim_kind %}{# One ruled fact line. Expects `c` (path/label/type/value/derivedFrom). With `verifier`, holder labels are marked as custom so they can't pass for platform-derived facts. #}
+{% with derived=c|recognized_threshold %}
+<span class="line-label">{% if derived %}CGPA at least 8.5{% elif verifier %}<span class="custom-label">Custom label: {{ c.label }}</span>{% else %}{{ c.label }}{% endif %}</span>
+<span class="line-value">{{ c.value }}</span>
+<span class="line-meta">
+  {% if derived %}<span class="origin derived">Platform-derived threshold</span><span>computed by the platform from a holder-confirmed <code>{{ c.derivedFrom }}</code>; not a zero-knowledge range proof</span>
+  {% else %}<span class="origin">Holder-authored statement</span>{% if verifier %}<span>derivation: <code>{{ c.derivedFrom|default:"none" }}</code></span>{% endif %}{% endif %}
+  <code>{{ c.path }}</code><span>{{ c.type }}</span>
+</span>
+{% endwith %}

@@ -1,1 +1,45 @@
-{% extends 'wallet/base.html' %}{% load wallet_time %}{% block content %}<span class="eyebrow">READY TO SHARE</span><h1>Your proof link is ready.</h1><p class="lead">{{ share.disclosedCount }} fact{{ share.disclosedCount|pluralize }} disclosed. {{ share.privateCount }} remain private.</p><section class="panel share-panel"><div class="share-link"><label for="share-url">Copy this private link</label><input id="share-url" value="{{ share.shareUrl }}" readonly><button type="button" class="button" id="copy-link">Copy link</button><p class="small muted" id="copy-status" role="status">Expires {{ share.expiresAt|wallet_time }}. Save the link now; only its hash is stored.</p><a href="{{ share.shareUrl }}" target="_blank" rel="noreferrer" class="secondary">Open verifier view ↗</a></div><div id="qr-code" aria-label="QR code for the disclosure link"></div></section><p class="notice warning">Anyone with the link can open it. Share it only with the intended recipient. A one-time link is consumed after the recipient explicitly opens the facts.</p><a href="{% url 'dashboard:sharing' %}">View sharing activity →</a>{% endblock %}{% block scripts %}{% load static %}<script src="{% static 'wallet/vendor/qrcode.js' %}" defer></script>{% endblock %}
+{% extends 'wallet/base.html' %}{% load wallet_time static wallet_ui %}
+{% block title %}Proof link ready · {{ product_label }}{% endblock %}
+{% block content %}
+<a class="crumb" href="{% url 'dashboard:sharing' %}">Shared</a>
+<div class="page-head">
+  <div>
+    <h1>Your proof link is ready</h1>
+    <p class="lede">{{ share.disclosedCount }} fact{{ share.disclosedCount|pluralize }} will be disclosed. {{ share.privateCount }} stay{{ share.privateCount|pluralize:"s," }} private.</p>
+  </div>
+</div>
+
+<div class="work">
+  <section class="sheet stack" aria-labelledby="link-title">
+    <h2 id="link-title">Send this link to the verifier</h2>
+    <div class="field">
+      <label for="share-url">Private link</label>
+      <div class="share-link">
+        <input id="share-url" value="{{ share.shareUrl }}" readonly aria-describedby="copy-status">
+        <button type="button" class="btn" id="copy-link">Copy link</button>
+      </div>
+      <p class="help" id="copy-status" role="status">Copy it now. Only a hash of the link is stored, so it can't be shown to you again.</p>
+    </div>
+    <div class="notice warning"><strong>Anyone who has this link can open it</strong>Send it only to the intended verifier. Opening the facts takes a deliberate click{% if terms.one_time %}, and this one-time link closes after the first opening{% endif %}.</div>
+    <dl class="kv">
+      <dt>For</dt><dd>{{ terms.verifier }}</dd>
+      <dt>Purpose</dt><dd>{{ terms.purpose }}</dd>
+      <dt>Expires</dt><dd>{{ share.expiresAt|wallet_time }}</dd>
+      <dt>Release</dt><dd>{% if terms.one_time %}Once, then closed{% else %}Any number of times until it expires{% endif %}</dd>
+      <dt>Disclosed</dt><dd>{{ share.disclosedCount }} fact{{ share.disclosedCount|pluralize }}</dd>
+      <dt>Withheld</dt><dd>{{ share.privateCount }} fact{{ share.privateCount|pluralize }}</dd>
+    </dl>
+    <div class="actions">
+      <a href="{{ share.shareUrl }}" target="_blank" rel="noreferrer" class="btn line small">Preview the verifier page</a>
+      <a class="btn quiet" href="{% url 'dashboard:sharing' %}">See all shared links</a>
+    </div>
+  </section>
+  <aside class="stack">
+    <h2>Or show this code</h2>
+    <p class="help">For in-person checks. The code holds the same link.</p>
+    <div class="qr" id="qr-code" role="img" aria-label="QR code for the proof link"></div>
+    <p class="help">Previewing doesn't use up a one-time link. Facts are only released when someone clicks “Open disclosed facts”.</p>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% asset 'wallet/vendor/qrcode.js' %}" defer></script>{% endblock %}

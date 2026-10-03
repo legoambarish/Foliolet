@@ -1,10 +1,69 @@
-{% load static %}<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}{{ product_label }}{% endblock %}</title><link rel="stylesheet" href="{% static 'wallet/wallet.css' %}"></head>
-<body class="{% if public %}public-layout{% endif %}"><a class="skip" href="#main">Skip to content</a>
-{% if not public %}<aside class="sidebar"><a class="brand" href="{% url 'dashboard:index' %}"><span class="brand-symbol" aria-hidden="true">◈</span>{{ product_label }}</a><span class="small muted">PRIVATE DOCUMENTS. SELECTIVE PROOFS.</span>
-<nav aria-label="Main navigation"><a href="{% url 'dashboard:index' %}" {% if request.resolver_match.url_name == 'index' %}aria-current="page"{% endif %}>▤ &nbsp; Wallet</a><a href="{% url 'dashboard:sharing' %}" {% if request.resolver_match.url_name == 'sharing' %}aria-current="page"{% endif %}>↗ &nbsp; Sharing activity</a><a href="{% url 'dashboard:integrity' %}" {% if request.resolver_match.url_name == 'integrity' %}aria-current="page"{% endif %}>◇ &nbsp; Integrity</a></nav>
-<div class="sidebar-note"><strong>Your files stay private.</strong><p>Share selected facts and a proof. The original document stays in your wallet.</p></div>
-{% if current_username %}<div class="account"><span>{{ current_username }}</span><form action="{% url 'dashboard:logout' %}" method="post">{% csrf_token %}<button class="text-button">Sign out</button></form></div>{% endif %}</aside>{% else %}<header class="public-header"><a class="brand" href="{% url 'dashboard:index' %}"><span class="brand-symbol">◈</span>{{ product_label }}</a><span class="muted">Selective disclosure</span></header>{% endif %}
-<main id="main" class="main">{% for message in messages %}<div role="status" class="notice {{ message.tags }}">{{ message }}</div>{% endfor %}{% if error %}<div role="alert" class="notice error">{{ error }}</div>{% endif %}{% block content %}{% endblock %}<footer>Share the fact, not the file. <span>Commitment integrity and source authenticity are different checks.</span></footer></main>
-<script src="{% static 'wallet/wallet.js' %}" defer></script>{% block scripts %}{% endblock %}</body></html>
+{% load static wallet_ui %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<script src="{% asset 'wallet/theme.js' %}"></script>
+<title>{% block title %}{{ product_label }}{% endblock %}</title>
+<link rel="preload" href="{% static 'wallet/fonts/public-sans-var.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{% static 'wallet/fonts/source-serif-4-var.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{% asset 'wallet/wallet.css' %}">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="masthead">
+  <div class="masthead-inner">
+    {% if public %}
+    <a class="wordmark" href="{% url 'dashboard:index' %}"><span class="wordmark-mark" aria-hidden="true"><span></span><span></span><span></span></span>{{ product_label }}</a>
+    <span class="wordmark-note">Disclosure verification</span>
+    <div class="masthead-tools">
+      <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        <button type="button" data-theme-choice="system" aria-pressed="true">Auto</button>
+      </div>
+    </div>
+    {% else %}
+    <a class="wordmark" href="{% url 'dashboard:index' %}"><span class="wordmark-mark" aria-hidden="true"><span></span><span></span><span></span></span>{{ product_label }}</a>
+    {% if current_username %}
+    {% with here=request.resolver_match.url_name %}
+    <nav class="primary-nav" aria-label="Main">
+      <a href="{% url 'dashboard:index' %}" {% if here == 'index' or here == 'detail' or here == 'compose' or here == 'enroll' or here == 'version' %}aria-current="page"{% endif %}>Documents</a>
+      <a href="{% url 'dashboard:sharing' %}" {% if here == 'sharing' %}aria-current="page"{% endif %}>Shared</a>
+      <a href="{% url 'dashboard:integrity' %}" {% if here == 'integrity' %}aria-current="page"{% endif %}>First-seen</a>
+    </nav>
+    {% endwith %}
+    {% endif %}
+    <div class="masthead-tools">
+      <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        <button type="button" data-theme-choice="system" aria-pressed="true">Auto</button>
+      </div>
+      {% if current_username %}
+      <div class="account">
+        <span class="who">Signed in as <strong class="ink-2">{{ current_username }}</strong></span>
+        <form action="{% url 'dashboard:logout' %}" method="post">{% csrf_token %}<button class="text-btn">Sign out</button></form>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</header>
+<main id="main" class="page{% block page_class %}{% endblock %}">
+  {% if messages or error %}
+  <div class="notices">
+    {% for message in messages %}<div role="status" class="notice {% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}success{% endif %}">{{ message }}</div>{% endfor %}
+    {% if error %}<div role="alert" class="notice error">{{ error }}</div>{% endif %}
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="site-foot">
+  <div><span>Share the fact, not the file.</span><span>A valid proof shows a fact was committed. It does not show the document is authentic.</span></div>
+</footer>
+<script src="{% asset 'wallet/wallet.js' %}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
