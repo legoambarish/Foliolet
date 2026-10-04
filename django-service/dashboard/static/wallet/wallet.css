@@ -242,6 +242,9 @@ legend{padding:0;margin-bottom:6px}
 .edit-row .field input[name=claim_path]{font-family:var(--mono);font-size:var(--t-small)}
 .remove-fact{min-height:40px;min-width:40px;padding:0 var(--s3);background:none;border:1px solid var(--control-edge);border-radius:var(--r-control);color:var(--ink-2);cursor:pointer;font:600 var(--t-small) var(--sans)}
 .remove-fact:hover{border-color:var(--fail);color:var(--fail)}
+.edit-row.scanned{border-color:var(--seal)}
+.edit-row>.scan-note{grid-area:auto;grid-column:1/-1;margin:0}
+.scan-note strong{color:var(--seal)}
 
 /* ---------- Status marks ---------- */
 .mark{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:var(--t-small);line-height:1.3;color:var(--quiet);white-space:nowrap}

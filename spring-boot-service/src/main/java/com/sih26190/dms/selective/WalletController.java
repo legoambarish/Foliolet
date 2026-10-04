@@ -18,13 +18,16 @@ public class WalletController {
   private final IntegrityService integrity;
   private final UserRepository users;
   private final AuditLogRepository audit;
+  private final FieldScanService scanner;
 
   public WalletController(
       WalletService wallet,
       DisclosureService disclosures,
       IntegrityService integrity,
       UserRepository users,
-      AuditLogRepository audit) {
+      AuditLogRepository audit,
+      FieldScanService scanner) {
+    this.scanner = scanner;
     this.wallet = wallet;
     this.disclosures = disclosures;
     this.integrity = integrity;
@@ -65,6 +68,11 @@ public class WalletController {
   @GetMapping("/documents/{id}")
   public Object detail(@PathVariable String id, Authentication auth) {
     return wallet.detail(id, user(auth));
+  }
+
+  @PostMapping("/documents/{id}/scan")
+  public Object scan(@PathVariable String id, Authentication auth) {
+    return scanner.scan(id, user(auth));
   }
 
   @PutMapping("/documents/{id}/claims")

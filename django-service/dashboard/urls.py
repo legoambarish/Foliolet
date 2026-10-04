@@ -11,6 +11,7 @@ urlpatterns = [
  path('wallet/<str:credential_id>/', views.detail, name='detail'),
  path('wallet/<str:credential_id>/share/', views.compose, name='compose'),
  path('wallet/<str:credential_id>/file/', views.original, name='original'),
+ path('wallet/<str:credential_id>/scan/', views.scan_fields, name='scan_fields'),
  path('wallet/<str:credential_id>/<str:action>/', views.document_action, name='document_action'),
  path('versions/<str:previous_id>/', views.enroll, name='version'),
  path('sharing/', views.sharing, name='sharing'),

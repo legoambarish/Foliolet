@@ -154,6 +154,38 @@ def document_action(request, credential_id, action):
     return redirect("dashboard:detail", credential_id=credential_id)
 
 
+SCAN_TYPES = ("string", "decimal", "date", "boolean")
+
+
+def _clean_scan(result):
+    """Pass on only well-formed suggestions; the browser inserts them as text, never as markup."""
+    rows = []
+    items = result.get("fields") if isinstance(result, dict) else None
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        row = {key: item.get(key) for key in ("path", "label", "type", "value", "evidence")}
+        if all(isinstance(value, str) for value in row.values()) and row["type"] in SCAN_TYPES:
+            rows.append(row)
+    discarded = result.get("discarded") if isinstance(result, dict) else 0
+    return {
+        "fields": rows,
+        "discarded": discarded if isinstance(discarded, int) and discarded >= 0 else 0,
+        "source": "image" if isinstance(result, dict) and result.get("source") == "image" else "text",
+    }
+
+
+@spring_login_required
+@require_POST
+def scan_fields(request, credential_id):
+    """Holder-triggered AI scan. Returns suggestions only; nothing is saved until facts are confirmed."""
+    try:
+        result = api.call("POST", f"/api/wallet/documents/{credential_id}/scan", request.session["sb_auth"])
+    except api.WalletAPIError as exc:
+        return JsonResponse({"error": str(exc)}, status=exc.status if 400 <= exc.status < 600 else 502)
+    return JsonResponse(_clean_scan(result))
+
+
 @spring_login_required
 def original(request, credential_id):
     try:

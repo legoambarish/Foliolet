@@ -73,3 +73,5 @@ tools/local-watcher/*state*.json
 tools/local-watcher/*config*.json
 *.sqlite3
 tools/local-watcher/agent-state.json
+
+spring-boot-service/src/main/resources/application.yaml

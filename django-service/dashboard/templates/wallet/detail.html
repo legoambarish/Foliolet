@@ -21,6 +21,10 @@
       {% if not document.merkleRoot %}<span class="kicker">Step 2 of 3 · Confirm facts</span>{% endif %}
       <h2 id="review-title">{% if document.merkleRoot %}Edit facts{% else %}Check these facts against your document{% endif %}</h2>
       <p class="help">Suggestions are a convenience and can be wrong. Each row you keep becomes a fact you state about this document. A proof later shows that a fact was committed. It does not show that the fact was read correctly from the file.</p>
+      <div class="cluster section-tight" id="scan-box">
+        <button type="button" class="btn line small" id="scan-fields" data-url="{% url 'dashboard:scan_fields' document.id %}">Scan for fields</button>
+        <span class="help" id="scan-status" role="status" aria-live="polite">Optional. An AI model reads this document and suggests facts for you to check. The document's text (or page images, for a scanned PDF) is sent to the model provider. Nothing is saved until you confirm.</span>
+      </div>
       <form method="post" id="claim-form" class="section-tight">
         {% csrf_token %}
         <div class="editor" id="fact-rows">

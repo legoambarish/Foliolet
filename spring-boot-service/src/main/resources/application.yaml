@@ -1,3 +1,4 @@
+#NOTE: this is only for reference, in case you plan on using .yaml instead of .properties, but it's better to use application.properties, using app.properties overrides this file.
 spring:
   application:
     name: foliolet
@@ -28,7 +29,7 @@ dms:
 blockchain:
   rpc-url: ${BLOCKCHAIN_RPC_URL:http://127.0.0.1:8545}
   expected-chain-id: ${BLOCKCHAIN_CHAIN_ID:1337}
-  private-key: ${BLOCKCHAIN_PRIVATE_KEY}
+  private-key: ${BLOCKCHAIN_PRIVATE_KEY:}
   contract-address: ${BLOCKCHAIN_CONTRACT_ADDRESS:}
   selective-contract-address: ${SELECTIVE_CONTRACT_ADDRESS:}
 wallet:
@@ -37,4 +38,4 @@ wallet:
   share-base-url: ${WALLET_SHARE_BASE_URL:http://localhost:8000}
 openrouter:
   api-key: ${OPENROUTER_API_KEY:}
-  model: ${OPENROUTER_MODEL:inclusionai/ling-3.0-flash-vl:free}
+  model: ${OPENROUTER_MODEL:inclusionai/ling-3.0-flash-sante:free}
