@@ -20,7 +20,6 @@ public class WalletJson {
       .disable(com.fasterxml.jackson.databind.MapperFeature.ALLOW_COERCION_OF_SCALARS);
 
   public WalletJson() {
-    // Jackson's global scalar switch does not prevent boolean/number-to-String coercion.
     var textual = proofMapper.coercionConfigFor(com.fasterxml.jackson.databind.type.LogicalType.Textual);
     for (var input : new com.fasterxml.jackson.databind.cfg.CoercionInputShape[] {
         com.fasterxml.jackson.databind.cfg.CoercionInputShape.Boolean,

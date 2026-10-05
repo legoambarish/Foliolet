@@ -29,11 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Optional, holder-triggered scan: the document's text (or page images when a PDF has no text
- * layer) goes to the configured OpenRouter model, which proposes facts. Suggestions are returned to
- * the browser only. Nothing is stored or committed until the holder confirms the facts.
- */
+
 @Service
 public class FieldScanService {
   private static final String ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";

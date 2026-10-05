@@ -9,11 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Turns raw model output into candidate facts. The model is untrusted: every candidate must pass
- * the same canonicalizer a typed fact passes, and when the document text is available its quoted
- * evidence must appear verbatim in that text. Nothing here confirms or stores a fact.
- */
+
 public final class FieldScanParser {
   public record ScanField(String path, String label, String type, String value, String evidence) {}
 
@@ -90,7 +86,7 @@ public final class FieldScanParser {
     }
   }
 
-  /** A well-formed model path wins; otherwise derive one from the label under a neutral prefix. */
+
   private String pathFor(String proposed, String label) {
     try {
       return canonical.path(proposed);
@@ -124,7 +120,7 @@ public final class FieldScanParser {
     return value == null || value.isNull() || value.isContainerNode() ? "" : value.asText("");
   }
 
-  /** Case, whitespace and Unicode-form insensitive form used only for containment checks. */
+
   private static String flatten(String text) {
     return Normalizer.normalize(text, Normalizer.Form.NFC)
         .toLowerCase(Locale.ROOT)

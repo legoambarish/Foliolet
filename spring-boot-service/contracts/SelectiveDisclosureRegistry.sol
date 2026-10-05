@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.19;
 
-/// Commitments only. The operator is the custodial platform, not an issuer.
+
 contract SelectiveDisclosureRegistry {
     address public immutable operator;
     struct CredentialAnchor {
@@ -12,7 +12,7 @@ contract SelectiveDisclosureRegistry {
         uint64 anchoredAt;
         uint32 version;
         uint8 provenanceLevel;
-        uint8 status; // 0 absent, 1 active, 2 revoked, 3 superseded
+        uint8 status;
         bytes32 supersededBy;
     }
     mapping(bytes32 => CredentialAnchor) private credentials;

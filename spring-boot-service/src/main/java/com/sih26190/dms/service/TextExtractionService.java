@@ -20,7 +20,7 @@ public class TextExtractionService {
 
         String text = lower.endsWith(".pdf")
                 ? extractFromPdf(filePath)
-                : Files.readString(filePath); // plain-text fallback, useful for quick testing
+                : Files.readString(filePath);
 
         if (text.length() > MAX_CHARS_FOR_LLM) {
             text = text.substring(0, MAX_CHARS_FOR_LLM);

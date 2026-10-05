@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.web3j.crypto.Hash;
 import org.web3j.utils.Numeric;
 
-/** Custodial encryption. The platform can decrypt; this is not end-to-end encryption. */
+
 @Component
 public class PrivateVault {
   private final byte[] key;
