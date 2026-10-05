@@ -2,6 +2,11 @@
 
 **Share the fact, not the file.**
 
+### Try the Demo here (we're using a free tier render plan to deploy this, so the site will be slow, please be patient): https://foliolet-demo.onrender.com 
+
+
+#### Note: The demo only showcases the selective disclosure feature, if you'd like to see the several other features, clone the repo and build the project locally, or watch the demo video covering all the features: https://youtu.be/2wcb9xYbyjo?si=kZTnx8xc-DqeQJaw
+
 A recruiter needs to know whether your CGPA clears a threshold. Sending a
 marksheet also gives them your exact grades, date of birth and other details
 that have nothing to do with the decision.
