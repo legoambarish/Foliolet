@@ -1,0 +1,1 @@
+These frozen source copies identify the pre-bridge contracts. Original paths remain for existing Java wrappers, reproducibility checks and old tests. They do not inherit EvidenceBridgeRegistry governance, holder binding or evidence classes. Legacy UI is disabled by default; any older wallet proof remains a separate assurance protocol.

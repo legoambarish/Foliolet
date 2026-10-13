@@ -30,7 +30,7 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
-        if (request.getRole() == null || request.getRole() == com.sih26190.dms.model.Role.ADMIN) {
+        if (request.getRole() != com.sih26190.dms.model.Role.HOLDER && request.getRole() != com.sih26190.dms.model.Role.OFFICER) {
             return ResponseEntity.badRequest().body("Privileged roles cannot be self-registered");
         }
         if (!request.getUsername().matches("[a-zA-Z0-9_.-]{3,60}") || request.getPassword().length() < 12 || request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {

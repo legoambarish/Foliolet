@@ -1,8 +1,17 @@
 from django.urls import path, include
 from django.conf import settings
 from . import wallet_views as views
+from . import bridge_views as bridge
 app_name = 'dashboard'
 urlpatterns = [
+ path('health/', bridge.health),
+ path('bridge/', bridge.home, name='bridge'),
+ path('bridge/assistant/stream/', bridge.assistant_stream),
+ path('bridge/api/<path:operation>/', bridge.proxy),
+ path('bridge/upload/', bridge.upload),
+ path('share/<str:token>/', bridge.share),
+ path('share/<str:token>/open/', bridge.release),
+ path('share/<str:token>/status/', bridge.share_status),
  path('', views.home, name='index'),
  path('login/', views.login, name='login'),
  path('register/', views.register, name='register'),

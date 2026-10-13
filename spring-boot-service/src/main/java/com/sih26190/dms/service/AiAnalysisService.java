@@ -42,10 +42,16 @@ public class AiAnalysisService {
     @Value("${openrouter.model}")
     private String openRouterModel;
 
+    @Value("${legacy.external-ai.enabled:false}")
+    private boolean legacyExternalAiEnabled;
+
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     public AiAnalysisResponse analyze(Long documentId, User requester) {
+        if (!legacyExternalAiEnabled) {
+            throw new IllegalStateException("External AI is disabled. Use the local read-only document assistant.");
+        }
         DocumentRecord document = documentRecordRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 

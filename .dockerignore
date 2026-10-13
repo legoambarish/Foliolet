@@ -1,0 +1,15 @@
+.git
+.venv
+.local-data
+.local-tools
+.bridge-data
+output
+**/node_modules
+**/target
+**/__pycache__
+**/application.properties
+.env*
+*.key
+*.pem
+*.pfx
+*.sqlite3

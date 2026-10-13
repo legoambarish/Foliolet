@@ -29,6 +29,8 @@ def login(request):
             request.session["sb_auth"] = [username, password]
             request.session["sb_username"] = result["username"]
             request.session["sb_role"] = result["role"]
+            if result["role"] in ("GOVERNANCE", "ISSUER", "VERIFIER"):
+                return redirect("dashboard:bridge")
             return redirect("dashboard:index")
         except api.WalletAPIError as exc:
             error = str(exc)

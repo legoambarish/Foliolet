@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-_private_dir = BASE_DIR.parent / '.local-data'
+_private_dir = Path(os.environ.get('DJANGO_PRIVATE_DIR', BASE_DIR.parent / '.local-data'))
 _private_dir.mkdir(exist_ok=True)
 _key_file = _private_dir / 'django.key'
 if not os.environ.get('DJANGO_SECRET_KEY') and not _key_file.exists():
@@ -32,8 +32,8 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG and os.environ.get('DJANGO_LOCAL_HTTP', 'false') != 'true'
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 ENABLE_LEGACY_UI = os.environ.get('ENABLE_LEGACY_UI', 'false').lower() == 'true'
 PRODUCT_LABEL = os.environ.get('PRODUCT_LABEL', 'Foliolet')
@@ -64,6 +64,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "dashboard.wallet_security.PrivateResponseMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -139,6 +140,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = _private_dir / 'static'
 
 
 # Email

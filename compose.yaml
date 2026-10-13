@@ -1,18 +1,98 @@
+name: foliolet-bridge-demo
 services:
   postgres:
-    image: postgres:17
+    image: postgres:17-bookworm
     environment:
-      POSTGRES_DB: wallet_dev
-      POSTGRES_USER: wallet
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:55432:5432"
-    volumes:
-      - wallet_postgres:/var/lib/postgresql/data
+      POSTGRES_DB: foliolet_bridge
+      POSTGRES_USER: foliolet
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-foliolet-public-demo-password}
+    volumes: [bridge_postgres:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet_dev"]
+      test: ["CMD-SHELL", "pg_isready -U foliolet -d foliolet_bridge"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 30
+  chain:
+    build: {context: ., dockerfile: containers/chain.Dockerfile}
+    environment: {HOST: 0.0.0.0, BRIDGE_CHAIN_DIR: /state}
+    ports: [127.0.0.1:8545:8545]
+    volumes: [bridge_chain:/state]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8545',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_chainId',params:[]})}).then(r=>r.json()).then(r=>process.exit(r.result==='0x539'?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  seed:
+    build: {context: ., dockerfile: containers/chain.Dockerfile}
+    command: [node, scripts/bridge-seed.cjs]
+    environment: {BLOCKCHAIN_RPC_URL: 'http://chain:8545', BRIDGE_CONFIG_DIR: /config}
+    volumes: [bridge_config:/config]
+    depends_on: {chain: {condition: service_healthy}}
+    restart: 'no'
+  backend:
+    build: {context: ., dockerfile: containers/backend.Dockerfile}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/foliolet_bridge
+      SPRING_DATASOURCE_USERNAME: foliolet
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-foliolet-public-demo-password}
+      SERVER_ADDRESS: 0.0.0.0
+      BLOCKCHAIN_RPC_URL: http://chain:8545
+      WALLET_DATA_DIR: /state
+      DMS_STORAGE_LOCATION: /state/legacy/files
+      DMS_BACKUP_LOCATION: /state/legacy/backups
+      BRIDGE_ENABLED: 'true'
+      BRIDGE_DEMO: 'true'
+      BRIDGE_PINS_FILE: /config/bridge-pins.json
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LOCAL_AI_ENABLED: ${LOCAL_AI_ENABLED:-true}
+      OLLAMA_TEXT_MODEL: ${OLLAMA_TEXT_MODEL:-qwen3:4b}
+    extra_hosts: [host.docker.internal:host-gateway]
+    ports: [127.0.0.1:8080:8080]
+    volumes: [bridge_backend:/state, bridge_config:/config:ro]
+    depends_on: {postgres: {condition: service_healthy}, seed: {condition: service_completed_successfully}}
+    healthcheck:
+      test: [CMD-SHELL, "curl --fail --silent http://localhost:8080/api/public/health > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      start_period: 60s
+      retries: 30
+  frontend:
+    build: {context: ., dockerfile: containers/frontend.Dockerfile}
+    environment:
+      SPRING_BOOT_API_BASE_URL: http://backend:8080
+      DJANGO_PRIVATE_DIR: /state
+      DJANGO_DEBUG: 'false'
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      DJANGO_LOCAL_HTTP: 'true'
+      BRIDGE_PINS_FILE: /config/bridge-pins.json
+      WALLET_TRUST_FILE: /config/trusted-deployment.json
+    volumes: [bridge_frontend:/state, bridge_config:/config:ro]
+    ports: [127.0.0.1:8000:8000]
+    depends_on: {backend: {condition: service_healthy}}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/').read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  reader:
+    image: nginxinc/nginx-unprivileged:1.28-alpine
+    volumes: [./reader:/usr/share/nginx/html:ro, ./django-service/dashboard/static/wallet:/usr/share/nginx/html/vendor:ro]
+    ports: [127.0.0.1:8090:8080]
+    depends_on: {seed: {condition: service_completed_successfully}}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://localhost:8080/]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  ai-check:
+    image: curlimages/curl:8.19.0
+    profiles: [ai]
+    extra_hosts: [host.docker.internal:host-gateway]
+    command: [--fail, --silent, --show-error, http://host.docker.internal:11434/api/tags]
+    restart: 'no'
 volumes:
-  wallet_postgres:
+  bridge_postgres:
+  bridge_chain:
+  bridge_config:
+  bridge_backend:
+  bridge_frontend:

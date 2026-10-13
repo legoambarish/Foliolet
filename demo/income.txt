@@ -1,0 +1,7 @@
+SIMULATED DOCUMENT / NOT A REAL PAYSLIP
+Test Employer
+Employee: Asha Test
+Monthly income: INR 45000
+Employment active: true
+Hidden bank reference: DEMO-0000
+The scoped test issuer must explicitly review and attest the values.

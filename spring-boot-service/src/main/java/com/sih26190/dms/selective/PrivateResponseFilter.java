@@ -13,6 +13,7 @@ public class PrivateResponseFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
     if (request.getRequestURI().startsWith("/api/wallet")
+        || request.getRequestURI().startsWith("/api/bridge")
         || request.getRequestURI().startsWith("/api/public")) {
       response.setHeader("Cache-Control", "no-store");
       response.setHeader("Referrer-Policy", "no-referrer");

@@ -1,0 +1,5 @@
+# Phase 3: human approval and bounded execution
+
+Implemented exact allowlisted plans for one selected signed request and one confirmed active credential. Local model aliases are resolved by deterministic code, never accepted as trusted IDs. Schema validation forbids extra steps, purpose/fact/audience changes or wider limits. Preparing a plan creates only an audit proposal. Holder plan approval and presentation signatures are required before deterministic execution.
+
+Actual integration covers preapproval refusal, cross-owner refusal, malicious expanded candidates, cancellation, wrong-key approval, concurrent idempotent execution, one committed grant and complete typed-step audit. Browser approval displays exact facts, recipient, purpose, deadline, one opening, retention and zero new chain transactions. AI-off rehearsal passes. The agent does not autonomously create verifier requests or issuer claims; the anchor step confirms existing issuer evidence. Multi-document plans and production recovery scheduling were cut.

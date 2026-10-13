@@ -38,3 +38,23 @@ wallet:
 openrouter:
   api-key: ${OPENROUTER_API_KEY:}
   model: ${OPENROUTER_MODEL:inclusionai/ling-3.0-flash-vl:free}
+bridge:
+  enabled: ${BRIDGE_ENABLED:false}
+  demo: ${BRIDGE_DEMO:false}
+  registry: ${BRIDGE_REGISTRY:}
+  governance: ${BRIDGE_GOVERNANCE:}
+  governance-key: ${BRIDGE_GOVERNANCE_KEY:}
+  university-key: ${BRIDGE_UNIVERSITY_KEY:}
+  employer-key: ${BRIDGE_EMPLOYER_KEY:}
+  rogue-key: ${BRIDGE_ROGUE_KEY:}
+  internship-verifier-key: ${BRIDGE_INTERNSHIP_VERIFIER_KEY:}
+  tenant-verifier-key: ${BRIDGE_TENANT_VERIFIER_KEY:}
+  public-base-url: ${PUBLIC_BASE_URL:}
+  import:
+    trusted-certificate: ${IMPORT_TRUSTED_CERTIFICATE:}
+    trusted-issuer: ${IMPORT_TRUSTED_ISSUER:}
+    trusted-type: ${IMPORT_TRUSTED_TYPE:}
+assistant:
+  enabled: ${LOCAL_AI_ENABLED:true}
+  base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
+  model: ${OLLAMA_TEXT_MODEL:qwen3:4b}

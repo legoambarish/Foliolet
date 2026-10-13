@@ -1,0 +1,98 @@
+{
+  "java": {
+    "tests": 26,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suite_count": 7
+  },
+  "node": {
+    "tests": 23,
+    "pass": 23,
+    "fail": 0,
+    "skipped": 0
+  },
+  "django": {
+    "tests": 24,
+    "passed": true
+  },
+  "live": {
+    "checks": 24,
+    "passed": true,
+    "readBlock": 634,
+    "at": "2026-10-13T15:42:38.625Z"
+  },
+  "workflows": {
+    "passed": true,
+    "checks": 62,
+    "at": "2026-10-13T15:42:49.067Z"
+  },
+  "recovery": {
+    "passed": true,
+    "checks": 3,
+    "simulation": "Committed chain record with pending database lifecycle, not a real process crash",
+    "at": "2026-10-13T20:59:36+0530"
+  },
+  "offline": {
+    "chainUnavailable": "UNKNOWN",
+    "chainReachable": true,
+    "historical": "PASS",
+    "current": "PASS",
+    "readerReachable": true,
+    "at": "2026-10-13T21:12:51.5088945+05:30",
+    "appPortsClosed": [
+      8000,
+      8080,
+      11434
+    ]
+  },
+  "ui": {
+    "passed": true,
+    "assertions": 18,
+    "browser": "Chrome headless",
+    "viewports": [
+      1440,
+      390
+    ],
+    "pageErrors": [],
+    "planner": {
+      "modelUsed": true,
+      "status": "VALIDATED_LOCAL_PLAN"
+    },
+    "at": "2026-10-13T15:46:24.706Z"
+  },
+  "spring_ai": {
+    "passed": true,
+    "checks": 3,
+    "seconds": 2.828,
+    "status": "GROUNDED_ASSISTANCE",
+    "modelUsed": true
+  },
+  "contract_reproducibility": true,
+  "npm_audit": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 24,
+    "critical": 5,
+    "total": 38
+  },
+  "secrets": {
+    "files_scanned": 284,
+    "suspected_secret_locations": [],
+    "scope": "tracked and implementation source; ignored private data excluded"
+  },
+  "jar_sha256": "b501d2102a4857bfca60b1362335f4476a145093cab72c12a831d9db94a5ec12",
+  "evidence_sha256": {
+    ".bridge-data/artifacts/node-tests.log": "9612c6b2b692e52a6cec7ce294c8d997d006d866c0fa07f77db746c157a9fcbe",
+    ".bridge-data/artifacts/django-tests.log": "cb01034930ec3b46ee10968ee01dd16ee952d196685e2c4e1e67cdde941c1dc9",
+    ".bridge-data/artifacts/rehearsal.log": "6f99c95ae3993c74c6bd1e5e2aa8e9d4c36164e8f6db1cf3e1784536a44864dc",
+    ".bridge-data/artifacts/browser-rehearsal.log": "e37bf237a30181017a7d47798dfd11f978a6d75ff714f837fdc78df8d16ac5c8",
+    ".bridge-data/artifacts/offline-results.json": "cf3e791ad92ac209a0c5536975a4babeaa101fe351d8821d27eea467b05c0150",
+    ".bridge-data/artifacts/recovery-results.json": "98490ec1256d22f9e6b12015e6f7614e1b0d9a6ebc341616896277c6ef10e556",
+    ".bridge-data/artifacts/spring-ai-results.json": "2f94746818faa792a45b0739785c077dd45c1f5f8caf38453ac74cb1d0335669"
+  },
+  "branch": "testbuilds",
+  "main_ref": "c04741ee68563566dc82ab4e71b97c3898714f72",
+  "docker_runtime": "UNVERIFIED: engine stale socket; automatic approval review rejected removal"
+}

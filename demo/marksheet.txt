@@ -1,0 +1,7 @@
+SIMULATED DOCUMENT / NOT A REAL INSTITUTIONAL RECORD
+Test University transcript
+Student: Asha Test
+CGPA: 8.7
+Currently enrolled: true
+Hidden reference: DEMO-99881
+The scoped test issuer must explicitly review and attest the values.
