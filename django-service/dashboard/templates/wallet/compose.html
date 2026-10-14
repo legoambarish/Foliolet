@@ -70,6 +70,7 @@
     </div>
     <p class="help">Not sent: the original file, unchecked values and their salts. The verifier can see <em>how many</em> facts are committed, and repeat proofs from this version share a root, so they can be linked to each other.</p>
     <button class="btn seal wide" id="create-proof">Create proof link</button>
+    {% if share_mode == 'local' %}<p class="help">Local-only sharing. This link and QR work on this computer. Restart with public sharing enabled to share across networks.</p>{% else %}<p class="help">Creating a link checks the public receiver first. The first start can take up to a minute. {% if share_mode == 'quick' %}The temporary HTTPS address lasts only while this tunnel runs.{% endif %}</p>{% endif %}
     <p class="help" id="create-help"><span id="disclosed-count">0</span> fact<span id="plural">s</span> selected.</p>
   </aside>
 </form>

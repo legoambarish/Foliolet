@@ -1,3 +1,13 @@
+import logging
+
+
+class ReceiverRequestLogFilter(logging.Filter):
+    """Also suppress bearer/export requests when using the private dev server."""
+    def filter(self, record):
+        message = record.getMessage()
+        return not any(value in message for value in ("/verify/", "/proof-download/", "/proof-status/", "?"))
+
+
 class PrivateResponseMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response

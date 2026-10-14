@@ -6,6 +6,7 @@
   <div>
     <h1>Your proof link is ready</h1>
     <p class="lede">{{ share.disclosedCount }} fact{{ share.disclosedCount|pluralize }} will be disclosed. {{ share.privateCount }} stay{{ share.privateCount|pluralize:"s," }} private.</p>
+    {% if share_mode == 'quick' %}<div class="notice warning"><strong>Temporary public HTTPS link</strong>Keep this application and its receiver tunnel running. Stopping or restarting the tunnel changes the address and breaks links and QR codes already sent, even before their expiry.</div>{% elif share_mode == 'named' %}<p class="help">Public HTTPS link using your configured stable hostname. The receiver and named tunnel must stay available.</p>{% else %}<div class="notice warning"><strong>Local-only link</strong>This address and QR work on this computer. They are not reachable from another network.</div>{% endif %}
   </div>
 </div>
 

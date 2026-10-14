@@ -51,7 +51,7 @@
 <section class="section" aria-labelledby="checks-title">
   <div class="section-head">
     <h2 id="checks-title">What has been checked</h2>
-    <p><span class="mark pass">Service verification passed</span>. <span id="ledger-summary">Your browser has not run its own check yet.</span></p>
+    <p><span class="mark pass">Service verification passed</span>. <span id="ledger-summary">{% if receiver_only %}Independent browser chain checking is unavailable on this public receiver.{% else %}Your browser has not run its own check yet.{% endif %}</span></p>
   </div>
   <table class="ledger" id="ledger">
     <thead><tr><th scope="col">Check</th><th scope="col">{{ product_label }} service</th><th scope="col">This browser</th></tr></thead>
@@ -101,6 +101,14 @@
 </section>
 
 <section class="section" id="independent-check" aria-labelledby="indep-title">
+  {% if receiver_only %}
+  <div class="section-head"><h2 id="indep-title">Keep and verify the proof</h2><p>Service verification is shown above. No independent browser chain check has run.</p></div>
+  <div class="sheet stack">
+    <p class="help">The development chain RPC is private to the holder's computer. It is not reachable from your phone, so independent browser chain checking is disabled here. Download the proof and use the standalone verifier with an explicitly configured trusted RPC and independently trusted registry, operator and chain pins.</p>
+    <a id="download-bundle" class="btn line" href="{% url 'dashboard:proof_download' p.grantId %}">Download proof (JSON)</a>
+    <p class="help">A bearer link can be forwarded. Expiry and revocation stop future releases; they cannot erase facts or proof files already received. A valid platform proof does not establish issuer authenticity or independently prove holder consent.</p>
+  </div>
+  {% else %}
   <div class="section-head"><h2 id="indep-title">Check it yourself</h2><p>Runs in this browser. It doesn't rely on the {{ product_label }} service.</p></div>
   <div class="work">
     <div class="sheet stack">
@@ -125,6 +133,7 @@
       <p class="help">{{ product_label }} is a custodial commitment system. A passing independent check establishes membership, signature and current pinned chain state. It does not establish that the holder approved this release if the platform itself is malicious.</p>
     </aside>
   </div>
+  {% endif %}
 </section>
 
 <details class="record section">
@@ -171,4 +180,4 @@
 </div>
 {% endif %}
 {% endblock %}
-{% block scripts %}{% if result %}<script src="{% asset 'wallet/vendor/ethers.umd.min.js' %}" defer></script><script src="{% asset 'wallet/proof-core.js' %}" defer></script><script src="{% asset 'wallet/verify.js' %}" defer></script>{% endif %}{% endblock %}
+{% block scripts %}{% if result %}{% if not receiver_only %}<script src="{% asset 'wallet/vendor/ethers.umd.min.js' %}" defer></script><script src="{% asset 'wallet/proof-core.js' %}" defer></script>{% endif %}<script src="{% asset 'wallet/verify.js' %}" defer></script>{% endif %}{% endblock %}

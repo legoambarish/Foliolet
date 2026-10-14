@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
 from . import wallet_api as api
 from . import proof_cache
+from . import tunnel_manager
 from .verification import validate_bundle, validate_success
 from .decorators import spring_login_required
 
@@ -206,19 +207,47 @@ def compose(request, credential_id):
         doc = api.call("GET", f"/api/wallet/documents/{credential_id}", request.session["sb_auth"])
         if request.method == "POST":
             minutes = int(request.POST.get("expires_minutes", "30"))
-            result = api.call("POST", "/api/wallet/disclosures", request.session["sb_auth"], payload={
-                "credentialId": credential_id, "claimIds": request.POST.getlist("claims"),
-                "verifierLabel": request.POST.get("verifier_label", ""), "purpose": request.POST.get("purpose", ""),
-                "expiresInMinutes": minutes, "oneTime": request.POST.get("one_time") == "yes"})
+            # Readiness precedes grant creation, so startup failure cannot create
+            # an apparently public but unreachable disclosure.
+            tunnel = tunnel_manager.ensure_public()
+            try:
+                created = api.call("POST", "/api/wallet/disclosures", request.session["sb_auth"], payload={
+                    "credentialId": credential_id, "claimIds": request.POST.getlist("claims"),
+                    "verifierLabel": request.POST.get("verifier_label", ""), "purpose": request.POST.get("purpose", ""),
+                    "expiresInMinutes": minutes, "oneTime": request.POST.get("one_time") == "yes"})
+            except api.WalletAPIError as exc:
+                if exc.status >= 500:
+                    raise api.WalletAPIError("Share creation could not be confirmed. Check Shared for a new grant and revoke it before retrying.", exc.status) from None
+                raise
+            result = created if isinstance(created, dict) else {}
+            try:
+                path = tunnel_manager.share_path(result.get("shareUrl"))
+                tunnel_manager.confirm_public(tunnel)
+                if tunnel["mode"] != "local":
+                    result["shareUrl"] = tunnel_manager.validate_origin(
+                        tunnel["origin"], quick=tunnel["mode"] == "quick") + path
+            except tunnel_manager.TunnelError:
+                # The grant exists but no link has been handed out. Revoke it
+                # through the original owner API; never silently publish failure.
+                grant = result.get("id", "")
+                if isinstance(grant, str) and re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", grant):
+                    try:
+                        api.call("POST", f"/api/wallet/disclosures/{grant}/revoke", request.session["sb_auth"])
+                    except api.WalletAPIError:
+                        raise tunnel_manager.TunnelError(
+                            f"Share publication failed. Grant {grant} may still be active; revoke it on the Shared page before retrying.") from None
+                    raise tunnel_manager.TunnelError("Share publication failed. The new grant was revoked; retry after restoring the tunnel.") from None
+                raise tunnel_manager.TunnelError("Share publication failed after creation. Check the Shared page and revoke the newest grant before retrying.") from None
             terms = {"verifier": request.POST.get("verifier_label", ""), "purpose": request.POST.get("purpose", ""),
                      "one_time": request.POST.get("one_time") == "yes"}
-            return page(request, "share_ready", share=result, terms=terms)
-    except (api.WalletAPIError, ValueError) as exc:
-        error = str(exc) if isinstance(exc, api.WalletAPIError) else "Choose a valid expiry."
+            return page(request, "share_ready", share=result, terms=terms, share_mode=tunnel["mode"])
+    except (api.WalletAPIError, tunnel_manager.TunnelError, ValueError) as exc:
+        error = "Choose a valid expiry." if isinstance(exc, ValueError) else str(exc)
     # Re-render submitted choices after a failure; GET shows a clean composer.
     form = request.POST if request.method == "POST" else {}
     selected = request.POST.getlist("claims") if request.method == "POST" else []
-    return page(request, "compose", document=doc, error=error, form=form, selected=selected)
+    return page(request, "compose", document=doc, error=error, form=form, selected=selected,
+                share_mode=settings.FOLIOLET_SHARE_MODE)
 
 
 @spring_login_required
@@ -299,7 +328,8 @@ def verify(request, token):
         except (ValueError, TypeError, KeyError):
             error = "The service did not return a valid successful verification. No facts were accepted."
     return page(request, "verify", result=result, error=error, network=settings.TRUSTED_DEPLOYMENT,
-                public=True, rpc_url=settings.PUBLIC_EVM_RPC_URL)
+                public=True, rpc_url=settings.PUBLIC_EVM_RPC_URL,
+                receiver_only=getattr(settings, "RECEIVER_ONLY", False))
 
 
 def proof_status(request, grant_id):

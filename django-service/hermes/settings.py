@@ -37,6 +37,13 @@ CSRF_COOKIE_SECURE = not DEBUG
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 ENABLE_LEGACY_UI = os.environ.get('ENABLE_LEGACY_UI', 'false').lower() == 'true'
 PRODUCT_LABEL = os.environ.get('PRODUCT_LABEL', 'Foliolet')
+FOLIOLET_SHARE_MODE = os.environ.get('FOLIOLET_SHARE_MODE', 'quick')
+from copy import deepcopy
+from django.utils.log import DEFAULT_LOGGING
+LOGGING = deepcopy(DEFAULT_LOGGING)
+LOGGING['filters']['receiver_requests'] = {'()': 'dashboard.wallet_security.ReceiverRequestLogFilter'}
+for _request_logger in ('django.request', 'django.server'):
+    LOGGING['loggers'].setdefault(_request_logger, {})['filters'] = ['receiver_requests']
 PUBLIC_EVM_RPC_URL = os.environ.get('PUBLIC_EVM_RPC_URL', 'http://127.0.0.1:8545')
 # Separately provisioned by the demo operator. Never discover these from Spring or a bundle.
 import json

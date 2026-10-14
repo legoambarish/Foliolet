@@ -2,6 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const bundle=JSON.parse(document.getElementById('proof-bundle').textContent);
   const output=document.getElementById('independent-result'),policy=document.getElementById('policy-result');
   const button=document.getElementById('verify-independent');
+  // The public receiver deliberately has no direct RPC. Still show its already
+  // released proof JSON without claiming an independent check took place.
+  document.getElementById('proof-details').textContent=JSON.stringify(bundle,null,2);
+  if (!button) return;
   const inputs=['rpc-url','expected-contract','expected-operator','expected-chain'].map(id=>document.getElementById(id));
   // Ledger cells are presentation only; the notices above remain the authoritative result text.
   const browserCells=typeof document.querySelectorAll==='function'?[...document.querySelectorAll('[data-browser-check]')]:[];
@@ -12,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
   for(const input of inputs)input.addEventListener('input',()=>{
     output.className='notice';output.textContent='Independent check not run for these settings.';policy.textContent='';policy.className='small muted';resetLedger();
   });
-  document.getElementById('proof-details').textContent=JSON.stringify(bundle,null,2);
   button.addEventListener('click',async event=>{
     event.target.disabled=true;event.target.setAttribute?.('aria-busy','true');inputs.forEach(input=>input.disabled=true);
     output.className='notice';output.textContent='Recomputing facts and reading the registry…';policy.textContent='';policy.className='small muted';resetLedger();

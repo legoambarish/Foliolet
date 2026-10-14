@@ -57,6 +57,12 @@ npm run evm
 
 Open `http://localhost:8000/`. Use `/register/` to create a HOLDER account (username 3–60 allowed ASCII characters; password at least 12 characters, at most 72 UTF-8 bytes). No seeded privileged account is required. All wallet data comes from real Spring endpoints.
 
+Public shares now use a receiver-only Cloudflare Quick Tunnel by default. Install
+official `cloudflared` with `tools/install-cloudflared.ps1`; the first share starts
+it automatically. Follow [the receiver tunnel guide](CLOUDFLARE_RECEIVER.md) for
+temporary hostname limits, local-only/named modes, security, stop/restart and a
+cross-network demo. Private Django, Spring and RPC remain on loopback.
+
 Spring deploys/reuses **both** real contracts. Contract addresses persist under `.local-data/chain`; Ganache data under `.local-data/evm`. Keep PostgreSQL, chain data, address files, vault key, Django key and encrypted wallet files together when restarting/backing up. Removing/resetting EVM state alone breaks existing anchors; startup fails when persisted contracts are missing rather than silently declaring old proofs valid.
 
 The EVM launcher generates `.local-data/development-relay.key` on first use. It prints only the operator address; Spring's launcher reads the key locally unless `BLOCKCHAIN_PRIVATE_KEY` is supplied. Keep that ignored key with the EVM state. If an existing chain lacks the key, restore its original key rather than generate another identity. Never use this development identity on a funded public network. Test signers are generated in memory and are unrelated to the local deployment.
