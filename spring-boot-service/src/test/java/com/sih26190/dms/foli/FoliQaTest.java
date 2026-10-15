@@ -65,11 +65,17 @@ class FoliQaTest {
   }
   @Test void flexibleReadQuestionsReachModelButWriteRequestsHaveNoToolPath() throws Exception {
     var model=mock(FoliLocalModel.class); when(model.promptFits(anyString(),anyString())).thenReturn(true); var service=new FoliChatService(model,retrieval,verifier);
-    when(model.ask(anyString(),anyString(),eq(false))).thenReturn(new FoliLocalModel.Reply("A careful-reading haiku.",3,10));
-    assertEquals("GENERAL",service.chat("Write a haiku about careful reading",List.of(),null,s -> {}).answerKind());
+    when(model.ask(anyString(),anyString(),eq(true))).thenReturn(
+        new FoliLocalModel.Reply("{\"answer\":\"A careful-reading haiku.\"}",3,10),
+        new FoliLocalModel.Reply("analysis: private self-talk",3,10));
+    var general=service.chat("Write a haiku about careful reading",List.of(),null,s -> {});
+    assertEquals("GENERAL",general.answerKind()); assertEquals("A careful-reading haiku.",general.answer());
+    var malformed=service.chat("hi what can you do for me?",List.of(),null,s -> {});
+    assertFalse(malformed.answer().contains("private self-talk")); assertTrue(malformed.warnings().size()>0);
+    verify(model,times(2)).ask(eq(FoliChatService.GENERAL_SYSTEM),anyString(),eq(true));
     assertTrue(service.chat("Delete this document",List.of(),corpus(),s -> {}).answer().contains("cannot"));
     assertTrue(service.chat("Revoke my share link",List.of(),null,s -> {}).answer().contains("cannot"));
-    verify(model,times(1)).ask(anyString(),anyString(),anyBoolean());
+    verify(model,times(2)).ask(anyString(),anyString(),eq(true));
   }
   @Test void unknownEvidenceAndQuotesAreNotMarkedVerified() throws Exception {
     var model=mock(FoliLocalModel.class); when(model.promptFits(anyString(),anyString())).thenReturn(true); var service=new FoliChatService(model,retrieval,verifier);
@@ -94,6 +100,11 @@ class FoliQaTest {
         "http://127.0.0.1:11434/remote","http://u:p@127.0.0.1:11434","http://127.0.0.1:11434?url=https://evil.invalid"))
       assertThrows(IllegalArgumentException.class,() -> FoliLocalModel.localOrigin(url));
     assertEquals("127.0.0.1",FoliLocalModel.localOrigin("http://127.0.0.1:11434").getHost());
+  }
+  @Test void modelThinkingTagsNeverReachFoliReplies() {
+    assertEquals("The answer.", FoliLocalModel.withoutThinking("<think>private reasoning</think>The answer."));
+    assertEquals("Before. After.", FoliLocalModel.withoutThinking("Before. <think>private reasoning</think> After."));
+    assertEquals("Visible", FoliLocalModel.withoutThinking("Visible<think>unfinished private reasoning"));
   }
   @Test void localTransportRefusesCloudMissingAndOversizedModelsAndUsesNoTools() throws Exception {
     var status=new AtomicReference<>("{\"cloud\":{\"disabled\":true}}");

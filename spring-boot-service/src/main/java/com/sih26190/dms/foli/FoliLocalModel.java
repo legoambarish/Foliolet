@@ -6,6 +6,7 @@ import java.net.http.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CancellationException;
+import java.util.regex.Pattern;
 import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.OllamaChatModel;
@@ -25,6 +26,7 @@ public class FoliLocalModel {
   private final HttpClient http;
   private final OllamaChatModel model;
   private final ObjectMapper json = new ObjectMapper();
+  private static final Pattern THINKING = Pattern.compile("(?is)<think\\b[^>]*>.*?(?:</think\\s*>|\\z)");
   public record Reply(String text, long milliseconds, long outputTokens) {}
 
   public FoliLocalModel(FoliProperties config) {
@@ -106,7 +108,7 @@ public class FoliLocalModel {
       // Explicit system/user messages. No tool callbacks, advisors, URLs or source paths.
       var response=model.call(new Prompt(List.of(new SystemMessage(system),new UserMessage(prompt)),options(structured)));
       FoliExtractionService.checkCancel();
-      String answer=response.getResult().getOutput().getText();
+      String answer=withoutThinking(response.getResult().getOutput().getText());
       if (answer==null || answer.isBlank()) throw new FoliException(HttpStatus.BAD_GATEWAY,"EMPTY_REPLY","The local model returned no answer. Retry the question.");
       return new Reply(answer,(System.nanoTime()-start)/1_000_000,
           response.getMetadata().getUsage().getCompletionTokens()==null?0:response.getMetadata().getUsage().getCompletionTokens());
@@ -116,6 +118,12 @@ public class FoliLocalModel {
       throw new FoliException(HttpStatus.SERVICE_UNAVAILABLE,"MODEL_TIMEOUT_OR_FAILURE",
           "The local model timed out or ran out of resources. Retry with a shorter question, or use the source viewer.");
     }
+  }
+
+  static String withoutThinking(String text) {
+    if (text == null) return null;
+    return THINKING.matcher(text).replaceAll("").replaceAll("(?i)</think\\s*>", "")
+        .replaceAll("[\\t ]{2,}", " ").trim();
   }
 
   public boolean promptFits(String system,String prompt) {
