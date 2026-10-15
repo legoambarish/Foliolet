@@ -5,7 +5,7 @@ class ReceiverRequestLogFilter(logging.Filter):
     """Also suppress bearer/export requests when using the private dev server."""
     def filter(self, record):
         message = record.getMessage()
-        return not any(value in message for value in ("/verify/", "/proof-download/", "/proof-status/", "?"))
+        return not any(value in message for value in ("/verify/", "/proof-download/", "/proof-status/", "/ask-foli/", "?"))
 
 
 class PrivateResponseMiddleware:
@@ -22,4 +22,6 @@ class PrivateResponseMiddleware:
         response["Referrer-Policy"] = "strict-origin"
         response["X-Content-Type-Options"] = "nosniff"
         response["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http: https:; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        if request.path.startswith('/ask-foli/'):
+            response["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'"
         return response

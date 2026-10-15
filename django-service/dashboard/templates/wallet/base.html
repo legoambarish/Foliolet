@@ -9,6 +9,7 @@
 <link rel="preload" href="{% static 'wallet/fonts/public-sans-var.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{% static 'wallet/fonts/source-serif-4-var.woff2' %}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{% asset 'wallet/wallet.css' %}">
+{% block extra_head %}{% endblock %}
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -32,6 +33,7 @@
       <a href="{% url 'dashboard:index' %}" {% if here == 'index' or here == 'detail' or here == 'compose' or here == 'enroll' or here == 'version' %}aria-current="page"{% endif %}>Documents</a>
       <a href="{% url 'dashboard:sharing' %}" {% if here == 'sharing' %}aria-current="page"{% endif %}>Shared</a>
       <a href="{% url 'dashboard:integrity' %}" {% if here == 'integrity' %}aria-current="page"{% endif %}>First-seen</a>
+      <a href="{% url 'dashboard:foli' %}" {% if here == 'foli' %}aria-current="page"{% endif %}>Ask Foli</a>
     </nav>
     {% endwith %}
     {% endif %}

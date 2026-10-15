@@ -1,12 +1,21 @@
 from django.urls import path, include
 from django.conf import settings
 from . import wallet_views as views
+from . import foli_views as foli
 app_name = 'dashboard'
 urlpatterns = [
  path('', views.home, name='index'),
  path('login/', views.login, name='login'),
  path('register/', views.register, name='register'),
  path('logout/', views.logout, name='logout'),
+ path('ask-foli/', foli.home, name='foli'),
+ path('ask-foli/api/documents/', foli.documents, name='foli-documents'),
+ path('ask-foli/api/health/', foli.health, name='foli-health'),
+ path('ask-foli/api/jobs/', foli.jobs, name='foli-jobs'),
+ path('ask-foli/api/jobs/<uuid:job_id>/', foli.job, name='foli-job'),
+ path('ask-foli/api/memory/', foli.memory, name='foli-memory'),
+ path('ask-foli/api/source/', foli.source, name='foli-source'),
+ path('ask-foli/api/page/', foli.source, {'image': True}, name='foli-page'),
  path('wallet/enroll/', views.enroll, name='enroll'),
  path('wallet/<str:credential_id>/', views.detail, name='detail'),
  path('wallet/<str:credential_id>/share/', views.compose, name='compose'),

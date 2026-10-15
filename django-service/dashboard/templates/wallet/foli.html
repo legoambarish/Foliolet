@@ -1,0 +1,43 @@
+{% extends 'wallet/base.html' %}{% load wallet_ui %}
+{% block title %}Ask Foli · {{ product_label }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% asset 'wallet/foli.css' %}">{% endblock %}
+{% block page_class %} foli-page{% endblock %}
+{% block content %}
+<div id="foli-app" data-api="{% url 'dashboard:foli' %}api/" data-login="{% url 'dashboard:login' %}">
+  <div class="foli-heading"><div><p class="foli-eyebrow">YOUR PRIVATE READING ROOM</p><h1>Ask Foli</h1><p class="muted">Read the details. Follow the source.</p></div>
+    <button id="foli-health" class="foli-runtime" type="button" title="Check local runtime"><span class="foli-dot" aria-hidden="true"></span><span id="foli-health-label">Checking local model</span><span aria-hidden="true">↻</span></button></div>
+  <div id="foli-alert" class="foli-alert" role="alert" hidden></div>
+  <div class="foli-workspace">
+    <aside class="foli-library" aria-label="Document selection">
+      <div class="foli-library-heading"><h2>Your sources</h2><button id="foli-refresh" class="text-btn" type="button" aria-label="Refresh documents">↻</button></div>
+      <label class="sr-only" for="foli-search">Search your documents</label><input id="foli-search" type="search" placeholder="Find a document…" autocomplete="off">
+      <button id="foli-general" class="foli-doc foli-doc-general" type="button" aria-pressed="true"><span class="foli-doc-icon" aria-hidden="true">✳</span><span><strong>General conversation</strong><small>No document needed</small></span></button>
+      <div id="foli-documents" class="foli-documents" aria-live="polite"><p class="foli-library-empty">Loading your documents…</p></div>
+      <p class="foli-library-note">PDF, TXT &amp; CSV<br>Scans are read with local OCR. Other file types are shown with their limits.</p>
+      <div class="foli-privacy"><span aria-hidden="true">◇</span><div><strong>On this computer</strong><p>Foli keeps your questions and selected source local. It can read and explain; it cannot change or share them.</p></div></div>
+    </aside>
+    <section class="foli-chat" aria-label="Conversation with Foli">
+      <div class="foli-context"><div class="foli-context-label"><span class="foli-context-icon" aria-hidden="true">F</span><div><h2 id="foli-document-title">General conversation</h2><p id="foli-document-subtitle">General explanations · no source selected</p></div></div>
+        <div class="foli-context-actions"><button id="foli-source-open" type="button" class="foli-small-btn" disabled>View source</button><button id="foli-clear" type="button" class="foli-small-btn" title="Clear conversation and cached readings">Clear</button></div></div>
+      <details id="foli-coverage" class="foli-coverage" hidden><summary id="foli-coverage-summary">Source coverage</summary><div id="foli-coverage-content"></div></details>
+      <div id="foli-log" class="foli-log" role="log" aria-label="Messages" aria-live="polite" aria-relevant="additions">
+        <div id="foli-welcome" class="foli-welcome"><span class="foli-welcome-mark" aria-hidden="true">F</span><h2>A little clarity,<br>one question at a time.</h2><p>Choose a document to explore its details,<br>or start a conversation here.</p>
+          <div class="foli-suggestions"><button type="button" data-question="Summarize this document, including its main obligations and exceptions.">Summarize a document <span>↗</span></button><button type="button" data-question="Find charges, notice periods and cancellation conditions.">Find fees &amp; deadlines <span>↗</span></button><button type="button" data-review="true">Look for fine print <span>↗</span></button><button type="button" data-question="Explain the difference between a quotation and an interpretation.">Explain a concept <span>↗</span></button></div>
+        </div>
+      </div>
+      <div class="foli-compose-area"><div id="foli-progress" class="foli-progress" role="status" hidden><span class="foli-spinner" aria-hidden="true"></span><span id="foli-progress-label">Reading source</span><button id="foli-stop" type="button" class="text-btn">Stop</button></div>
+        <div class="foli-reading-tools"><button id="foli-review" type="button" class="foli-review-btn" disabled><span aria-hidden="true">⌕</span> Review fine print</button><span>Conversation stays in this tab · server readings expire after 10 min</span></div>
+        <form id="foli-form" class="foli-composer">{% csrf_token %}<label class="sr-only" for="foli-question">Ask Foli a question</label><textarea id="foli-question" rows="1" maxlength="4000" placeholder="Ask anything about your document…" aria-describedby="foli-compose-note"></textarea><button id="foli-send" type="submit" aria-label="Send question" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
+        <p id="foli-compose-note" class="foli-compose-note">Enter to send · Shift + Enter for a new line. Foli can make mistakes; inspect the source.</p>
+      </div>
+    </section>
+  </div>
+  <p class="foli-footnote">A matched quote confirms alignment with the extracted source. It does not establish correct OCR, legal effect or document authenticity.</p>
+  <dialog id="foli-source-dialog" class="foli-source-dialog" aria-labelledby="foli-source-title"><div class="foli-source-toolbar"><div><p class="foli-eyebrow">SOURCE VIEWER</p><h2 id="foli-source-title">Source passage</h2></div><button id="foli-source-close" type="button" class="foli-small-btn" aria-label="Close source viewer">Close ×</button></div>
+    <div class="foli-source-nav"><button id="foli-page-prev" class="foli-small-btn" type="button" aria-label="Previous source page">←</button><span id="foli-page-label"></span><button id="foli-page-next" class="foli-small-btn" type="button" aria-label="Next source page">→</button><button id="foli-original-toggle" class="foli-small-btn" type="button" hidden>Show original page</button></div>
+    <p id="foli-source-status" class="foli-source-status" role="status"></p><div class="foli-source-content"><pre id="foli-source-text"></pre><div id="foli-original" hidden><p class="muted small">Rendered original · compare uncertain text visually</p><img id="foli-page-image" alt="Rendered original PDF page"></div></div>
+  </dialog>
+  <noscript><p class="notice warning">Enable JavaScript for the private chat and source viewer. Your existing Documents tab remains available.</p></noscript>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% asset 'wallet/foli.js' %}" defer></script>{% endblock %}
