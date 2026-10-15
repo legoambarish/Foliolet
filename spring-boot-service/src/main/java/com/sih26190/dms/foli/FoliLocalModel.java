@@ -59,11 +59,11 @@ public class FoliLocalModel {
     } catch (Exception e) { throw new IllegalArgumentException("Foli requires a numeric HTTP loopback Ollama origin with an explicit port"); }
   }
 
-  private OllamaChatOptions options(boolean structured) {
+  private OllamaChatOptions options(Object format) {
     var options = OllamaChatOptions.builder().model(config.getModel()).temperature(0.1)
         .numCtx(config.getContextTokens()).numPredict(config.getOutputTokens()).keepAlive("10m")
         .disableThinking();
-    if (structured) options.format("json");
+    if (format != null) options.format(format);
     return options.build();
   }
 
@@ -92,6 +92,10 @@ public class FoliLocalModel {
   }
 
   public Reply ask(String system, String prompt, boolean structured) {
+    return ask(system,prompt,structured?"json":null);
+  }
+
+  public Reply ask(String system, String prompt, Object format) {
     FoliExtractionService.checkCancel();
     if (!promptFits(system,prompt)) throw new FoliException(HttpStatus.BAD_REQUEST,"CONTEXT_LIMIT",
         "This question and its evidence exceed the safe local context budget. Shorten the question or clear the conversation.");
@@ -106,7 +110,7 @@ public class FoliLocalModel {
     long start=System.nanoTime();
     try {
       // Explicit system/user messages. No tool callbacks, advisors, URLs or source paths.
-      var response=model.call(new Prompt(List.of(new SystemMessage(system),new UserMessage(prompt)),options(structured)));
+      var response=model.call(new Prompt(List.of(new SystemMessage(system),new UserMessage(prompt)),options(format)));
       FoliExtractionService.checkCancel();
       String answer=withoutThinking(response.getResult().getOutput().getText());
       if (answer==null || answer.isBlank()) throw new FoliException(HttpStatus.BAD_GATEWAY,"EMPTY_REPLY","The local model returned no answer. Retry the question.");

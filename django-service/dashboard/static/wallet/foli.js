@@ -237,7 +237,7 @@
     if (document) {
       if (!document.supported) alert('This file type is not supported yet. Foli currently reads PDF, UTF-8 TXT and CSV.');
       else await run('index');
-    } else assistantMessage({answer: 'Hello. Ask me to explain a concept, write a summary, or think through a question. Select one of your documents when you want answers with source evidence.', answerKind: 'GENERAL', citations: [], warnings: []});
+    } else assistantMessage({answer: 'Hello. Ask general questions here. To summarize or ask about a document, select it from Your sources in the sidebar first.', answerKind: 'GENERAL', citations: [], warnings: []});
     $('question').focus();
   }
   function renderDocuments() {

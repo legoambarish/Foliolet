@@ -65,17 +65,19 @@ class FoliQaTest {
   }
   @Test void flexibleReadQuestionsReachModelButWriteRequestsHaveNoToolPath() throws Exception {
     var model=mock(FoliLocalModel.class); when(model.promptFits(anyString(),anyString())).thenReturn(true); var service=new FoliChatService(model,retrieval,verifier);
-    when(model.ask(anyString(),anyString(),eq(true))).thenReturn(
+    when(model.ask(anyString(),anyString(),eq(FoliChatService.GENERAL_FORMAT))).thenReturn(
         new FoliLocalModel.Reply("{\"answer\":\"A careful-reading haiku.\"}",3,10),
         new FoliLocalModel.Reply("analysis: private self-talk",3,10));
     var general=service.chat("Write a haiku about careful reading",List.of(),null,s -> {});
     assertEquals("GENERAL",general.answerKind()); assertEquals("A careful-reading haiku.",general.answer());
     var malformed=service.chat("hi what can you do for me?",List.of(),null,s -> {});
     assertFalse(malformed.answer().contains("private self-talk")); assertTrue(malformed.warnings().size()>0);
-    verify(model,times(2)).ask(eq(FoliChatService.GENERAL_SYSTEM),anyString(),eq(true));
+    var needsDocument=service.chat("Please summarize my document",List.of(),null,s -> {});
+    assertEquals("Please select a wallet/document from the sidebar first, then ask me about it.",needsDocument.answer());
+    verify(model,times(2)).ask(eq(FoliChatService.GENERAL_SYSTEM),anyString(),eq(FoliChatService.GENERAL_FORMAT));
     assertTrue(service.chat("Delete this document",List.of(),corpus(),s -> {}).answer().contains("cannot"));
     assertTrue(service.chat("Revoke my share link",List.of(),null,s -> {}).answer().contains("cannot"));
-    verify(model,times(2)).ask(anyString(),anyString(),eq(true));
+    verify(model,never()).ask(anyString(),anyString(),eq(true));
   }
   @Test void unknownEvidenceAndQuotesAreNotMarkedVerified() throws Exception {
     var model=mock(FoliLocalModel.class); when(model.promptFits(anyString(),anyString())).thenReturn(true); var service=new FoliChatService(model,retrieval,verifier);
@@ -134,6 +136,11 @@ class FoliQaTest {
       var body=json.readTree(requests.get(0));
       assertTrue(!body.hasNonNull("tools") || body.path("tools").isEmpty()); assertFalse(body.path("stream").asBoolean());
       assertEquals("json",body.path("format").asText());
+      model.ask("s","p",FoliChatService.GENERAL_FORMAT);
+      var generalBody=json.readTree(requests.get(1));
+      assertEquals("object",generalBody.path("format").path("type").asText());
+      assertEquals("string",generalBody.path("format").path("properties").path("answer").path("type").asText());
+      assertEquals("answer",generalBody.path("format").path("required").get(0).asText());
       assertFalse(model.promptFits("s","x".repeat(8192)));
       assertEquals("CONTEXT_LIMIT",assertThrows(FoliException.class,() -> model.ask("s","x".repeat(8192),true)).code());
     } finally { server.stop(0); }
