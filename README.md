@@ -2,6 +2,12 @@
 
 **Share the fact, not the file.**
 
+On the existing `cf` branch, **Ask Foli** adds private local Ollama conversation,
+authorized PDF/TXT/CSV reading, scanned-page OCR, exact source citations and
+whole-document fine-print review. Start it with the [Foli runbook](docs/FOLI_IMPLEMENTATION.md),
+see the [measured evaluation](docs/FOLI_EVALUATION_2026-10-15.md), or follow the
+[complete demonstration](docs/FOLI_DEMO.md).
+
 ### Try the Demo here (we're using a free tier render plan to deploy this, so the site will be slow, please be patient): https://foliolet-demo.onrender.com 
 
 

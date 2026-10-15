@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class FoliBoundaryFilter extends OncePerRequestFilter {
   private final FoliProperties config;
+  private final java.util.concurrent.Semaphore requests=new java.util.concurrent.Semaphore(4);
   public FoliBoundaryFilter(FoliProperties config) { this.config = config; }
   @Override protected boolean shouldNotFilter(HttpServletRequest request) {
     return !request.getRequestURI().startsWith("/api/foli");
@@ -54,7 +55,9 @@ public class FoliBoundaryFilter extends OncePerRequestFilter {
         @Override public BufferedReader getReader() { return new BufferedReader(new InputStreamReader(getInputStream(), java.nio.charset.StandardCharsets.UTF_8)); }
       };
     }
-    chain.doFilter(request, response);
+    if(!requests.tryAcquire()) { reject(response,429,"BUSY","The private reader is busy. Retry shortly."); return; }
+    try { chain.doFilter(request,response); }
+    finally { requests.release(); }
   }
   private static void reject(HttpServletResponse response, int status, String code, String message) throws IOException {
     response.setStatus(status); response.setContentType("application/json");

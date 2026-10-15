@@ -53,13 +53,22 @@ def call(path, payload=None, timeout=180):
 
 
 def memory():
+    measurement = {}
     try:
         result = subprocess.run(['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader,nounits'],
                                 capture_output=True, text=True, timeout=5, check=True)
         used, total = map(int, result.stdout.strip().split(','))
-        return {'gpuUsedMiB': used, 'gpuTotalMiB': total}
+        measurement.update({'gpuUsedMiB': used, 'gpuTotalMiB': total})
     except Exception:
-        return {}
+        pass
+    if os.name == 'nt':
+        try:
+            command = "@{processes=@(Get-Process -Name ollama,llama-server,java,tesseract -ErrorAction SilentlyContinue | Select-Object ProcessName,Id,WorkingSet64,PeakWorkingSet64,CPU); os=Get-CimInstance Win32_OperatingSystem | Select-Object FreePhysicalMemory,TotalVisibleMemorySize} | ConvertTo-Json -Depth 4 -Compress"
+            result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', command],capture_output=True,text=True,timeout=12,check=True)
+            measurement['ram'] = json.loads(result.stdout)
+        except Exception as error:
+            measurement['ramUnavailable'] = type(error).__name__
+    return measurement
 
 
 def score(case, response):
@@ -133,11 +142,13 @@ def main():
             call('/api/generate', {'model': loaded['name'], 'keep_alive': 0})
         started = time.perf_counter()
         response = call('/api/chat', {'model': name, 'messages': [{'role': 'user', 'content': 'In one sentence, explain a contractual notice period.'}],
-                        'stream': False, 'think': False, 'keep_alive': 0,
+                        'stream': False, 'think': False, 'keep_alive': '30s',
                         'options': {'num_gpu': 0, 'num_ctx': 4096, 'num_predict': 80}}, timeout=180)
         report['cpuFallback'] = {'model': name, 'seconds': round(time.perf_counter()-started, 3),
                                  'tokens': response.get('eval_count'), 'answer': response.get('message', {}).get('content'),
-                                 'tokensPerSecond': round(response.get('eval_count', 0)/max(response.get('eval_duration', 1)/1e9, .001), 2)}
+                                 'tokensPerSecond': round(response.get('eval_count', 0)/max(response.get('eval_duration', 1)/1e9, .001), 2),
+                                 'running':call('/api/ps'),'resources':memory()}
+        call('/api/generate',{'model':name,'keep_alive':0})
     target.write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(f'Saved {target}', flush=True)
 

@@ -97,6 +97,7 @@ public class FoliJobs {
   }
   private void current(Job job,User user) {
     if (job.documentId==null) return;
+    user=users.findById(job.owner).orElseThrow(AuthorizedDocumentResolver::missing);
     Source current=resolver.open(job.documentId,user);
     FoliController.requireHash(job.hash,current.hash());
     if (!job.version.equals(current.document().version())) throw AuthorizedDocumentResolver.failure("SOURCE_CHANGED","Document version changed. Read it again.");

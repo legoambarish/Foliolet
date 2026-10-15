@@ -9,6 +9,11 @@ are recorded in ignored `.local-data/foli/starting-refs.txt`. No remote operatio
 Both supplied Markdown documents were read completely. The current implementation
 request overrides their historical planning-only/branch-creation instructions.
 
+Input identities (SHA-256): research plan
+`6fc4ff6895ea172f2515eb117f8f9a1951d399f569ab6ec1b89f866727b7e49d`;
+implementation master prompt
+`84ffc0cedec318e447dcd03a975d65a9fecea7744290aab26007bd518a5d6844`.
+
 ## Actual architecture and read contract
 
 * Spring Boot 4.1.1 / Java 17, PDFBox 3.0.8, JPA/PostgreSQL and HTTP Basic

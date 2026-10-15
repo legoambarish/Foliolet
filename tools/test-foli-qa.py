@@ -51,6 +51,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--limit',type=int,default=80)
     parser.add_argument('--output',default='phase-2-qa-live.json')
+    parser.add_argument('--ids',nargs='*',help='Optional case IDs for a targeted regression; omitted means the full corpus')
     args=parser.parse_args()
     fixture=json.loads((OUT/'reading-fixture.json').read_text())
     auth,other=fixture['auth']
@@ -58,7 +59,8 @@ def main():
     results=[]
     health=call('GET','/health',auth).json()
     print('Runtime:',health['ollama']['status'],health['ollama']['model'],flush=True)
-    for case in gold_cases()[:args.limit]:
+    cases=[case for case in gold_cases() if not args.ids or case['id'] in args.ids]
+    for case in cases[:args.limit]:
         payload={'question':case['question'],'mode':'chat','history':[]}
         if case['kind']!='general': payload['documentId']=doc
         outcome,seconds=job(payload,auth,other if not results else None)

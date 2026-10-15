@@ -8,7 +8,8 @@ import static com.sih26190.dms.foli.FoliData.*;
 @Service
 public class FoliRetrievalService {
   public record Span(String id, int page, int start, int end, String text) {}
-  private static final Set<String> STOP=Set.of("the","a","an","of","to","is","it","and","in","on","for","what","how","does","this","that","document","please","me","can","you","are","be","with","as","my");
+  private static final Set<String> STOP=Set.of("the","a","an","of","to","is","it","and","in","on","for","what","how","does","this","that","document","please","me","can","you","are","be","with","as","my",
+      "do","did","when","who","which","where","why","would","could","should","need","will","has","have","was","were","am");
   private static final Map<String,String> EXPANSIONS=Map.ofEntries(
       Map.entry("cancel","cancellation terminate termination notice"),Map.entry("continue","renewal renew subscription"),
       Map.entry("compensation","liability damages loss cap"),Map.entry("quality","warranty warranties defect"),
@@ -48,16 +49,29 @@ public class FoliRetrievalService {
     var scores=new HashMap<Span,Double>();
     for (var span:spans) {
       String lower=span.text().toLowerCase(Locale.ROOT); Set<String> words=tokens(lower); double score=0;
-      for (var term:terms) if (words.contains(term)) score+=1+Math.log(1.0+spans.size()/(double)(1+documentFrequency.getOrDefault(term,0)));
+      // BM25-style IDF suppresses repeated page headers/boilerplate. Common
+      // auxiliary words must not turn unrelated archive pages into evidence.
+      for (var term:terms) if (words.contains(term)) {
+        int frequency=documentFrequency.getOrDefault(term,0);
+        score+=Math.log(1+(spans.size()-frequency+.5)/(frequency+.5));
+      }
       for (String quote:quotes) if (span.text().contains(quote)) score+=50;
       var clause=Pattern.compile("(?i)\\b(?:clause|section|paragraph)\\s+(\\d+)\\b").matcher(question);
-      while(clause.find()) if(Pattern.compile("(?i)\\b(?:clause|section)\\s+"+clause.group(1)+"[.: ]").matcher(span.text()).find()) score+=30;
+      boolean first=true;
+      while(clause.find()) {
+        String number=clause.group(1);
+        if(Pattern.compile("(?im)^\\s*(?:clause|section)\\s+"+number+"[.: ]").matcher(span.text()).find()) score+=first?100:25;
+        else if(Pattern.compile("(?i)\\b(?:clause|section)\\s+"+number+"[.: ]").matcher(span.text()).find()) score+=10;
+        first=false;
+      }
       if (score>0) scores.put(span,score);
     }
     var ranked=new ArrayList<>(scores.keySet());
     ranked.sort(Comparator.<Span>comparingDouble(s -> -scores.get(s)).thenComparingInt(Span::page).thenComparingInt(Span::start));
     var chosen=new LinkedHashSet<Span>(); int characters=0;
+    double floor=ranked.isEmpty()?0:scores.get(ranked.get(0))*.10;
     for (var span:ranked) {
+      if(scores.get(span)<floor) continue;
       if (chosen.size()>=6 || characters+span.text().length()>10_000) break;
       chosen.add(span); characters+=span.text().length();
     }

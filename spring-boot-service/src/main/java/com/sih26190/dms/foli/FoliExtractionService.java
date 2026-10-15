@@ -20,7 +20,7 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 @Service
 public class FoliExtractionService {
-  public static final String VERSION = "foli-pages-1";
+  public static final String VERSION = "foli-pages-2";
   private final FoliProperties config;
   private final OcrService ocr;
   public FoliExtractionService(FoliProperties config, OcrService ocr) { this.config = config; this.ocr = ocr; }
@@ -57,9 +57,17 @@ public class FoliExtractionService {
     var result = new ArrayList<Page>(); int characters = 0;
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(config.getExtractionTimeoutSeconds());
     try (PDDocument document = Loader.loadPDF(bytes)) {
+      if(document.getNumberOfPages()==0) throw new FoliException(HttpStatus.UNPROCESSABLE_CONTENT,"EMPTY_PDF","This PDF has no pages to read.");
       if (document.getNumberOfPages() > 5000) throw new FoliException(HttpStatus.PAYLOAD_TOO_LARGE,
           "PAGE_COUNT_LIMIT", "This PDF exceeds the 5000-page accounting safety ceiling; no review was completed.");
       PDFRenderer renderer = new PDFRenderer(document); renderer.setSubsamplingAllowed(true);
+      var documentWarnings=new ArrayList<String>();
+      var catalog=document.getDocumentCatalog();
+      if(catalog.getOpenAction()!=null) documentWarnings.add("PDF opening actions are ignored and never executed.");
+      if(catalog.getNames()!=null && catalog.getNames().getEmbeddedFiles()!=null)
+        documentWarnings.add("Embedded attachments are not read. Review them separately in a suitable viewer.");
+      if(catalog.getAcroForm()!=null && catalog.getAcroForm().hasXFA())
+        documentWarnings.add("Dynamic XFA form content may not render completely. Foli cannot guarantee coverage of those fields.");
       for (int i = 0; i < document.getNumberOfPages(); i++) {
         checkCancel(); int number = i + 1;
         progress.accept("Reading page " + number + "/" + document.getNumberOfPages());
@@ -67,21 +75,25 @@ public class FoliExtractionService {
           result.add(empty(number, "SKIPPED_LIMIT", "Page not processed: page, character or extraction-time budget reached.")); continue;
         }
         try {
+          PDPage page = document.getPage(i);
+          boolean images = hasImage(page.getResources(), 0, Collections.newSetFromMap(new IdentityHashMap<>()),new long[2]);
+          boolean forms=page.getAnnotations().stream().anyMatch(a -> a instanceof org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget);
           var stripper = new QualityStripper(config.getMaxPageCharacters(), deadline); stripper.setSortByPosition(true);
           stripper.setStartPage(number); stripper.setEndPage(number);
           String nativeText = stripper.getText(document);
           if (nativeText.length() > config.getMaxPageCharacters()) {
             result.add(empty(number, "SKIPPED_LIMIT", "Page text exceeds the character safety limit.")); continue;
           }
-          PDPage page = document.getPage(i);
-          boolean images = hasImage(page.getResources(), 0, Collections.newSetFromMap(new IdentityHashMap<>()));
           boolean suspicious = nativeText.strip().length() < 24 || nativeText.indexOf('\ufffd') >= 0
               || nativeText.chars().filter(c -> Character.isISOControl(c) && !Character.isWhitespace(c)).count() > 3;
           var warnings = new ArrayList<String>();
+          if(i==0) warnings.addAll(documentWarnings);
+          if(forms) warnings.add("PDF form widgets detected; embedded text and rendered-page OCR must be compared.");
           if (stripper.tiny) warnings.add("Very small print detected; check the rendered original.");
+          if (stripper.columns) warnings.add("Separated columns or table cells detected. Extracted reading order may differ from the visual page; inspect the original before interpreting scope.");
           String text = nativeText; String status = "TEXT"; Double confidence = null;
           List<Word> words = List.of(); int rotation = 0;
-          if (suspicious || images) {
+          if (suspicious || images || forms) {
             progress.accept("OCR page " + number + "/" + document.getNumberOfPages());
             var image = render(renderer, page, i, 200);
             var recognized = ocr.recognize(image); image.flush();
@@ -145,6 +157,7 @@ public class FoliExtractionService {
     if (!source.document().format().equals("pdf")) throw new FoliException(HttpStatus.BAD_REQUEST, "NO_RENDER", "Original page preview is available for PDF only.");
     try (var document = Loader.loadPDF(source.bytes())) {
       if (number < 1 || number > document.getNumberOfPages()) throw AuthorizedDocumentResolver.missing();
+      hasImage(document.getPage(number-1).getResources(),0,Collections.newSetFromMap(new IdentityHashMap<>()),new long[2]);
       var renderer = new PDFRenderer(document); renderer.setSubsamplingAllowed(true);
       var image = render(renderer, document.getPage(number-1), number-1, 130);
       var output = new ByteArrayOutputStream(); javax.imageio.ImageIO.write(image, "png", output); image.flush(); return output.toByteArray();
@@ -158,25 +171,40 @@ public class FoliExtractionService {
     if (dpi < 20) throw new IOException("Page dimensions exceed rendering ceiling");
     return renderer.renderImageWithDPI(index, dpi, ImageType.RGB);
   }
-  private static boolean hasImage(PDResources resources, int depth, Set<Object> visited) throws IOException {
-    if (resources == null || !visited.add(resources.getCOSObject())) return false;
-    if (depth > 10) return true; // Suspicious nested forms need rendered-page checking.
-    for (var name : resources.getXObjectNames()) {
-      var object = resources.getXObject(name);
-      if (object instanceof PDImageXObject) return true;
-      if (object instanceof PDFormXObject form && hasImage(form.getResources(), depth+1, visited)) return true;
-    }
-    return false;
+  private static boolean hasImage(PDResources resources, int depth, Set<Object> ancestors,long[] budget) throws IOException {
+    if(resources==null) return false;
+    if(depth>10 || !ancestors.add(resources.getCOSObject())) throw new IOException("Nested/cyclic PDF resources exceed the safety budget");
+    boolean found=false;
+    try {
+      for(var name:resources.getXObjectNames()) {
+        checkCancel(); if(++budget[1]>5000) throw new IOException("PDF resource count exceeds the safety budget");
+        var object=resources.getXObject(name);
+        if(object instanceof PDImageXObject image) {
+          long pixels=(long)image.getWidth()*image.getHeight(); budget[0]+=pixels;
+          if(image.getWidth()<=0 || image.getHeight()<=0 || pixels>80_000_000 || budget[0]>100_000_000)
+            throw new IOException("PDF decoded-image dimensions exceed the safety budget");
+          found=true;
+        }
+        if(object instanceof PDFormXObject form) found=hasImage(form.getResources(),depth+1,ancestors,budget) || found;
+      }
+    } finally { ancestors.remove(resources.getCOSObject()); }
+    return found;
   }
   static Page empty(int page, String status, String warning) { return new Page(page, "", status, null, 0, 0, 0, List.of(), List.of(warning)); }
   static void checkCancel() { if (Thread.currentThread().isInterrupted()) throw new CancellationException(); }
   private static class QualityStripper extends PDFTextStripper {
-    boolean tiny; int count; final int maximum; final long deadline;
+    boolean tiny,columns; int count; final int maximum; final long deadline;
+    final Map<Integer,double[]> rows=new HashMap<>();
     QualityStripper(int maximum, long deadline) throws IOException { super(); this.maximum=maximum; this.deadline=deadline; }
     @Override protected void processTextPosition(TextPosition position) {
       checkCancel();
       if (++count > maximum || System.nanoTime()>deadline) throw new TextBudgetException();
       if (position.getFontSizeInPt() < 6) tiny = true;
+      int row=(int)Math.round(position.getYDirAdj()/3);
+      double x=position.getXDirAdj(),end=x+position.getWidthDirAdj();
+      var bounds=rows.get(row);
+      if(bounds==null) rows.put(row,new double[]{x,end});
+      else { if(x-bounds[1]>60 || bounds[0]-end>60) columns=true; bounds[0]=Math.min(bounds[0],x); bounds[1]=Math.max(bounds[1],end); }
       super.processTextPosition(position);
     }
   }

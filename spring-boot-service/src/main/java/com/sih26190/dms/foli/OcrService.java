@@ -35,8 +35,11 @@ public class OcrService {
     for (int angle : new int[] {0, 90, 180, 270}) {
       if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException();
       if (System.nanoTime() >= deadline) break;
-      Result result = run(angle == 0 ? input : rotate(input, angle), angle, deadline);
-      if (result.confidence() > best.confidence() || (best.text().isBlank() && !result.text().isBlank())) best = result;
+      BufferedImage frame=angle==0?input:rotate(input,angle);
+      Result result;
+      try { result=run(frame,angle,deadline); }
+      finally { if(frame!=input) frame.flush(); }
+      if (result.confidence() > best.confidence() || best.text().isBlank()) best = result;
       if (!best.text().isBlank() && best.confidence() >= 78) break;
     }
     return best;

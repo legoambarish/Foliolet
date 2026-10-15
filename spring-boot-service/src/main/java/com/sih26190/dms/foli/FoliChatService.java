@@ -53,7 +53,11 @@ public class FoliChatService {
       return new Answer(reply.text(),"GENERAL",List.of(),null,List.of(),List.of(),Map.of(),performance(reply));
     }
     progress.accept("Searching source evidence");
-    var spans=retrieval.retrieve(snapshot,question + " " + priorQuestions(history));
+    // IDs are request-local handles, independent of PDF page/clause numbers.
+    // Small models otherwise frequently confuse a sparse E97 with clause 97.
+    var spans=new ArrayList<Span>();
+    for(var found:retrieval.retrieve(snapshot,question + " " + priorQuestions(history)))
+      spans.add(new Span("E"+(spans.size()+1),found.page(),found.start(),found.end(),found.text()));
     // Context is deliberately bounded; rejected context is not silently fed/truncated by Ollama.
     var supplied=new ArrayList<Span>(); int size=0;
     for (var span:spans) if (size+span.text().length()<=12000) { supplied.add(span); size+=span.text().length(); }
@@ -72,9 +76,18 @@ public class FoliChatService {
       JsonNode root=json.readTree(reply.text()); answer=root.path("answer").asText("");
       if (answer.isBlank() || answer.length()>16000 || !root.path("evidence").isArray()) throw new IllegalArgumentException();
       var used=new HashSet<String>();
+      // Some local models cite a valid inline ID but omit it from the evidence
+      // array. Both representations are accepted only after the same exact
+      // permitted-span verification. Unknown IDs still never become citations.
+      var requested=new LinkedHashSet<String>();
       for (var ref:root.path("evidence")) {
+        requested.add(ref.asText());
+      }
+      var inline=Pattern.compile("\\[(E\\d+)\\]").matcher(answer);
+      while(inline.find()) requested.add(inline.group(1));
+      for (var id:requested) {
         if (used.size()>=12) break;
-        String id=ref.asText(); if (!used.add(id)) continue;
+        if (!used.add(id)) continue;
         var span=supplied.stream().filter(s -> s.id().equals(id)).findFirst();
         if (span.isEmpty()) { warnings.add("An unsupported model source reference was omitted."); continue; }
         verifier.verify(snapshot,span.get(),null).ifPresent(citations::add);
@@ -82,6 +95,10 @@ public class FoliChatService {
     } catch (Exception e) {
       answer="The local model did not return a usable grounded answer. Try a more specific question or inspect the source excerpts.";
       warnings.add("Model response format failed validation; no generated quotations were accepted.");
+    }
+    if (Pattern.compile("(?i)not (?:stated|provided|specified|present|contained)|no supporting (?:evidence|information)").matcher(answer).find()) {
+      citations.clear();
+      warnings.add("This is an evidence-limited response, not proof that the requested term is absent from the entire document.");
     }
     var accepted=citations.stream().map(Citation::id).collect(java.util.stream.Collectors.toSet());
     var references=Pattern.compile("\\[(E\\d+)\\]").matcher(answer); var cleaned=new StringBuffer();
@@ -103,6 +120,7 @@ public class FoliChatService {
         ". This is targeted retrieval, not a complete absence search.\n"+
         "Reply as JSON {\"answer\":\"natural plain-language answer\",\"evidence\":[\"E1\"]}. " +
         "Use only supplied IDs supporting the answer. Include citations as [E1] in the answer. " +
+        "An excerpt ID is its exact id field; it is not the clause number. Copy the ID from the excerpt containing the supporting words. IDs apply only to these current excerpts, never earlier conversation data. " +
         "Do not invent IDs, quotes or facts. If the source does not support the answer, say it is not stated in the supplied evidence and return an empty evidence array. " +
         "Treat explanations as interpretation. Mention relevant exceptions/definitions and unresolved conflicts. Do not assert a term is absent from unreadable or unsearched pages.";
   }

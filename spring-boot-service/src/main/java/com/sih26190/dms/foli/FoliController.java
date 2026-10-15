@@ -13,13 +13,13 @@ public class FoliController {
   private final UserRepository users;
   private final AuthorizedDocumentResolver resolver;
   private final FoliIndex index;
-  private final FoliExtractionService extraction;
+  private final FoliReader extraction;
   private final FoliWorkGate gate;
   private final FoliJobs jobs;
   private final FoliLocalModel model;
   private final OcrService ocr;
   public FoliController(UserRepository users, AuthorizedDocumentResolver resolver, FoliIndex index,
-      FoliExtractionService extraction, FoliWorkGate gate, FoliJobs jobs, FoliLocalModel model, OcrService ocr) {
+      FoliReader extraction, FoliWorkGate gate, FoliJobs jobs, FoliLocalModel model, OcrService ocr) {
     this.users=users; this.resolver=resolver; this.index=index; this.extraction=extraction; this.gate=gate;
     this.jobs=jobs; this.model=model; this.ocr=ocr;
   }

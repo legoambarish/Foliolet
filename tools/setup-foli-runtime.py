@@ -20,7 +20,6 @@ ROOT = Path(__file__).resolve().parents[1]
 OLLAMA_VERSION = "0.40.3"
 OLLAMA_SHA = "e5ecff02dfc7cae8ddf6d6b7a7ac5f727ffeedf4491f44ae75ff5b0820dbbbd5"
 OCR_VERSION = "5.5.3"
-OCR_NAME = "tesseract-ocr-w64-setup-5.5.3.20260724.exe"
 
 
 def download(url, target, expected):
@@ -75,7 +74,12 @@ def main():
         shutil.copytree(reused / "models", models)
     ocr = tools / "ocr"
     ocr_exe = ocr / "Library/bin/tesseract.exe"
-    receipts = {"ollamaVersion": OLLAMA_VERSION, "ollamaArchiveSha256": OLLAMA_SHA}
+    receipt_file=ROOT / ".local-data/foli/runtime-setup.json"
+    receipt_file.parent.mkdir(parents=True,exist_ok=True)
+    receipts=json.loads(receipt_file.read_text()) if receipt_file.exists() else {}
+    receipts.update({"ollamaVersion": OLLAMA_VERSION, "ollamaArchiveSha256": OLLAMA_SHA})
+    lock=ROOT / 'tools/foli-ocr-win64.lock'
+    receipts['ocrLockSha256']=hashlib.sha256(lock.read_bytes()).hexdigest()
     if not ocr_exe.exists():
         # The upstream Windows installer requires elevation. Use an isolated
         # conda-forge prefix instead; no UAC, system installation or PATH changes.
@@ -92,11 +96,14 @@ def main():
         env["MAMBA_ROOT_PREFIX"] = str(tools / "mamba-cache")
         env["MAMBA_SSL_VERIFY"] = requests.certs.where()
         print(time.strftime("%H:%M:%S"), "Installing Tesseract in an isolated cf prefix", flush=True)
-        subprocess.run([str(micro), "create", "--no-rc", "-y", "-p", str(ocr), "-c", "conda-forge",
-                        "tesseract=5.5.3"], check=True, timeout=600, env=env)
+        subprocess.run([str(micro), "create", "--no-rc", "-y", "-p", str(ocr), "--file", str(lock)],
+                       check=True, timeout=600, env=env)
         receipts["micromambaArchiveSha256"] = micro_sha
-    subprocess.run([str(ocr_exe), "--version"], check=True, timeout=10)
-    (ROOT / ".local-data/foli/runtime-setup.json").write_text(json.dumps(receipts, indent=2), encoding="utf-8")
+    version=subprocess.run([str(ocr_exe), "--version"], check=True, timeout=10,capture_output=True,text=True).stdout
+    if not version.startswith('tesseract '+OCR_VERSION): raise RuntimeError('Unexpected installed OCR version; retained without replacement')
+    print(version.splitlines()[0],flush=True)
+    receipts['tesseractVersion']=OCR_VERSION
+    receipt_file.write_text(json.dumps(receipts, indent=2), encoding="utf-8")
     print("Runtime setup complete. Start tools/start-foli-ollama.ps1, then explicitly pull any missing candidate.", flush=True)
 
 

@@ -56,6 +56,13 @@ class FoliQaTest {
     assertTrue(verifier.suppressUnsupportedQuotes("It states \"Invented exact quotation\".",List.of(span),warnings).contains("omitted"));
     assertFalse(warnings.isEmpty());
   }
+  @Test void exactClauseHeadingsLeadAndBoilerplateIsNotEvidenceForAnUnrelatedQuestion() throws Exception {
+    var source=corpus();
+    assertEquals(28,retrieval.retrieve(source,"Explain clause 10: For clause 4, Eligible Customer means annual usage below 100 units.").get(0).page());
+    var selected=retrieval.retrieve(source,"How quickly do I need to notify a claim?");
+    assertTrue(selected.stream().anyMatch(s -> s.page()==25));
+    assertTrue(selected.stream().noneMatch(s -> s.page()==2));
+  }
   @Test void flexibleReadQuestionsReachModelButWriteRequestsHaveNoToolPath() throws Exception {
     var model=mock(FoliLocalModel.class); when(model.promptFits(anyString(),anyString())).thenReturn(true); var service=new FoliChatService(model,retrieval,verifier);
     when(model.ask(anyString(),anyString(),eq(false))).thenReturn(new FoliLocalModel.Reply("A careful-reading haiku.",3,10));
@@ -71,6 +78,16 @@ class FoliQaTest {
     var result=service.chat("Explain the fee",List.of(),corpus(),s -> {});
     assertTrue(result.citations().isEmpty()); assertEquals("NO_SOURCE_SUPPORT",result.answerKind());
     assertFalse(result.answer().contains("one million")); assertFalse(result.answer().contains("[E9999]"));
+  }
+  @Test void abstentionDoesNotAttachAnIrrelevantSourceButValidInlineEvidenceIsVerified() throws Exception {
+    var source=corpus(); var model=mock(FoliLocalModel.class); when(model.promptFits(anyString(),anyString())).thenReturn(true);
+    var service=new FoliChatService(model,retrieval,verifier);
+    when(model.ask(anyString(),anyString(),eq(true))).thenReturn(new FoliLocalModel.Reply(
+        "{\"answer\":\"The bank account is not stated in the supplied evidence [E1].\",\"evidence\":[\"E1\"]}",1,8));
+    assertTrue(service.chat("Explain clause 1",List.of(),source,s -> {}).citations().isEmpty());
+    when(model.ask(anyString(),anyString(),eq(true))).thenReturn(new FoliLocalModel.Reply(
+        "{\"answer\":\"The subscription renews unless cancelled [E1].\",\"evidence\":[]}",1,8));
+    assertEquals(1,service.chat("Explain clause 1",List.of(),source,s -> {}).citations().size());
   }
   @Test void loopbackOriginRejectsRemoteNamesCredentialsPathsAndRedirectTargets() {
     for(String url:List.of("https://127.0.0.1:11434","http://localhost:11434","http://example.com:11434",
@@ -165,5 +182,18 @@ class FoliQaTest {
         assertEquals("COMPLETE",jobs.get(id,user).get("state"));
       }
     } finally { jobs.close(); }
+  }
+  @Test void simultaneousReadRequestsAreBoundedWithoutBlockingPollThreads() throws Exception {
+    var filter=new FoliBoundaryFilter(new FoliProperties()); var entered=new CountDownLatch(4); var release=new CountDownLatch(1);
+    var pool=Executors.newFixedThreadPool(4); var tasks=new ArrayList<java.util.concurrent.Future<?>>();
+    try {
+      for(int i=0;i<4;i++) tasks.add(pool.submit(() -> {
+        var request=new MockHttpServletRequest("GET","/api/foli/source"); request.setRemoteAddr("127.0.0.1");
+        try { filter.doFilter(request,new MockHttpServletResponse(),(q,s) -> { entered.countDown(); try { release.await(); } catch(InterruptedException e) { Thread.currentThread().interrupt(); } }); }
+        catch(Exception e) { throw new RuntimeException(e); }
+      }));
+      assertTrue(entered.await(2,TimeUnit.SECONDS)); var request=new MockHttpServletRequest("GET","/api/foli/jobs/id"); request.setRemoteAddr("127.0.0.1");
+      var response=new MockHttpServletResponse(); filter.doFilter(request,response,(q,s) -> fail("Fifth request should be rejected promptly")); assertEquals(429,response.getStatus());
+    } finally { release.countDown(); for(var task:tasks) task.get(2,TimeUnit.SECONDS); pool.shutdownNow(); }
   }
 }

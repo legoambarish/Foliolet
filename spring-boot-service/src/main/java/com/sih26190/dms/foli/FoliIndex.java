@@ -12,15 +12,17 @@ public class FoliIndex {
   private record Entry(Snapshot snapshot, long expires) {}
   private final Map<String, Entry> cache = new LinkedHashMap<>(16, .75f, true);
   private final AuthorizedDocumentResolver resolver;
-  private final FoliExtractionService extraction;
+  private final FoliReader extraction;
   private final FoliProperties config;
   private final FoliWorkGate gate;
-  public FoliIndex(AuthorizedDocumentResolver resolver, FoliExtractionService extraction, FoliProperties config, FoliWorkGate gate) {
+  public FoliIndex(AuthorizedDocumentResolver resolver, FoliReader extraction, FoliProperties config, FoliWorkGate gate) {
     this.resolver = resolver; this.extraction = extraction; this.config = config; this.gate = gate;
   }
   public Snapshot read(String id, User user, Consumer<String> progress) {
-    Source source = resolver.open(id, user);
     String prefix = user.getId() + ":" + id + ":";
+    Source source;
+    try { source=resolver.open(id,user); }
+    catch(RuntimeException e) { synchronized(cache) { cache.keySet().removeIf(k -> k.startsWith(prefix)); } throw e; }
     String key = prefix + source.document().version() + ":" + source.hash() + ":" + FoliExtractionService.VERSION;
     synchronized (cache) {
       cache.entrySet().removeIf(e -> e.getValue().expires < System.currentTimeMillis()
