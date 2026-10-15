@@ -97,6 +97,180 @@ persistent local Ganache EVM, not a public network.
 
 ## Run locally
 
+### macOS setup (Homebrew, Docker Compose, manual service terminals)
+
+These steps use the repository's cross-platform Maven/Node/Python entry points; the checked-in PowerShell launchers are Windows-only. Run development services on loopback and use harmless documents. Do not fund the local EVM key or expose these development servers to a network.
+
+#### 1. Install prerequisites
+
+Install Homebrew if needed, then install Java 17, Python 3.12, Node/npm, Ollama and Tesseract. Docker Desktop is used for the project's PostgreSQL container:
+
+```sh
+brew install openjdk@17 python@3.12 node ollama tesseract
+brew install --cask docker
+open -a Docker
+```
+
+Wait for Docker Desktop to start, then verify the tools:
+
+```sh
+export JAVA_HOME="$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$(brew --prefix openjdk@17)/bin:$PATH"
+java -version                 # Java 17
+python3.12 --version
+node --version
+npm --version
+docker info
+tesseract --version           # Tesseract 5
+tesseract --list-langs        # must include eng
+```
+
+#### 2. Clone and build dependencies
+
+```sh
+git clone https://github.com/legoambarish/Foliolet.git
+cd Foliolet
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip
+./.venv/bin/python -m pip install -r django-service/requirements.txt -r tools/requirements-dev.txt
+npm ci
+npm --prefix spring-boot-service ci
+npm run contracts:build
+npm run assets:build
+```
+
+The Python environment includes Django and the watcher's `watchdog`, PyCryptodome and HTTP dependencies. `npm ci` installs the workspace UI dependencies; the Spring tools install pinned Solidity 0.8.19, ethers and Ganache. Spring Boot dependencies are resolved by the Maven wrapper on its first build; no global Maven install is required.
+
+#### 3. Start PostgreSQL
+
+The Spring wallet backend uses PostgreSQL at `127.0.0.1:55432`; Django's local session/account database is SQLite under `.local-data/`. Use the supplied Compose service for PostgreSQL:
+
+```sh
+cp .env.example .env
+```
+
+Edit `.env` and replace `POSTGRES_PASSWORD` with a fresh local development password, then run:
+
+```sh
+docker compose up -d postgres
+docker compose ps
+```
+
+Keep that password private. In the Spring terminal below, set `SPRING_DATASOURCE_PASSWORD` to the same value. Do not start a second PostgreSQL instance on port 55432. To stop the container without deleting its database, use `docker compose stop postgres`; do not use `docker compose down -v` for routine shutdown.
+
+#### 4. Start the persistent local Ethereum network
+
+In a new terminal at the repository root:
+
+```sh
+npm run evm
+```
+
+This starts Ganache on `127.0.0.1:8545`, chain ID `1337`. On first start it creates `.local-data/development-relay.key` and persistent state under `.local-data/evm/`. Keep the key, chain data and `.local-data/chain/` contract addresses together across restarts; do not delete or regenerate them to fix a startup error. This is a local development chain, not public Ethereum.
+
+#### 5. Start local Ollama for Foli
+
+Foli runs inside Spring Boot; Ollama is its separate local inference service. This example uses port `11435` so it will not conflict with an Ollama app/service already listening on the default port `11434`. Create an isolated local model store:
+
+```sh
+mkdir -p .local-data/foli/models .local-data/foli/tmp
+```
+
+In another terminal from the repository root, start Ollama with cloud features disabled and bound to loopback:
+
+```sh
+export OLLAMA_HOST=127.0.0.1:11435
+export OLLAMA_MODELS="$PWD/.local-data/foli/models"
+export OLLAMA_NO_CLOUD=1
+export OLLAMA_NUM_PARALLEL=1
+export OLLAMA_MAX_LOADED_MODELS=1
+export OLLAMA_MAX_QUEUE=4
+export OLLAMA_KEEP_ALIVE=10m
+export OLLAMA_CONTEXT_LENGTH=8192
+ollama serve
+```
+
+In a separate terminal, pull the selected model through that listener once:
+
+```sh
+OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:4b-instruct
+curl -fsS http://127.0.0.1:11435/api/status
+```
+
+The status must report `cloud.disabled: true`. The model download is about 2.5 GB; inference is local. Do not set the backend to a cloud Ollama endpoint.
+
+#### 6. Start Spring Boot (wallet backend and Foli)
+
+Spring needs the PostgreSQL password from `.env`, the running local EVM, and the local relay key created by `npm run evm`. In a new terminal:
+
+```sh
+cd spring-boot-service
+export SPRING_DATASOURCE_PASSWORD='the same local password set in .env'
+export BLOCKCHAIN_PRIVATE_KEY="$(tr -d '\r\n' < ../.local-data/development-relay.key)"
+export SERVER_ADDRESS=127.0.0.1
+export FOLI_OLLAMA_URL=http://127.0.0.1:11435
+export FOLI_MODEL=qwen3:4b-instruct
+export FOLI_TESSERACT="$(command -v tesseract)"
+export FOLI_OCR_DATA_DIR="$(brew --prefix)/share/tessdata"
+export FOLI_TEMP_DIR=../.local-data/foli/tmp
+./mvnw spring-boot:run
+```
+
+Foli's Spring AI Ollama client and PDFBox reader are resolved by Maven. The model handles local chat; Tesseract handles scanned-page OCR. Confirm `tesseract --list-langs` includes `eng` before relying on OCR. The Foli health badge should report the model ready and Tesseract available. Keep this Spring API on loopback.
+
+#### 7. Start Django (web frontend)
+
+In another terminal from the repository root:
+
+```sh
+cd django-service
+export FOLIOLET_SHARE_MODE=local
+../.venv/bin/python manage.py migrate --noinput
+../.venv/bin/python manage.py runserver 127.0.0.1:8000 --noreload
+```
+
+`FOLIOLET_SHARE_MODE=local` prevents development sharing from starting a Cloudflare tunnel. Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/), register a holder account, then open [Ask Foli](http://127.0.0.1:8000/ask-foli/). The document picker only lists documents your account is authorized to read.
+
+#### 8. Optional paired watcher agent
+
+The watcher is an optional local process, not a document-import or OCR service. It sends signed, ordered fingerprints of stable files to Spring; it does not upload file contents or prove issuer authenticity.
+
+1. Sign in and open [Integrity](http://127.0.0.1:8000/integrity/); pair an agent and copy its ID and secret once.
+2. Save them in `.local-data/agent.json` (never inside the watched directory or Git), for example:
+
+   ```json
+   {"agentId":"YOUR-UUID","secret":"0xYOUR-32-BYTE-SECRET","apiUrl":"http://127.0.0.1:8080"}
+   ```
+
+   Restrict the file to your user with `chmod 600 .local-data/agent.json`. Create a separate intake directory, then run from the repository root:
+
+   ```sh
+   mkdir -p "$HOME/Foliolet-intake"
+   ./.venv/bin/python tools/local-watcher/watch.py "$HOME/Foliolet-intake" --config .local-data/agent.json
+   ```
+
+   Use `--once` for a single scan. Keep the watcher state file next to its config and preserve both across restarts. A matching observation means sampled continuity from a holder-controlled agent—not DigiLocker/issuer verification or a complete history of file changes.
+
+#### Stop and preserve local state
+
+Press Ctrl+C in the Ollama, Ganache, Spring, Django and watcher terminals. Stop PostgreSQL with `docker compose stop postgres`. Preserve `.local-data/`, `.env`, and the Docker volume; they hold keys, chain/database state, encrypted files and local model weights. Never reset these as a normal restart.
+
+#### Optional macOS checks
+
+From the repository root (use separate terminals for server processes):
+
+```sh
+(cd spring-boot-service && ./mvnw -B package)
+npm run test:contracts
+npm run test:verifier
+(cd django-service && ../.venv/bin/python manage.py test dashboard)
+(cd spring-boot-service && FOLI_TESSERACT="$(command -v tesseract)" FOLI_OCR_DATA_DIR="$(brew --prefix)/share/tessdata" ./mvnw -B -Dtest=FoliQaTest,FoliOcrLiveIT test)
+```
+
+The live wallet workflow/security tests additionally need the running services, a disposable local database and separately provisioned trust pins; see [RUN_GUIDE.md](docs/RUN_GUIDE.md).
+
+### Windows setup (PowerShell)
+
 The tested path is Windows PowerShell with Java 17+, Python 3.12+, Node/npm and
 PostgreSQL. Maven is included through its wrapper. Use harmless documents for
 this local development setup. The [complete guide](docs/RUN_GUIDE.md) includes
