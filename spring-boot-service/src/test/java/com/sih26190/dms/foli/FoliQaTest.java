@@ -124,7 +124,7 @@ class FoliQaTest {
     var started=new CountDownLatch(1);
     when(index.read(eq("doc"),eq(first),any())).thenAnswer(i -> { started.countDown(); Thread.sleep(60000); return corpus(); });
     try(var closer=new AutoCloseable() { public void close() {} }) {
-      var jobs=new FoliJobs(resolver,index,chat,users,config);
+      var jobs=new FoliJobs(resolver,index,chat,mock(FoliReviewService.class),users,config);
       try {
         var job=jobs.create(new FoliJobs.Request("doc","", "index",List.of(),null),first); String id=job.get("id").toString();
         assertTrue(started.await(2,TimeUnit.SECONDS));
@@ -150,5 +150,20 @@ class FoliQaTest {
       filter.doFilter(request,response,(q,s) -> reached.set(true));
       assertFalse(reached.get(),scenario); assertTrue(response.getStatus()>=400); assertTrue(response.getHeader("Cache-Control").contains("no-store"));
     }
+  }
+  @Test void completedJobsAreEvictedInsteadOfBlockingAllNewWork() throws Exception {
+    var users=mock(UserRepository.class); var chat=mock(FoliChatService.class);
+    when(users.findById(anyLong())).thenAnswer(i -> Optional.of(FoliReadingTest.user(i.getArgument(0),Role.HOLDER)));
+    when(chat.chat(anyString(),any(),isNull(),any())).thenReturn(new FoliChatService.Answer("hello","GENERAL",List.of(),null,List.of(),List.of(),Map.of(),Map.of()));
+    var jobs=new FoliJobs(mock(AuthorizedDocumentResolver.class),mock(FoliIndex.class),chat,mock(FoliReviewService.class),users,new FoliProperties());
+    try {
+      for(int i=0;i<36;i++) {
+        var user=FoliReadingTest.user(i/8+1,Role.HOLDER);
+        var job=jobs.create(new FoliJobs.Request(null,"Hello","chat",List.of(),null),user);
+        String id=job.get("id").toString(); long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(2);
+        while(!jobs.get(id,user).get("state").equals("COMPLETE") && System.nanoTime()<deadline) Thread.sleep(5);
+        assertEquals("COMPLETE",jobs.get(id,user).get("state"));
+      }
+    } finally { jobs.close(); }
   }
 }

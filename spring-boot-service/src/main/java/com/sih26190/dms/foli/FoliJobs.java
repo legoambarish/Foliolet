@@ -35,25 +35,30 @@ public class FoliJobs {
   private final AuthorizedDocumentResolver resolver;
   private final FoliIndex index;
   private final FoliChatService chat;
+  private final FoliReviewService review;
   private final UserRepository users;
   private final FoliProperties config;
-  public FoliJobs(AuthorizedDocumentResolver resolver,FoliIndex index,FoliChatService chat,UserRepository users,FoliProperties config) {
-    this.resolver=resolver; this.index=index; this.chat=chat; this.users=users; this.config=config;
+  public FoliJobs(AuthorizedDocumentResolver resolver,FoliIndex index,FoliChatService chat,FoliReviewService review,UserRepository users,FoliProperties config) {
+    this.resolver=resolver; this.index=index; this.chat=chat; this.review=review; this.users=users; this.config=config;
   }
   public synchronized Map<String,Object> create(Request request,User user) {
     cleanup();
     String mode=request.mode()==null?"chat":request.mode();
     if (request.question()!=null && request.question().length()>4000 || request.history()!=null && request.history().size()>6)
       throw new IllegalArgumentException();
-    if (!mode.equals("index") && (request.question()==null || request.question().isBlank())) throw new IllegalArgumentException();
-    if (mode.equals("review")) throw new FoliException(HttpStatus.BAD_REQUEST,"MODE_UNAVAILABLE","Document-wide review is not available in this build yet.");
+    if (!Set.of("index","chat","review").contains(mode)) throw new IllegalArgumentException();
+    if (mode.equals("chat") && (request.question()==null || request.question().isBlank())) throw new IllegalArgumentException();
+    // Completed responses are also bounded. Evict the oldest terminal result,
+    // rather than wedging the queue until its ten-minute TTL expires.
+    if(jobs.size()>=32) jobs.values().stream().filter(j -> !j.active())
+        .min(Comparator.comparingLong(j -> j.created)).ifPresent(j -> jobs.remove(j.id));
     if (jobs.size()>=32 || jobs.values().stream().filter(j -> j.owner==user.getId() && j.active()).count()>=2)
       throw new FoliException(HttpStatus.TOO_MANY_REQUESTS,"BUSY","Foli already has pending work. Wait or stop a request.");
     var bucket=requests.computeIfAbsent(user.getId(),ignored -> new ArrayDeque<>());
     while(!bucket.isEmpty() && bucket.peekFirst()<System.currentTimeMillis()-60000) bucket.removeFirst();
     if (bucket.size()>=10) throw new FoliException(HttpStatus.TOO_MANY_REQUESTS,"RATE_LIMIT","Please wait a minute before sending more questions.");
     String id=request.documentId()==null || request.documentId().isBlank()?null:request.documentId();
-    if (id==null && mode.equals("index")) throw new IllegalArgumentException();
+    if (id==null && !mode.equals("chat")) throw new IllegalArgumentException();
     Source source=id==null?null:resolver.open(id,user);
     if (source!=null && request.sourceHash()!=null) FoliController.requireHash(request.sourceHash(),source.hash());
     var job=new Job(user.getId(),id,source==null?"":source.hash(),source==null?"":source.document().version());
@@ -73,7 +78,11 @@ public class FoliJobs {
         FoliController.requireHash(job.hash,source.hash());
         if (!job.version.equals(source.document().version())) throw AuthorizedDocumentResolver.failure("SOURCE_CHANGED","Document version changed. Select it again.");
       }
-      Object result=mode.equals("index")?source.manifest():chat.chat(request.question(),request.history(),source,stage -> progress(job,stage));
+      Object result=switch(mode) {
+        case "index" -> source.manifest();
+        case "review" -> review.review(source,stage -> progress(job,stage));
+        default -> chat.chat(request.question(),request.history(),source,stage -> progress(job,stage));
+      };
       progress(job,"Checking current source access");
       current(job,user);
       synchronized(job) { if(job.active()) { job.result=result; job.state="COMPLETE"; job.stage="Done"; } }
