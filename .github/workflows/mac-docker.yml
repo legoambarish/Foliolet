@@ -92,6 +92,11 @@ jobs:
           ./foliolet config
           ./foliolet up
           ./foliolet status
+      - name: Allow the unprivileged test container to create fictional downloads
+        run: |
+          # Only this ephemeral CI directory is writable by the fixture producer.
+          # The production watcher retains its read-only mount.
+          sudo chown 1000:1000 "$HOME/Downloads/Foliolet Intake"
       - name: Real HTTP, managed watcher, PDFBox, Tesseract, Ollama, EVM and security acceptance
         run: ./foliolet test
       - name: Browser dependencies and fictional fixtures

@@ -7,11 +7,26 @@
     "watcher": {"passed": 11},
     "ocrWorker": {"passed": 4},
     "privateControl": {"passed": 6, "skipped": 1, "skipReason": "Windows symlink permission unavailable"},
+    "nodeProofAndUi": {"passed": 23},
+    "contractSecurity": "PASS",
     "bashSyntax": "PASS",
     "composeConfiguration": "PASS"
   },
   "dockerOnWindows": "UNAVAILABLE: Docker Desktop Linux engine socket is absent; no reset/cleanup attempted",
-  "remoteCi": "PENDING FIRST BRANCH PUSH",
+  "remoteCi": {
+    "lastCompletedRun": "https://github.com/legoambarish/Foliolet/actions/runs/38937234400",
+    "testedRevision": "fca565f62eb47c3521dba430ecaba405b7403e80",
+    "hostChecks": {"ubuntu-24.04": "PASS", "macos-15-intel": "PASS", "macos-15": "PASS"},
+    "productionAndAcceptanceImageBuilds": {"amd64": "PASS", "arm64": "PASS"},
+    "builtImageStateAndPrivilegeChecks": {"amd64": "PASS", "arm64": "PASS"},
+    "fullStackStartupIncludingModelDownload": {"amd64": "PASS", "arm64": "PASS"},
+    "runtimeAcceptance": "FAILED on both architectures: synthetic fixture producer UID 1000 cannot write the GitHub runner-owned intake directory",
+    "correction": "CI alone assigns its dedicated fictional intake directory to UID 1000; production watcher mount remains read-only",
+    "correctionVerification": "RERUN REQUIRED; not yet verified",
+    "browserSecurityAndRestartGates": "NOT REACHED",
+    "testedImagePublication": "NOT PUBLISHED: runtime gates have not passed"
+  },
+  "preservation": {"originalFilesHashChecked": 102, "mismatches": 0, "mainCfAndFeatureRemoteBranches": "UNCHANGED"},
   "physicalMacDockerDesktop": "NOT TESTED",
   "authenticDigiLockerDocuments": "NOT TESTED",
   "physicalNfc": "NOT TESTED"
