@@ -53,6 +53,21 @@ class IntakeIndicatorsTest {
     assertTrue(IntakeIndicators.decode(new BufferedImage(100,100,BufferedImage.TYPE_INT_RGB)).isEmpty());
     assertThrows(IllegalArgumentException.class,() -> IntakeIndicators.decode(new BufferedImage(3000,3000,BufferedImage.TYPE_BYTE_GRAY)));
   }
+  @Test void lowContrastDarkAndRotatedQrRemainProvisional() throws Exception {
+    for(int[] palette:List.of(new int[]{110,190},new int[]{180,30})) {
+      var input=qr("https://verify.digilocker.gov.in/synthetic-low-contrast",260);
+      for(int y=0;y<input.getHeight();y++) for(int x=0;x<input.getWidth();x++) {
+        int level=(input.getRGB(x,y)&255)==0?palette[0]:palette[1];
+        input.setRGB(x,y,new Color(level,level,level).getRGB());
+      }
+      for(var frame:List.of(input,rotated(input))) {
+        var decoded=IntakeIndicators.decode(frame);
+        assertEquals(1,decoded.size());
+        assertEquals("DIGILOCKER_VERIFICATION_ORIGIN",decoded.get(0).kind());
+        assertFalse(decoded.toString().contains("https:"));
+      }
+    }
+  }
   @Test void wordmarkGeometryAcceptsGraphicButRejectsProseAndLoneBrandName() {
     var image=new BufferedImage(700,200,BufferedImage.TYPE_INT_RGB);var g=image.createGraphics();g.setColor(new Color(110,50,230));g.fillRect(300,50,350,100);g.dispose();
     var words=List.of(new Word("Powered",0,7,310,65,65,15,95),new Word("by",8,10,380,65,20,15,95),new Word("DigiLocker",11,21,310,95,280,35,96));

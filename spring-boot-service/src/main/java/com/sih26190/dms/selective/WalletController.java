@@ -19,6 +19,7 @@ public class WalletController {
   private final UserRepository users;
   private final AuditLogRepository audit;
   private final FieldScanService scanner;
+  private final com.sih26190.dms.intake.IntakeJobs intake;
 
   public WalletController(
       WalletService wallet,
@@ -26,8 +27,9 @@ public class WalletController {
       IntegrityService integrity,
       UserRepository users,
       AuditLogRepository audit,
-      FieldScanService scanner) {
+      FieldScanService scanner, com.sih26190.dms.intake.IntakeJobs intake) {
     this.scanner = scanner;
+    this.intake = intake;
     this.wallet = wallet;
     this.disclosures = disclosures;
     this.integrity = integrity;
@@ -51,7 +53,10 @@ public class WalletController {
       @RequestParam String category,
       @RequestParam(required = false) String observationId,
       Authentication auth) {
-    return wallet.enroll(file, displayName, category, observationId, null, user(auth));
+    var owner=user(auth);
+    var result=wallet.enroll(file, displayName, category, observationId, null, owner);
+    intake.automatically(result.get("id").toString(),owner);
+    return result;
   }
 
   @PostMapping("/documents/{id}/versions")
@@ -62,7 +67,10 @@ public class WalletController {
       @RequestParam String category,
       @RequestParam(required = false) String observationId,
       Authentication auth) {
-    return wallet.enroll(file, displayName, category, observationId, id, user(auth));
+    var owner=user(auth);
+    var result=wallet.enroll(file, displayName, category, observationId, id, owner);
+    intake.automatically(result.get("id").toString(),owner);
+    return result;
   }
 
   @GetMapping("/documents/{id}")
