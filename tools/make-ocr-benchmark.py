@@ -2,6 +2,7 @@
 import io, json
 from pathlib import Path
 import fitz
+from fixture_fonts import fixture_font
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -78,7 +79,7 @@ def main():
         w=fitz.Widget();w.field_name=k;w.field_type=fitz.PDF_WIDGET_TYPE_TEXT;w.field_value=v;w.rect=fitz.Rect(190,y,450,y+28);w.text_fontsize=12;p.add_widget(w)
     finish(d,'form-widgets.pdf')
     d,p=base();write(p,45,150,'Name: Ananya Rao');write(p,45,190,'Mathematics: 91');write(p,45,230,'Physics: 86')
-    im=Image.new('RGB',(550,110),'white');g=ImageDraw.Draw(im);g.text((10,10),'Mathematics: 71',font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf',36),fill='black')
+    im=Image.new('RGB',(550,110),'white');g=ImageDraw.Draw(im);g.text((10,10),'Mathematics: 71',font=fixture_font(36),fill='black')
     b=io.BytesIO();im.save(b,format='PNG');p.insert_image(fitz.Rect(40,167,400,208),stream=b.getvalue());finish(d,'mixed-values.pdf')
     d,p=base();write(p,45,150,'Name: Ananya Rao');p.insert_text((45,190),'Mathematics: 99',fontsize=11,render_mode=3)
     write(p,45,230,'Physics: 86');finish(d,'native-hidden.pdf')

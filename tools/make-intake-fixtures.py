@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import fitz
+from fixture_fonts import fixture_font
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,8 +33,8 @@ def graphic():
     draw.ellipse((25, 25, 215, 215), fill='white')
     draw.rounded_rectangle((70, 65, 160, 173), 8, fill=purple)
     draw.polygon(((130, 65), (160, 95), (130, 95)), fill='white')
-    draw.text((260, 65), 'Powered by', font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 28), fill='white')
-    draw.text((255, 112), 'DigiLocker', font=ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 54), fill='white')
+    draw.text((260, 65), 'Powered by', font=fixture_font(28), fill='white')
+    draw.text((255, 112), 'DigiLocker', font=fixture_font(54, bold=True), fill='white')
     return image
 
 
@@ -57,7 +58,7 @@ def native(name, brand=False, code=None, pages=1, scanned=False, hybrid=False):
             if brand: page.insert_image(fitz.Rect(280, 525, 550, 625), stream=png(graphic()))
     if hybrid:
         image = Image.new('RGB', (1000, 100), 'white'); draw = ImageDraw.Draw(image)
-        draw.text((30, 15), 'Extra charge: INR 800 for dispatch', font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 32), fill='black')
+        draw.text((30, 15), 'Extra charge: INR 800 for dispatch', font=fixture_font(32), fill='black')
         document[0].insert_image(fitz.Rect(60, 330, 540, 380), stream=png(image))
     if scanned:
         raster = fitz.open()

@@ -23,6 +23,8 @@ from Crypto.Hash import keccak
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = os.environ.get("WALLET_TEST_API", "http://127.0.0.1:8080")
+UI = os.environ.get("WALLET_TEST_UI", "http://localhost:8000")
+RPC = os.environ.get("WALLET_TEST_RPC", "http://127.0.0.1:8545")
 DB = os.environ.get("WALLET_TEST_DSN", "host=127.0.0.1 port=55432 dbname=wallet_dev user=wallet")
 assert BASE.startswith(("http://127.0.0.1:", "http://localhost:")), "Use isolated local services"
 checks = []
@@ -126,7 +128,7 @@ def main():
     artifact = ROOT / ".local-data" / "live-test-proof.json"
     artifact.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
     result = subprocess.run(["node", str(ROOT / "spring-boot-service/scripts/verify-proof.cjs"), str(artifact),
-        "--contract", network["contract"], "--operator", network["operator"], "--chain-id", str(network["chainId"])], capture_output=True, text=True)
+        "--contract", network["contract"], "--operator", network["operator"], "--chain-id", str(network["chainId"]), "--rpc", RPC], capture_output=True, text=True)
     check(result.returncode == 0, "separate Node verifier recomputes Merkle/signature and reads actual EVM state")
     mutations = {
         "value": lambda b: b["claims"][0]["leaf"].update(value="false"),
@@ -231,9 +233,9 @@ def main():
     ui = requests.Session()
     landing = ui.get(ui_share["shareUrl"], timeout=20)
     csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', landing.text).group(1)
-    released = ui.post(ui_share["shareUrl"], data={"csrfmiddlewaretoken": csrf}, headers={"Origin": "http://localhost:8000"}, timeout=70)
+    released = ui.post(ui_share["shareUrl"], data={"csrfmiddlewaretoken": csrf}, headers={"Origin": UI}, timeout=70)
     check(released.status_code == 200 and "Service verification passed" in released.text, "real Django CSRF-protected one-time release succeeds")
-    export_url = "http://localhost:8000/proof-download/"+ui_share["id"]+"/"
+    export_url = UI + "/proof-download/"+ui_share["id"]+"/"
     exported = ui.get(export_url, timeout=70)
     check(exported.status_code == 200 and "attachment" in exported.headers.get("Content-Disposition", "")
           and len(exported.json()["claims"]) == 1 and "9.17" not in exported.text, "real HTTP attachment exports only the already released fact/proof")

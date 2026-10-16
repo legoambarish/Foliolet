@@ -46,7 +46,7 @@ def main():
             raise AssertionError('Database accepted duplicate username')
 
     ui = requests.Session()
-    origin = 'http://localhost:8000'
+    origin = w.UI
     def post(path, data, files=None):
         landing = ui.get(origin+path, timeout=30)
         csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', landing.text).group(1)
@@ -95,7 +95,7 @@ def main():
     check(all(l['salt'] not in raw and l['value'] not in raw for l in hidden), 'selective bundle omits every hidden fixture value and salt')
     path = ROOT / '.local-data/security-demo-proof.json'
     path.write_text(json.dumps(selective))
-    command = ['node', str(ROOT/'spring-boot-service/scripts/verify-proof.cjs'), str(path)]
+    command = ['node', str(ROOT/'spring-boot-service/scripts/verify-proof.cjs'), str(path), '--rpc', w.RPC]
     trusted = ['--contract',pins['contract'],'--operator',pins['operator'],'--chain-id',str(pins['chainId'])]
     good = subprocess.run(command+trusted,capture_output=True,text=True)
     check(good.returncode == 0, 'separate Node accepts genuine live proof with local pins')

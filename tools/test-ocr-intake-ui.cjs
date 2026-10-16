@@ -1,4 +1,4 @@
-/* Real Edge upload -> source review -> confirmation -> EVM -> selective disclosure. Fictional data only. */
+/* Real Chromium/Edge upload -> source review -> confirmation -> EVM -> selective disclosure. Fictional data only. */
 const {chromium}=require(process.env.FOLI_PLAYWRIGHT_MODULE||'playwright');
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'.local-data','ocr-p0','walkthrough');
@@ -10,7 +10,7 @@ async function main(){
  const auth=['ocr-ui-'+crypto.randomBytes(6).toString('hex'),'isolated-'+crypto.randomBytes(20).toString('hex')];
  const basic='Basic '+Buffer.from(auth.join(':')).toString('base64');
  let r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:auth[0],password:auth[1],role:'HOLDER'})});assert(r.ok);
- browser=await chromium.launch({headless:true,channel:'msedge'});
+ browser=await chromium.launch({headless:true,...(process.env.FOLI_BROWSER_CHANNEL ? {channel:process.env.FOLI_BROWSER_CHANNEL} : process.platform==='win32' ? {channel:'msedge'} : {})});
  const ctx=await browser.newContext({viewport:{width:1365,height:1000}});
  await ctx.route('**/*',async route=>{const u=route.request().url();if(![UI+'/',API+'/',RPC+'/','data:','blob:'].some(origin=>u.startsWith(origin))){external.push(u.split('/').slice(0,3).join('/'));await route.abort();}else await route.continue();});
  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
