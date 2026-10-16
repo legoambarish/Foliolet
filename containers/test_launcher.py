@@ -12,6 +12,7 @@ import json,os,sys
 args=sys.argv[1:]
 with open(os.environ['FAKE_DOCKER_LOG'],'a') as log: log.write(json.dumps(args)+'\\n')
 if args[:2]==['context','inspect']: print('unix:///var/run/docker.sock')
+if args[:2]==['compose','version'] and os.environ.get('FAKE_COMPOSE_MISSING')=='1': sys.exit(1)
 if args and args[0]=='compose' and 'version' not in args and os.environ.get('FAKE_DOCKER_FAIL')=='1': sys.exit(17)
 '''
 
@@ -46,7 +47,7 @@ class LauncherTests(unittest.TestCase):
         self.assertFalse(Path(self.env['FOLIOLET_INTAKE_DIR']).exists())
     def test_symlink_and_broad_personal_folder_are_rejected(self):
         link=self.root/'link';link.symlink_to(self.root,target_is_directory=True)
-        for folder in (str(Path.home()),str(link/'child')):
+        for folder in (str(Path.home()),str(Path.home())+'/',str(Path.home()/'Downloads')+'/',str(self.root)+'/../..',str(link/'child')):
             self.env['FOLIOLET_INTAKE_DIR']=folder
             self.assertNotEqual(self.run_launcher('up').returncode,0)
     def test_failed_compose_is_a_failed_command(self):
@@ -55,5 +56,13 @@ class LauncherTests(unittest.TestCase):
     def test_deploy_requires_immutable_image(self):
         self.env['FOLIOLET_IMAGE']='ghcr.io/example/foliolet:latest'
         self.assertNotEqual(self.run_launcher('deploy').returncode,0)
+    def test_fresh_user_install_uses_bundled_compose_before_plugin_registration(self):
+        self.env['HOME']=str(self.root)
+        self.env['FAKE_COMPOSE_MISSING']='1'
+        plugin=self.root/'Applications/Docker.app/Contents/Resources/cli-plugins/docker-compose'
+        plugin.parent.mkdir(parents=True);plugin.write_text(DOCKER);plugin.chmod(0o700)
+        result=self.run_launcher('up')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertTrue(any('--wait' in c for c in self.calls()))
 
 if __name__=='__main__':unittest.main(verbosity=2)

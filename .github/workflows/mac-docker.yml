@@ -82,6 +82,8 @@ jobs:
           cache-from: type=gha,scope=mac-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=mac-${{ matrix.arch }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+      - name: Prove the built image contains no initialized developer vault/configuration
+        run: docker run --rm --network none --read-only --entrypoint python foliolet-local:mac /app/containers/test_image.py
       - name: Build isolated fictional-data test image
         run: docker buildx build --target acceptance --load -f containers/Dockerfile -t foliolet-test:mac .
       - name: One-command start from empty persistent volumes

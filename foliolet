@@ -29,7 +29,15 @@ if ! command -v docker >/dev/null 2>&1; then
   bash "$ROOT/containers/install-docker-mac.sh"
   export PATH="$HOME/Applications/Docker.app/Contents/Resources/bin:$PATH"
 fi
-docker compose version >/dev/null || fail 'Docker Compose v2 is required. Update Docker Desktop.'
+COMPOSE_BINARY=''
+if ! docker compose version >/dev/null 2>&1; then
+  # A fresh per-user Desktop install can precede its CLI-plugin registration.
+  for plugin in /Applications/Docker.app/Contents/Resources/cli-plugins/docker-compose "$HOME/Applications/Docker.app/Contents/Resources/cli-plugins/docker-compose"; do
+    if [ -x "$plugin" ]; then COMPOSE_BINARY="$plugin"; break; fi
+  done
+  [ -n "$COMPOSE_BINARY" ] || fail 'Docker Compose v2 is required. Update Docker Desktop.'
+  "$COMPOSE_BINARY" version >/dev/null || fail 'The bundled Docker Compose plugin could not start.'
+fi
 if ! docker info >/dev/null 2>&1; then
   if [ "$(uname -s)" = Darwin ] && { [ "$ACTION" = up ] || [ "$ACTION" = deploy ]; }; then
     if [ -d /Applications/Docker.app ]; then open -g /Applications/Docker.app
@@ -49,7 +57,9 @@ fi
 endpoint="${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null)}"
 case "$endpoint" in unix://*|npipe://*) ;; *) fail 'Select a local Docker context before running Foliolet.' ;; esac
 case "$FOLIOLET_INTAKE_DIR" in /*) ;; *) fail 'FOLIOLET_INTAKE_DIR must be an absolute, dedicated folder.' ;; esac
-case "$FOLIOLET_INTAKE_DIR" in /|/tmp|/Users|/home|"$HOME"|"$HOME/Downloads"|"$HOME/Documents") fail 'Use a dedicated intake subfolder, not a broad personal folder.' ;; esac
+while [ "$FOLIOLET_INTAKE_DIR" != / ] && [ "${FOLIOLET_INTAKE_DIR%/}" != "$FOLIOLET_INTAKE_DIR" ]; do FOLIOLET_INTAKE_DIR="${FOLIOLET_INTAKE_DIR%/}"; done
+case "$FOLIOLET_INTAKE_DIR" in */../*|*/./*|*/..|*/.|*//*) fail 'Use a normalized dedicated intake path without dot or empty components.' ;; esac
+case "$FOLIOLET_INTAKE_DIR" in /|/tmp|/Users|/home|"$HOME"|"$HOME/Downloads"|"$HOME/Documents"|"$HOME/Desktop"|"$HOME/Library"|"$HOME/Pictures"|"$HOME/Movies"|"$HOME/Music") fail 'Use a dedicated intake subfolder, not a broad personal folder.' ;; esac
 # Refuse symlinks in every existing path component, including the final folder.
 part="$FOLIOLET_INTAKE_DIR"
 while [ "$part" != / ] && [ "$part" != . ]; do
@@ -57,7 +67,10 @@ while [ "$part" != / ] && [ "$part" != . ]; do
   part="$(dirname "$part")"
 done
 if [ "$ACTION" = up ] || [ "$ACTION" = deploy ]; then mkdir -p "$FOLIOLET_INTAKE_DIR"; fi
-compose() { docker compose --project-directory "$ROOT" -f "$ROOT/compose.mac.yaml" -p "$COMPOSE_PROJECT_NAME" "$@"; }
+compose() {
+  if [ -n "$COMPOSE_BINARY" ]; then "$COMPOSE_BINARY" --project-directory "$ROOT" -f "$ROOT/compose.mac.yaml" -p "$COMPOSE_PROJECT_NAME" "$@"
+  else docker compose --project-directory "$ROOT" -f "$ROOT/compose.mac.yaml" -p "$COMPOSE_PROJECT_NAME" "$@"; fi
+}
 run() {
   "$@" &
   child=$!
@@ -69,7 +82,7 @@ run() {
 }
 case "$ACTION" in
   up)
-    if [ "${FOLIOLET_SKIP_BUILD:-0}" != 1 ]; then status 'Building Foliolet and running image-build regression checks...'; run compose build; fi
+    if [ "${FOLIOLET_SKIP_BUILD:-0}" != 1 ]; then status 'Building Foliolet and running image-build regression checks...'; run compose build backend; fi
     status 'Starting database, EVM, local model, OCR, application and consent-based watcher...'
     run compose up -d --no-build --wait --wait-timeout 1800
     ;;
