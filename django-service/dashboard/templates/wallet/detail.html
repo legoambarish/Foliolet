@@ -15,11 +15,12 @@
 <section class="sheet section-tight stack" id="intake-analysis" data-url="{% url 'dashboard:intake-analysis' document.id %}" data-retry="{% url 'dashboard:intake-retry' document.id %}" data-pdf="{% if document.intake.format == 'pdf' %}yes{% else %}no{% endif %}" data-editable="{% if document.status == 'DRAFT' and not document.merkleRoot %}yes{% else %}no{% endif %}">
   <div class="intake-labels" id="intake-labels">{% include 'wallet/_intake_labels.html' with intake=document.intake %}</div>
   <p class="help" id="intake-stage" role="status" aria-live="polite">{{ document.intake.stage|default:'Original saved. Local reading status is loading.' }}</p>
-  <p class="help">Indicators are provisional. Fact comparison describes changes relative to AI suggestions; OCR and suggestions can be wrong. Your confirmed facts remain holder assertions.</p>
+  <p class="help">Indicators are provisional. Fact comparison describes changes relative to the saved suggestions; OCR and suggestions can be wrong. Your confirmed facts remain holder assertions.</p>
   <p class="help" id="intake-coverage"></p>
-  <div id="intake-warnings" class="help"></div>
+  <div id="intake-review" class="stack" aria-live="polite"></div>
+  <details><summary>Reading details</summary><div id="intake-diagnostics" class="help section-tight"></div><div id="intake-warnings" class="help"></div></details>
   {% if document.intake.changes %}<p class="help">{{ document.intake.changes.edited }} edited · {{ document.intake.changes.added }} added · {{ document.intake.changes.removed }} removed.</p>{% endif %}
-  {% if document.intake.fields %}<details><summary>Review the original AI proposal</summary><ul class="lines">{% for f in document.intake.fields %}<li class="line"><span class="wrap-any">{{ f.label }}: {{ f.value }} <span class="help">({{ f.type }})</span><br><span class="help">Page {{ f.citation.page }} · “{{ f.evidence }}”</span></span></li>{% endfor %}</ul><p class="help">This saved proposal stays fixed. Compare it with your review rows or committed facts below.</p></details>{% endif %}
+  {% if document.intake.fields %}<details><summary>Review the original proposal</summary><ul class="lines">{% for f in document.intake.fields %}<li class="line"><span class="wrap-any">{{ f.label }}: {{ f.value }} <span class="help">({{ f.type }})</span><br><span class="help">Page {{ f.citation.page }} · “{{ f.evidence }}”</span></span></li>{% endfor %}</ul><p class="help">This saved proposal stays fixed. Compare it with your review rows or committed facts below.</p></details>{% endif %}
 </section>
 
 <div class="work section">

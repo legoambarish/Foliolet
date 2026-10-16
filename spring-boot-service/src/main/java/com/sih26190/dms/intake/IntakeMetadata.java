@@ -50,9 +50,11 @@ public class IntakeMetadata {
     out.put("format",filename.endsWith(".pdf")?"pdf":filename.endsWith(".txt")?"txt":filename.endsWith(".csv")?"csv":"unsupported");
     var r=records.findById(d.id).orElse(null);
     if(r!=null) {
-      if(r.encryptedReport!=null) out.put("report",open(r.encryptedReport,d.id,"report",Map.class));
+      Map report=r.encryptedReport==null?Map.of():open(r.encryptedReport,d.id,"report",Map.class);
+      if(!report.isEmpty()) out.put("report",report);
       var b=baseline(r);
-      out.put("fields",b==null?List.of():b.fields());
+      // A later reading can be reviewed even after manual confirmation; it never rewrites the first baseline.
+      out.put("fields",b==null?report.getOrDefault("currentFields",List.of()):b.fields());
       if(r.encryptedChanges!=null) out.put("changes",open(r.encryptedChanges,d.id,"changes",Changes.class));
       out.put("attempts",r.attempts);
     }

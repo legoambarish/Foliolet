@@ -146,6 +146,7 @@ def detail(request, credential_id):
             request.POST.getlist("claim_path"), request.POST.getlist("claim_label"), request.POST.getlist("claim_type"), request.POST.getlist("claim_value"))]
     elif not rows and doc and doc.get("status") == "DRAFT":
         rows = doc.get("intake", {}).get("fields") or doc.get("suggestions", [])
+        rows = [r for r in rows if (r.get("support") or {}).get("quality") != "REVIEW_REQUIRED"]
     rows = [r for r in rows if not r.get("derived")]
     if not rows:
         rows = [{"path": "", "label": "", "type": "string", "value": ""}]

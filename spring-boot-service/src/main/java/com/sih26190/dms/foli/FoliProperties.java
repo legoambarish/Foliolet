@@ -19,6 +19,8 @@ public class FoliProperties {
   private String tesseract = "tesseract";
   private String ocrLanguage = "eng";
   private String ocrDataDir = "";
+  private String layoutPython = "";
+  private String layoutScript = "";
   private String tempDir = "../.local-data/foli/tmp";
   private int maxBytes = 20 * 1024 * 1024;
   private int maxPages = 200;

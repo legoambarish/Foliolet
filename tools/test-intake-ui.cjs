@@ -76,13 +76,15 @@ async function main() {
   const rows=page.locator('.edit-row');let mathIndex=-1;
   for(let n=0;n<await rows.count();n++) if(await rows.nth(n).locator('[name=claim_label]').inputValue()==='Math') mathIndex=n;
   assert(mathIndex>=0);const mathRow=rows.nth(mathIndex);assert.equal(await mathRow.locator('[name=claim_value]').inputValue(),'90');
-  assert(await mathRow.locator('.scan-note').innerText().then(text=>text.includes('Math: 90')));
-  await page.getByText('Preview: AI-suggested facts unchanged.',{exact:false}).waitFor();
+  assert(await mathRow.locator('details').last().textContent().then(text=>text.includes('Math: 90')));
+  await page.getByText('Preview: suggested facts unchanged.',{exact:false}).waitFor();
   await mathRow.locator('[name=claim_value]').fill('95');
   await page.getByText('Preview: facts edited since extraction.',{exact:false}).waitFor();
   pass('Real Ollama fields populate review rows with Math 90, source quote and immediate edited preview');
   const source=mathRow.locator('.scan-note a');assert.match(await source.getAttribute('href'),/^\/ask-foli\/api\/page\/\?/);
-  const image=await context.request.get(UI+await source.getAttribute('href'));assert.equal(image.status(),200);assert.match(image.headers()['content-type'],/image\/png/);
+  let image;
+  for(let attempt=0;attempt<30;attempt++) {image=await context.request.get(UI+await source.getAttribute('href'));if(image.status()!==429)break;await new Promise(resolve=>setTimeout(resolve,1000));}
+  assert.equal(image.status(),200);assert.match(image.headers()['content-type'],/image\/png/);
   pass('Owner can open the exact retained original PDF page from a suggested fact');
   const reviewColors=[];
   for(const theme of ['light','dark']) {

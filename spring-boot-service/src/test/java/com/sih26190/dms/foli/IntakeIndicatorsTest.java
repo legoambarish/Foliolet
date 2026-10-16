@@ -83,7 +83,7 @@ class IntakeIndicatorsTest {
     }
     var source=new Source(new Document("wallet:0x"+"a".repeat(64),"Forged fixture","forged.pdf","pdf","DRAFT","1",true),PrivateVault.sha256(bytes),bytes);
     var config=new FoliProperties();var ocr=mock(OcrService.class);
-    when(ocr.recognize(any())).thenReturn(new OcrService.Result("Synthetic page",95,0,List.of(),""));when(ocr.version()).thenReturn("test OCR");
+    when(ocr.recognize(any())).thenReturn(new OcrService.Result("Synthetic page",95,0,List.of(),""));when(ocr.recognizeLayout(any())).thenReturn(List.of(new OcrService.Result("Synthetic page",95,0,List.of(),"")));when(ocr.version()).thenReturn("test OCR");
     var extraction=new FoliExtractionService(config,ocr);var snapshot=extraction.extract(source,x -> {});
     var result=new IntakeIndicators(config,extraction,ocr).inspect(source,snapshot);
     assertEquals("POSSIBLE_DIGILOCKER_FORMAT",result.status()); assertFalse(result.pages().get(2).qr().isEmpty());

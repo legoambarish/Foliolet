@@ -149,19 +149,19 @@ class IntakeWorkflowTest extends WalletTestContext {
     fields.set(0,new ClaimInput("education.math_new","Math","decimal","90"));assertEquals(new IntakeMetadata.Changes(0,1,2),metadata.compare(baseline,fields));
     fields.add(fields.get(0));assertThrows(IllegalArgumentException.class,() -> metadata.compare(baseline,fields));
   }
-  @Test void manualConfirmationDuringModelWorkCannotAcquireALateBaseline() throws Exception {
+  @Test void manualConfirmationDuringReadingCannotAcquireALateBaseline() throws Exception {
     var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
-    when(model.ask(anyString(),anyString(),eq(true))).thenAnswer(call -> {entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));return new FoliLocalModel.Reply(PROPOSAL,1,10);});
+    doAnswer(call -> {entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));FoliData.Source source=call.getArgument(0);return new FoliReader.Response(extraction.extract(source,x -> {}),null,null,null,200,new IntakeIndicators.Report("test",source.hash(),"NO_DIGILOCKER_INDICATOR",1,1,List.of(),List.of()));}).when(reader).inspect(any(),any());
     String id=draft();jobs.automatically(id,owner);assertTrue(entered.await(4,TimeUnit.SECONDS));
     try {wallet.confirm(id,new ConfirmClaims(List.of(new ClaimInput("education.math","Math","decimal","95"))),owner);}finally{release.countDown();}
     done(id);assertNull(records.findById(id).orElseThrow().encryptedBaseline);assertEquals("NOT_ASSESSED",metadata.summary(id).get("lineage"));
   }
   @Test void modelOutageKeepsOriginalAndAllowsManualConfirmation() throws Exception {
     when(model.ask(anyString(),anyString(),eq(true))).thenThrow(new FoliException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"OFFLINE","Local model offline"));
-    String id=draft();jobs.automatically(id,owner);assertEquals("MODEL_OFFLINE",done(id).get("state"));
+    String id=draft();jobs.automatically(id,owner);assertEquals("READY",done(id).get("state"));verify(model,never()).ask(anyString(),anyString(),anyBoolean());
     assertArrayEquals(CONTENT,resolver.open("wallet:"+id,owner).bytes());
     wallet.confirm(id,new ConfirmClaims(List.of(new ClaimInput("education.math","Math","decimal","90"))),owner);
-    assertEquals("NOT_ASSESSED",metadata.summary(id).get("lineage"));
+    assertEquals("SUGGESTIONS_MODIFIED",metadata.summary(id).get("lineage"));
   }
   @Test void aBriefFoliSourceReadDoesNotDropAutomaticAnalysis() throws Exception {
     var held=new CountDownLatch(1);var release=new CountDownLatch(1);

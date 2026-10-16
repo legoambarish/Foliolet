@@ -20,7 +20,7 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 @Service
 public class FoliExtractionService {
-  public static final String VERSION = "foli-pages-2";
+  public static final String VERSION = "foli-pages-3-layout";
   private final FoliProperties config;
   private final OcrService ocr;
   public FoliExtractionService(FoliProperties config, OcrService ocr) { this.config = config; this.ocr = ocr; }
@@ -78,9 +78,8 @@ public class FoliExtractionService {
           PDPage page = document.getPage(i);
           boolean images = hasImage(page.getResources(), 0, Collections.newSetFromMap(new IdentityHashMap<>()),new long[2]);
           boolean forms=page.getAnnotations().stream().anyMatch(a -> a instanceof org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget);
-          var stripper = new QualityStripper(config.getMaxPageCharacters(), deadline); stripper.setSortByPosition(true);
-          stripper.setStartPage(number); stripper.setEndPage(number);
-          String nativeText = stripper.getText(document);
+          var stripper = new PositionedTextStripper(config.getMaxPageCharacters(),deadline);
+          String nativeText = stripper.extract(document,number);
           if (nativeText.length() > config.getMaxPageCharacters()) {
             result.add(empty(number, "SKIPPED_LIMIT", "Page text exceeds the character safety limit.")); continue;
           }
@@ -91,23 +90,36 @@ public class FoliExtractionService {
           if(forms) warnings.add("PDF form widgets detected; embedded text and rendered-page OCR must be compared.");
           if (stripper.tiny) warnings.add("Very small print detected; check the rendered original.");
           if (stripper.columns) warnings.add("Separated columns or table cells detected. Extracted reading order may differ from the visual page; inspect the original before interpreting scope.");
+          if (stripper.hidden) warnings.add("Invisible PDF text detected. Hidden text cannot support an automatically suggested fact.");
+          if (stripper.overlapping) warnings.add("Overlapping PDF glyphs detected. Affected field values need review; other fields are checked separately.");
+          if (stripper.unmapped>0) warnings.add("Some PDF glyph positions could not be aligned exactly; those glyphs cannot support layout facts.");
           String text = nativeText; String status = "TEXT"; Double confidence = null;
           List<Word> words = List.of(); int rotation = 0;
-          if (suspicious || images || forms) {
+          var layers=new ArrayList<Layer>();
+          if(!stripper.words().isEmpty()) layers.add(new Layer("native","NATIVE",0,Math.round(page.getCropBox().getWidth()*10),Math.round(page.getCropBox().getHeight()*10),stripper.words(),List.of()));
+          if (suspicious || images || forms || stripper.tiny || stripper.hidden) {
+            ocr.limitUntil(deadline-TimeUnit.SECONDS.toNanos(1));
             progress.accept("OCR page " + number + "/" + document.getNumberOfPages());
-            var image = render(renderer, page, i, 200);
-            var recognized = ocr.recognize(image); image.flush();
+            var image = render(renderer, page, i, 300);
+            int imageWidth=image.getWidth(),imageHeight=image.getHeight();
+            var readings=ocr.recognizeLayout(image);image.flush();
+            var recognized=readings.get(0);
             confidence = recognized.confidence(); rotation = recognized.rotation();
             warnings.add(recognized.warning());
             if (!recognized.text().isBlank()) {
               if (nativeText.isBlank() || suspicious) {
                 text = recognized.text(); words = recognized.words(); status = confidence < 78 ? "OCR_UNCERTAIN" : "OCR";
+                // Sparse embedded text is still retained rather than overwritten by page-wide OCR.
+                if(!nativeText.isBlank()) {
+                  text=nativeText+"\n[Rendered-page OCR transcription]\n"+recognized.text();
+                  int offset=text.length()-recognized.text().length();words=shift(recognized.words(),offset);status="MIXED_OCR";
+                } else layers.removeIf(l -> l.kind().equals("NATIVE"));
               } else {
                 status = "MIXED_OCR";
                 if (!nativeText.replaceAll("\\s+", " ").strip().equals(recognized.text().replaceAll("\\s+", " ").strip())) {
                   text = nativeText + "\n[Rendered-page OCR transcription]\n" + recognized.text();
                   int offset=nativeText.length()+"\n[Rendered-page OCR transcription]\n".length();
-                  words=recognized.words().stream().map(w -> new Word(w.text(),w.start()+offset,w.end()+offset,w.left(),w.top(),w.width(),w.height(),w.confidence())).toList();
+                  words=shift(recognized.words(),offset);
                   warnings.add("Embedded text and rendered-page OCR differ. Both readings retained; visually resolve contradictions.");
                 } else {
                   // Map matching OCR words to native offsets without rewriting retained text.
@@ -120,6 +132,17 @@ public class FoliExtractionService {
                   words=List.copyOf(mapped);
                 }
               }
+              int uprightWidth=rotation%180==0?imageWidth:imageHeight,uprightHeight=rotation%180==0?imageHeight:imageWidth;
+              if(!words.isEmpty()) layers.add(new Layer("ocr","OCR",rotation,uprightWidth,uprightHeight,words,List.of(),recognized.method()));
+              // Each extra reading has its own exact offsets. Never repair or replace OCR characters.
+              for(int pass=1;pass<readings.size();pass++) {
+                var check=readings.get(pass);String separator="\n[Independent OCR segmentation check]\n";
+                int offset=text.length()+separator.length();
+                if(offset+check.text().length()>config.getMaxPageCharacters()) {warnings.add("Complementary OCR reading omitted by the text budget.");break;}
+                text+=separator+check.text();
+                layers.add(new Layer("ocr-check-"+pass,"OCR_CHECK",check.rotation(),check.rotation()%180==0?imageWidth:imageHeight,
+                    check.rotation()%180==0?imageHeight:imageWidth,shift(check.words(),offset),List.of(),check.method()));
+              }
             } else if (nativeText.isBlank()) { text = ""; status = "UNREADABLE";
             } else { status = "TEXT_UNCERTAIN"; warnings.add("Image/suspicious content could not be checked with OCR."); }
           }
@@ -127,13 +150,16 @@ public class FoliExtractionService {
             result.add(empty(number, "SKIPPED_LIMIT", "Extracted text exceeds the safety budget; no partial text was silently kept.")); continue;
           }
           characters += text.length();
-          result.add(new Page(number, text, status, confidence, 0, 0, rotation, words, List.copyOf(warnings)));
+          result.add(new Page(number, text, status, confidence, 0, 0, rotation, words, List.copyOf(warnings),List.copyOf(layers)));
         } catch (CancellationException e) { throw e;
-        } catch (TextBudgetException e) { result.add(empty(number, "SKIPPED_LIMIT", "Page exceeds text or parsing-time budget."));
+        } catch (PositionedTextStripper.BudgetExceeded e) { result.add(empty(number, "SKIPPED_LIMIT", "Page exceeds text or parsing-time budget."));
         } catch (Exception e) { result.add(empty(number, "FAILED", "Page extraction or rendering failed. Review the original.")); }
       }
     }
     return result;
+  }
+  private static List<Word> shift(List<Word> words,int offset) {
+    return words.stream().map(w -> new Word(w.text(),w.start()+offset,w.end()+offset,w.left(),w.top(),w.width(),w.height(),w.confidence(),w.visible())).toList();
   }
 
   private List<Page> text(byte[] bytes, Consumer<String> progress) throws CharacterCodingException {
@@ -203,21 +229,4 @@ public class FoliExtractionService {
   }
   static Page empty(int page, String status, String warning) { return new Page(page, "", status, null, 0, 0, 0, List.of(), List.of(warning)); }
   static void checkCancel() { if (Thread.currentThread().isInterrupted()) throw new CancellationException(); }
-  private static class QualityStripper extends PDFTextStripper {
-    boolean tiny,columns; int count; final int maximum; final long deadline;
-    final Map<Integer,double[]> rows=new HashMap<>();
-    QualityStripper(int maximum, long deadline) throws IOException { super(); this.maximum=maximum; this.deadline=deadline; }
-    @Override protected void processTextPosition(TextPosition position) {
-      checkCancel();
-      if (++count > maximum || System.nanoTime()>deadline) throw new TextBudgetException();
-      if (position.getFontSizeInPt() < 6) tiny = true;
-      int row=(int)Math.round(position.getYDirAdj()/3);
-      double x=position.getXDirAdj(),end=x+position.getWidthDirAdj();
-      var bounds=rows.get(row);
-      if(bounds==null) rows.put(row,new double[]{x,end});
-      else { if(x-bounds[1]>60 || bounds[0]-end>60) columns=true; bounds[0]=Math.min(bounds[0],x); bounds[1]=Math.max(bounds[1],end); }
-      super.processTextPosition(position);
-    }
-  }
-  private static class TextBudgetException extends RuntimeException {}
 }

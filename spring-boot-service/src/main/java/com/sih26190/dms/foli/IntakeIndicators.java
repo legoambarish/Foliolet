@@ -15,13 +15,17 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 /** Offline pixel/QR heuristics, deliberately without any authenticity or network API. */
 public final class IntakeIndicators {
-  public static final String VERSION="intake-indicators-1";
+  public static final String VERSION="intake-indicators-2-coverage";
   public record Bounds(float left,float top,float right,float bottom) {}
   public record Qr(String kind,String payloadHash,int payloadLength,Bounds bounds) {}
   public record PageResult(int page,boolean inspected,boolean logo,double logoScore,String logoEvidence,
-                           List<Qr> qr,List<String> warnings) {}
+                           List<Qr> qr,List<String> warnings,boolean qrInspected,boolean logoInspected) {
+    public PageResult(int page,boolean inspected,boolean logo,double logoScore,String logoEvidence,List<Qr> qr,List<String> warnings){this(page,inspected,logo,logoScore,logoEvidence,qr,warnings,inspected,inspected);}
+  }
   public record Report(String version,String sourceHash,String status,int totalPages,int inspectedPages,
-                       List<PageResult> pages,List<String> warnings) {}
+                       List<PageResult> pages,List<String> warnings,int qrInspectedPages,int logoInspectedPages) {
+    public Report(String version,String sourceHash,String status,int totalPages,int inspectedPages,List<PageResult> pages,List<String> warnings){this(version,sourceHash,status,totalPages,inspectedPages,pages,warnings,inspectedPages,inspectedPages);}
+  }
   private final FoliProperties config;
   private final FoliExtractionService extraction;
   private final OcrService ocr;
@@ -29,35 +33,53 @@ public final class IntakeIndicators {
     this.config=config; this.extraction=extraction; this.ocr=ocr;
   }
   public Report inspect(Source source,Snapshot snapshot) {
+    return inspect(source,snapshot,System.nanoTime()+TimeUnit.SECONDS.toNanos(config.getExtractionTimeoutSeconds()));
+  }
+  public Report inspect(Source source,Snapshot snapshot,long deadline) {
+    ocr.limitUntil(deadline);
     if(!source.document().format().equals("pdf")) return new Report(VERSION,source.hash(),"NO_DIGILOCKER_INDICATOR",snapshot.pages().size(),snapshot.pages().size(),List.of(),List.of("Text/CSV has no rendered DigiLocker graphic to inspect."));
-    var pages=new ArrayList<PageResult>(); int inspected=0; boolean possible=false,weak=false;
-    long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(config.getExtractionTimeoutSeconds());
+    var pages=new ArrayList<PageResult>(); int inspected=0,logoInspected=0; boolean possible=false,weak=false;
     for(var page:snapshot.pages()) {
       FoliExtractionService.checkCancel();
-      if(page.number()>config.getMaxPages() || System.nanoTime()>deadline || page.status().equals("SKIPPED_LIMIT") || page.status().equals("FAILED")) {
+      if(page.number()>config.getMaxPages() || System.nanoTime()+TimeUnit.SECONDS.toNanos(2)>deadline || page.status().equals("SKIPPED_LIMIT") || page.status().equals("FAILED")) {
         pages.add(new PageResult(page.number(),false,false,0,"Not inspected",List.of(),List.of("Page omitted by the safety budget or parser failure."))); continue;
       }
       try {
         byte[] png=extraction.renderPage(source,page.number());
         var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
         try {
-          var qr=decode(image); var graphic=recognizeLogo(image,ocr); var logo=graphic.logo();
+          var cached=cachedReading(page,image);var qr=decode(image);
+          int previous=config.getOcrTimeoutSeconds();config.setOcrTimeoutSeconds((int)Math.max(1,Math.min(previous,TimeUnit.NANOSECONDS.toSeconds(deadline-System.nanoTime())-1)));
+          LogoReading graphic;
+          try {graphic=recognizeLogo(image,ocr,cached);}finally{config.setOcrTimeoutSeconds(previous);}
+          var logo=graphic.logo();
           weak|=logo.score()>0 && !logo.found();
           boolean readable=graphic.readable();
           // No OCR means a missing logo is unknown, even if the QR decoder found nothing.
           var warnings=new ArrayList<String>();
           if(!readable) warnings.add("Logo OCR unavailable or unreadable; no absence claim for this page.");
           if(logo.score()>0 && !logo.found()) warnings.add("Weak DigiLocker text/graphic resemblance; inspect the original.");
-          pages.add(new PageResult(page.number(),readable,logo.found(),logo.score(),logo.evidence(),qr,List.copyOf(warnings)));
-          if(readable) inspected++;
+          pages.add(new PageResult(page.number(),true,logo.found(),logo.score(),logo.evidence(),qr,List.copyOf(warnings),true,readable));
+          inspected++;if(readable)logoInspected++;
           possible|=logo.found() || qr.stream().anyMatch(q -> q.kind().equals("DIGILOCKER_VERIFICATION_ORIGIN"));
         } finally { image.flush(); }
       } catch(java.util.concurrent.CancellationException e) { throw e;
       } catch(Exception e) { pages.add(new PageResult(page.number(),false,false,0,"Rendering failed",List.of(),List.of("Indicator inspection failed; review the original."))); }
     }
-    boolean partial=inspected<snapshot.pages().size() || weak;
+    boolean partial=inspected<snapshot.pages().size() || logoInspected<snapshot.pages().size() || weak;
     return new Report(VERSION,source.hash(),possible?"POSSIBLE_DIGILOCKER_FORMAT":partial?"INCONCLUSIVE":"NO_DIGILOCKER_INDICATOR",
-        snapshot.pages().size(),inspected,List.copyOf(pages),partial?List.of("Indicator search is incomplete. Positive indicators remain unverified; missing indicators do not establish source origin."):List.of());
+        snapshot.pages().size(),inspected,List.copyOf(pages),partial?List.of("QR and logo coverage are reported separately. Weak or uninspected indicators establish no source origin."):List.of(),inspected,logoInspected);
+  }
+  private static OcrService.Result cachedReading(Page page,BufferedImage image) {
+    if(page.layers()==null)return null;
+    var layer=page.layers().stream().filter(l -> l.id().equals("ocr")).findFirst()
+        .orElseGet(() -> page.layers().stream().filter(l -> l.kind().equals("NATIVE")).findFirst().orElse(null));
+    if(layer==null || layer.words().isEmpty())return null;
+    double width=layer.rotation()%180==0?image.getWidth():image.getHeight(),height=layer.rotation()%180==0?image.getHeight():image.getWidth();
+    var words=layer.words().stream().filter(Word::visible).map(w -> new Word(w.text(),w.start(),w.end(),
+        (int)Math.round(w.left()*width/layer.width()),(int)Math.round(w.top()*height/layer.height()),
+        Math.max(1,(int)Math.round(w.width()*width/layer.width())),Math.max(1,(int)Math.round(w.height()*height/layer.height())),w.confidence())).toList();
+    return new OcrService.Result(page.text(),words.stream().mapToDouble(Word::confidence).average().orElse(0),layer.rotation(),words,"Reused source-position reading",layer.method());
   }
   public static String qrKind(String payload) {
     if(payload==null || payload.length()>4096) return "UNKNOWN_QR";
@@ -94,7 +116,10 @@ public final class IntakeIndicators {
   public record Logo(boolean found,double score,String evidence) {}
   public record LogoReading(Logo logo,boolean readable) {}
   public static LogoReading recognizeLogo(BufferedImage image,OcrService ocr) {
-    var recognized=ocr.recognize(image); var first=logo(image,recognized);
+    return recognizeLogo(image,ocr,null);
+  }
+  private static LogoReading recognizeLogo(BufferedImage image,OcrService ocr,OcrService.Result cached) {
+    var recognized=cached==null?ocr.recognize(image):cached; var first=logo(image,recognized);
     if(!first.found()) {
       var template=graphicTemplate(image,ocr);
       if(template.found()) return new LogoReading(template,true);

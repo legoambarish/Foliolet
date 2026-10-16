@@ -91,31 +91,79 @@ document.addEventListener('DOMContentLoaded', () => {
     const actual = [...rows.children].map(row => Object.fromEntries(['path','label','type','value'].map(key => [key, row.querySelector('[name=claim_' + key + ']').value])))
       .filter(f => f.path.trim() || f.value.trim());
     preview.textContent = semantic(actual) === semantic(baseline)
-      ? 'Preview: AI-suggested facts unchanged. Confirmation checks this again on the server.'
-      : 'Preview: facts edited since extraction. The original AI proposal remains saved for comparison.';
+      ? 'Preview: suggested facts unchanged. Confirmation checks this again on the server.'
+      : 'Preview: facts edited since extraction. The original proposal remains saved for comparison.';
   }
   rows?.addEventListener('input', () => { dirty = true; changed(); });
   rows?.addEventListener('change', () => { dirty = true; changed(); });
   rows?.addEventListener('click', event => { if (event.target.closest('.remove-fact')) { dirty = true; setTimeout(changed, 0); } });
   document.getElementById('add-fact')?.addEventListener('click', () => { dirty = true; setTimeout(changed, 0); });
+  const reviewReasons = {
+    OCR_REQUIRES_VISUAL_REVIEW: 'Read from an image; check the original characters.',
+    LOW_FIELD_OCR_CONFIDENCE: 'Some words in this field were hard to read.',
+    CONFLICTING_READINGS: 'The source readings disagree about this value.',
+    RENDERED_VALUE_NOT_CORROBORATED: 'The rendered page did not independently confirm this field.',
+    AMBIGUOUS_DUPLICATE_LABEL: 'This label has multiple possible values.',
+    OCR_CHARACTER_CONFUSION: 'A letter and a number may have been confused. No correction was guessed.',
+    NON_NUMERIC_SCORE_LITERAL: 'This score contains more than a plain number.',
+    VALUE_OUTSIDE_EXPECTED_RANGE: 'This value is outside the usual range.',
+    AMBIGUOUS_DATE_FORMAT: 'The date order is ambiguous; the source spelling was kept.',
+    INVALID_DATE_LITERAL: 'This date needs checking.',
+    UNPARSED_DATE_LITERAL: 'The original date spelling was kept.',
+    UNALIGNED_OR_HIDDEN_GLYPHS_NEAR_FIELD: 'Overlapping, hidden or unmapped text affects this field.',
+    MARK_EXCEEDS_PRINTED_MAXIMUM: 'This mark exceeds the maximum printed in the same row.',
+    MODEL_SELECTED_ASSOCIATION: 'The local model linked these source cells; check that the label belongs to this value.',
+    LABEL_READINGS_DISAGREE: 'The readings disagree about the field label.',
+    LABEL_VALUE_BOUNDARY_REQUIRES_REVIEW: 'The label and value share a text cell; check their boundary.'
+  };
+  function sourceLink(field) {
+    const source = document.createElement('a');
+    const q = new URLSearchParams({documentId: field.citation.documentId, hash: field.citation.sourceHash, page: String(field.citation.page)});
+    source.href = analysis.dataset.pdf === 'yes' ? '/ask-foli/api/page/?' + q
+      : '/wallet/' + encodeURIComponent(field.citation.documentId.slice(7)) + '/file/';
+    source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = analysis.dataset.pdf === 'yes' ? 'View original page' : 'View original file';
+    return source;
+  }
   function showFields(fields) {
     baseline = fields;
     if (!rows || !fields.length || dirty || applied || analysis.dataset.editable !== 'yes') { changed(); return; }
     const template = rows.firstElementChild.cloneNode(true); rows.replaceChildren();
-    for (const field of fields) {
+    function append(field) {
       const row = template.cloneNode(true); row.querySelector('.scan-note')?.remove();
       for (const key of ['path','label','type','value']) row.querySelector('[name=claim_' + key + ']').value = field[key];
       const note = document.createElement('p'); note.className = 'help scan-note';
-      note.textContent = 'Page ' + field.citation.page + ' · “' + field.evidence + '” · ' + field.citation.provenance + '. ';
+      note.textContent = 'Page ' + field.citation.page + ' · ' + (field.support?.quality === 'REVIEW_REQUIRED' ? 'Added for your review' : 'Source-supported association') + ' · ' + field.citation.provenance + '. ';
       if (field.citation.provenance.includes('OCR')) note.append('OCR may misread characters; check the original. ');
-      const source = document.createElement('a');
-      const q = new URLSearchParams({documentId: field.citation.documentId, hash: field.citation.sourceHash, page: String(field.citation.page)});
-      source.href = analysis.dataset.pdf === 'yes' ? '/ask-foli/api/page/?' + q
-        : '/wallet/' + encodeURIComponent(field.citation.documentId.slice(7)) + '/file/';
-      source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = analysis.dataset.pdf === 'yes' ? 'View original page' : 'View original file';
-      if (field.citation.documentId.startsWith('wallet:')) note.append(source);
+      if (field.citation.documentId.startsWith('wallet:')) note.append(sourceLink(field));
+      const details = document.createElement('details'), summary = document.createElement('summary'), quote = document.createElement('p');
+      summary.textContent = 'Source evidence'; quote.className = 'help wrap-any'; quote.textContent = field.evidence;
+      details.append(summary, quote); row.append(details);
       row.appendChild(note); rows.appendChild(row);
     }
+    const uncertain = fields.filter(f => f.support?.quality === 'REVIEW_REQUIRED');
+    for (const field of fields.filter(f => f.support?.quality !== 'REVIEW_REQUIRED')) append(field);
+    const review = document.getElementById('intake-review'); review?.replaceChildren();
+    if (review && uncertain.length) {
+      const heading = document.createElement('h3'); heading.textContent = 'Check before using'; review.append(heading);
+      const explain = document.createElement('p'); explain.className = 'help'; explain.textContent = 'These values were located, but need your review. Open the original page, then add a value if it is correct. You can edit it in the fact rows.'; review.append(explain);
+      for (const field of uncertain) {
+        const card = document.createElement('div'); card.className = 'notice warning';
+        const title = document.createElement('strong'); title.textContent = field.label + ': ' + field.value;
+        const reason = document.createElement('p'); reason.className = 'help'; reason.textContent = [...new Set((field.support.reasons || []).map(r => reviewReasons[r] || 'Check this source association.'))].join(' ');
+        const add = document.createElement('button'); add.type = 'button'; add.className = 'btn line small use-reviewed-fact'; add.textContent = 'Use after checking';
+        add.addEventListener('click', () => {
+          if (rows.children.length === 1 && !rows.firstElementChild.querySelector('[name=claim_value]').value) rows.replaceChildren();
+          append(field); add.disabled = true; add.textContent = 'Added to review rows'; dirty = true; changed();
+        });
+        card.append(title, reason, sourceLink(field), document.createTextNode(' '), add); review.append(card);
+        if (field.support.alternatives?.length) {
+          const alt = document.createElement('p'); alt.className = 'help wrap-any';
+          alt.textContent = 'Other reading: ' + field.support.alternatives.map(f => f.quote).join(' ') + '. Check the original before choosing a value.';
+          card.append(alt);
+        }
+      }
+    }
+    if (!rows.children.length) rows.append(template);
     applied = true; changed();
   }
   function showLabels(body) {
@@ -123,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const names = [body.indicator === 'POSSIBLE_DIGILOCKER_FORMAT' ? 'Possible DigiLocker document (unverified)'
       : body.indicator === 'NO_DIGILOCKER_INDICATOR' ? 'No DigiLocker indicator found' : 'DigiLocker indicator check inconclusive'];
     if (body.method === 'WATCHER_ASSISTED') names.push('Imported with Foliolet');
-    names.push(body.lineage === 'SUGGESTIONS_UNMODIFIED' ? 'AI-suggested facts unchanged'
+    names.push(body.lineage === 'SUGGESTIONS_UNMODIFIED' ? 'Suggested facts unchanged'
       : body.lineage === 'SUGGESTIONS_MODIFIED' ? 'Facts edited since extraction' : 'Manual facts / not compared', 'Issuer not verified');
     for (const text of names) { const tag = document.createElement('span'); tag.className = 'mark quiet'; tag.textContent = text; labels.appendChild(tag); }
   }
@@ -132,9 +180,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const body = await call(analysis.dataset.url); stage.textContent = body.stage || 'Original saved. Enter facts manually or read locally.';
       showLabels(body); showFields(body.fields || []);
       const manifest = body.report?.manifest, indicators = body.report?.indicators;
+      const diagnostic = body.report?.diagnostics, diagnosticBox = document.getElementById('intake-diagnostics');
+      if (diagnosticBox) {
+        diagnosticBox.replaceChildren();
+        if (diagnostic) {
+          const counts = document.createElement('p'); counts.textContent = diagnostic.candidates + ' associations located · ' + diagnostic.supported + ' supported · ' + diagnostic.reviewRequired + ' need review.'; diagnosticBox.append(counts);
+          const reasonNames = {OVERLAPPING_VALUE_WITHHELD:'An overprinted number could not be read safely',OCR_LABEL_NOT_RECOGNIZED:'An OCR field label could not be identified safely',NO_ALIGNED_GEOMETRY:'Readable text had no aligned field locations',PAGE_UNREADABLE:'A page could not be read',INVISIBLE_SOURCE_TEXT:'Hidden PDF text excluded',WORD_OFFSET_OR_GEOMETRY_MISMATCH:'Text with mismatched locations excluded',OCR_TOO_WEAK_TO_SUGGEST:'Fields too unclear to suggest safely',INVALID_LITERAL_VALUE:'Invalid field values excluded',TABLE_VALUE_MISSING:'Table cells were missing',TABLE_COLUMN_COLLISION:'More than one value occupied a table cell',TABLE_OVERLAPPING_COLUMNS:'Overlapping columns could not be paired safely',CITATION_MISMATCH:'A source quote failed exact validation',FIELD_COUNT_LIMIT:'The field limit was reached',UNSAFE_CGPA_LITERAL:'An unclear CGPA was withheld',INVALID_LABEL_PATH:'A label could not be safely identified',EVIDENCE_SPAN_LIMIT:'Evidence was too spread out to associate safely',CONFLICTING_READINGS:'Conflicting source readings held for review'};
+          for (const [code, count] of Object.entries(diagnostic.rejections || {})) { const p = document.createElement('p'); p.textContent = (reasonNames[code] || 'Other source checks') + ': ' + count + '.'; diagnosticBox.append(p); }
+        }
+      }
       document.getElementById('intake-coverage').textContent = manifest
         ? manifest.readablePages + '/' + manifest.totalPages + ' pages readable · ' + manifest.ocrPages + ' OCR pages · '
-          + (indicators?.inspectedPages || 0) + '/' + (indicators?.totalPages || 0) + ' pages inspected for indicators.' : '';
+          + (indicators?.qrInspectedPages ?? indicators?.inspectedPages ?? 0) + '/' + (indicators?.totalPages || 0) + ' pages checked for QR · '
+          + (indicators?.logoInspectedPages ?? indicators?.inspectedPages ?? 0) + '/' + (indicators?.totalPages || 0) + ' pages checked for logo.' : '';
       const warnings = [...(manifest?.warnings || []), ...(indicators?.warnings || []), ...(body.report?.suggestionWarnings || []),
         ...(manifest?.pages || []).flatMap(p => p.warnings.map(w => 'Page ' + p.number + ': ' + w)),
         ...(indicators?.pages || []).flatMap(p => p.warnings.map(w => 'Page ' + p.page + ': ' + w))];

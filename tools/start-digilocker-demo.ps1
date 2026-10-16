@@ -73,6 +73,7 @@ $env:SERVER_ADDRESS='127.0.0.1'; $env:SERVER_PORT='8088'
 $env:SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE='20MB'; $env:SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE='21MB'
 $env:OPENROUTER_API_KEY=''; $env:OPENROUTER_MODEL='disabled-for-intake'; $env:FOLI_MODEL='qwen3:4b-instruct'; $env:FOLI_OLLAMA_URL=$OllamaUrl
 $env:FOLI_TESSERACT=$intakeOcr; $env:FOLI_OCR_DATA_DIR=(Join-Path $RuntimeRoot '.local-tools\ocr\share\tessdata')
+$env:FOLI_LAYOUT_PYTHON=$intakePython; $env:FOLI_LAYOUT_SCRIPT=(Join-Path $intakeRoot 'tools\ocr-layout-worker.py')
 $env:FOLI_TEMP_DIR=(Join-Path $intakeData 'foli\tmp')
 $env:LOGGING_LEVEL_ORG_APACHE_PDFBOX='OFF'; $env:LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI='OFF'
 $env:SERVER_TOMCAT_ACCESSLOG_ENABLED='false'

@@ -53,7 +53,7 @@ class LocalModelDouble(http.server.BaseHTTPRequestHandler):
         self.rfile.read(int(self.headers.get('Content-Length', 0)))
         model_calls += 1
         if mode == 'timeout': time.sleep(6)
-        proposal = {'fields': [{'page': 1, 'evidence': 'Math: 90', 'label': 'Math', 'type': 'decimal', 'value': '95' if mode == 'forged' else '90'}]}
+        proposal = {'pairs': [{'labelCell': 'FORGED' if mode == 'forged' else 'P1_native_R1_C0', 'valueCell': 'P1_native_R1_C1', 'value':'FORGED'}]}
         self.send({'model': 'qwen3:4b-instruct', 'created_at': '2026-10-16T00:00:00Z', 'message': {'role': 'assistant', 'content': json.dumps(proposal)},
                    'done': True, 'done_reason': 'stop', 'prompt_eval_count': 10, 'eval_count': 10})
 
@@ -96,6 +96,13 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for port in (8098, 11439):
         with socket.socket() as probe: probe.bind(('127.0.0.1', port))
+    import fitz
+    with fitz.open() as pdf:
+        page=pdf.new_page()
+        page.insert_text((40,60),'FICTIONAL LOCAL LINKER FAILURE TEST')
+        page.insert_text((40,120),'Award Code')
+        page.insert_text((240,120),'NV001')
+        pdf.save(OUT/'fixtures/linker.pdf')
     suffix = uuid.uuid4().hex[:10]
     database = 'intake_fault_' + suffix
     state = OUT / ('failure-runtime-' + suffix); state.mkdir()
@@ -119,10 +126,10 @@ def main():
             call('POST', '/api/auth/register', json={'username': auth[0], 'password': auth[1], 'role': 'HOLDER'}); return auth
         auth = account()
         identifier = upload(auth); result = done(auth, identifier)
-        check(result['state'] == 'MODEL_OFFLINE', 'Real refused local model connection produces bounded offline state')
+        check(result['state'] == 'READY' and any(f['value']=='90' for f in result['fields']), 'Structured source facts survive a real refused local model connection')
         check(call('GET', '/api/wallet/documents/' + identifier + '/file', auth).content == (OUT / 'fixtures/marks.txt').read_bytes(), 'Model outage preserves exact encrypted original')
         call('PUT', '/api/wallet/documents/' + identifier + '/claims', auth, json={'claims': [{'path': 'education.math', 'label': 'Math', 'type': 'decimal', 'value': '90'}]})
-        check(call('GET', '/api/wallet/intake/documents/' + identifier, auth)['lineage'] == 'NOT_ASSESSED', 'Manual confirmation remains available during model outage')
+        check(call('GET', '/api/wallet/intake/documents/' + identifier, auth)['lineage'] == 'SUGGESTIONS_MODIFIED', 'Holder confirmation remains available during model outage with server-side removal tracking')
         scan = upload(auth, 'scanned.pdf'); unreadable = done(auth, scan)
         check(unreadable['indicator'] == 'POSSIBLE_DIGILOCKER_FORMAT' and unreadable['report']['manifest']['readablePages'] == 0
               and not unreadable['fields'] and unreadable['report']['manifest']['warnings'], 'Missing OCR is explicit; independent QR can remain possible without invented facts')
@@ -131,24 +138,24 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         for failure, code in [('missing', 'MODEL_MISSING'), ('oversized', 'MODEL_SIZE_LIMIT'), ('cloud', 'CLOUD_NOT_DISABLED')]:
             mode = failure; before = model_calls
-            r = done(account_auth := account(), upload(account_auth))
+            r = done(account_auth := account(), upload(account_auth,'linker.pdf'))
             check(r['report']['modelCode'] == code and not r['fields'] and model_calls == before, 'Local model preflight rejects ' + failure + ' without inference')
-        mode = 'forged'; auth = account(); identifier = upload(auth); forged = done(auth, identifier)
-        check(forged['state'] == 'NO_VERIFIABLE_FIELDS' and forged['report']['discarded'] == 1 and not forged['fields'], 'Wrong model value 95 against source Math 90 is deterministically discarded')
-        mode = 'timeout'; auth = account(); identifier = upload(auth); before = time.monotonic(); timed = done(auth, identifier)
+        mode = 'forged'; auth = account(); identifier = upload(auth,'linker.pdf'); forged = done(auth, identifier)
+        check(forged['state'] == 'NO_VERIFIABLE_FIELDS' and forged['report']['discarded'] == 1 and not forged['fields'], 'Forged model cell references cannot invent a field or supply a value')
+        mode = 'timeout'; auth = account(); identifier = upload(auth,'linker.pdf'); before = time.monotonic(); timed = done(auth, identifier)
         check(timed['state'] == 'TIMED_OUT' and time.monotonic()-before < 20 and not timed['fields'], 'Delayed local inference times out without a baseline or lost upload')
         # Interrupt a real in-flight job and restart the same disposable backend/data.
-        mode = 'timeout'; auth = account(); interrupted = upload(auth)
+        mode = 'timeout'; auth = account(); interrupted = upload(auth,'linker.pdf')
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
-            if 'Suggesting local facts' in call('GET', '/api/wallet/intake/documents/' + interrupted, auth).get('stage', ''): break
+            if 'Checking unassociated source cells' in call('GET', '/api/wallet/intake/documents/' + interrupted, auth).get('stage', ''): break
             time.sleep(.1)
         child.terminate(); child.wait(timeout=10)
         child = start_backend(env, log)
         resumed = call('GET', '/api/wallet/intake/documents/' + interrupted, auth)
-        check(resumed['state'] == 'INTERRUPTED' and call('GET', '/api/wallet/documents/' + interrupted + '/file', auth).content == (OUT / 'fixtures/marks.txt').read_bytes(), 'Real backend restart marks an interrupted job and retains its original')
+        check(resumed['state'] == 'INTERRUPTED' and call('GET', '/api/wallet/documents/' + interrupted + '/file', auth).content == (OUT / 'fixtures/linker.pdf').read_bytes(), 'Real backend restart marks an interrupted job and retains its original')
         mode = 'valid'; call('POST', '/api/wallet/intake/documents/' + interrupted + '/retry', auth)
-        check(done(auth, interrupted)['fields'][0]['value'] == '90', 'Owner retry after restart can create the first valid source-bound proposal')
+        check(done(auth, interrupted)['fields'][0]['value'] == 'NV001', 'Owner retry after restart can create a source-bound proposal; model-supplied values are ignored')
         too_big = HTTP.post(API + '/api/wallet/documents', auth=auth, files={'file': ('oversized.txt', b'x' * (20*1024*1024+1))}, data={'displayName': 'Synthetic oversized', 'category': 'Other'}, timeout=20)
         check(too_big.status_code in (400, 413), 'Oversized upload is refused before enrollment')
     finally:

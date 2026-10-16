@@ -81,10 +81,33 @@ class IntakeTests(TestCase):
         api.return_value = doc
         response = self.client.get('/wallet/abc/')
         for text in ('Possible DigiLocker document (unverified)', 'Imported with Foliolet', 'Issuer not verified',
-                     'Facts edited since extraction', 'Math: 90', '<summary>Advanced</summary>', 'Review the original AI proposal'):
+                     'Facts edited since extraction', 'Math: 90', '<summary>Advanced</summary>', 'Review the original proposal'):
             self.assertContains(response, text)
         self.assertContains(response, 'value="90"')
         self.assertNotContains(response, 'Verified DigiLocker')
+
+    @patch('dashboard.wallet_views.api.call')
+    def test_uncertain_ocr_is_not_automatically_a_fact_without_javascript(self, api):
+        self.login()
+        doc = draft()
+        doc['intake'] = {'format': 'pdf', 'fields': [
+            {'path': 'education.math', 'label': 'Math', 'type': 'decimal', 'value': '71',
+             'evidence': 'Math: 71', 'citation': {'page': 1}, 'support': {'quality': 'REVIEW_REQUIRED'}}]}
+        api.return_value = doc
+        response = self.client.get('/wallet/abc/')
+        self.assertNotContains(response, 'value="71"')
+        self.assertContains(response, 'id="intake-review"')
+        self.assertContains(response, 'Math: 71')
+
+    @patch('dashboard.wallet_views.api.call')
+    def test_supported_fields_remain_available_without_model_or_javascript(self, api):
+        self.login()
+        doc = draft()
+        doc['intake'] = {'format': 'pdf', 'fields': [
+            {'path': 'education.math', 'label': 'Math', 'type': 'decimal', 'value': '91',
+             'evidence': 'Math: 91', 'citation': {'page': 1}, 'support': {'quality': 'SUPPORTED'}}]}
+        api.return_value = doc
+        self.assertContains(self.client.get('/wallet/abc/'), 'value="91"')
 
     @patch('dashboard.wallet_views.api.call')
     def test_names_and_values_do_not_require_user_to_type_paths(self, api):

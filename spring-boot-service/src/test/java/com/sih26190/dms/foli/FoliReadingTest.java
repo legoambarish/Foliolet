@@ -25,7 +25,7 @@ class FoliReadingTest {
   @BeforeEach void setup() {
     config = new FoliProperties(); config.setTempDir(directory.toString());
     ocr = mock(OcrService.class); when(ocr.version()).thenReturn("test OCR");
-    when(ocr.recognize(any())).thenReturn(new OcrService.Result("", 0, 0, List.of(), "OCR unavailable"));
+    when(ocr.recognizeLayout(any())).thenReturn(List.of(new OcrService.Result("", 0, 0, List.of(), "OCR unavailable")));
     extraction = new FoliExtractionService(config, ocr);
   }
   static byte[] pdf(int pages) throws Exception {
@@ -88,7 +88,7 @@ class FoliReadingTest {
     }
     var s = extraction.extract(source(bytes, "pdf"), ignored -> {});
     assertEquals("UNREADABLE", s.pages().get(0).status()); assertFalse(s.manifest().complete());
-    verify(ocr).recognize(any());
+    verify(ocr).recognizeLayout(any());
   }
   @Test void tsvOffsetsPreserveWordsAndConfidence() {
     String tsv = "5\t1\t1\t1\t1\t1\t10\t20\t30\t40\t92\tunless\n5\t1\t1\t1\t1\t2\t45\t20\t40\t40\t80\tcancelled\n";
@@ -116,10 +116,10 @@ class FoliReadingTest {
       widget.setRectangle(new org.apache.pdfbox.pdmodel.common.PDRectangle(40,100,200,30)); doc.getPage(0).getAnnotations().add(widget);
       doc.save(out); bytes=out.toByteArray();
     }
-    when(ocr.recognize(any())).thenReturn(new OcrService.Result("Form field: cancellation is timely.",92,0,List.of(),"OCR transcription"));
+    when(ocr.recognizeLayout(any())).thenReturn(List.of(new OcrService.Result("Form field: cancellation is timely.",92,0,List.of(),"OCR transcription")));
     var result=extraction.extract(source(bytes,"pdf"),s -> {});
     assertEquals("MIXED_OCR",result.pages().get(0).status()); assertTrue(result.pages().get(0).text().contains("Form field"));
-    verify(ocr).recognize(any());
+    verify(ocr).recognizeLayout(any());
   }
   @Test void separatedColumnsKeepTheirWordsAndWarnAboutVisualOrder() throws Exception {
     byte[] bytes;

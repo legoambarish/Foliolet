@@ -60,16 +60,16 @@ try {
         if (-not $systemPython) { throw 'Python 3.12 or newer is required. Install Python and click Foliolet again.' }
         Run-Step 'python-setup' $systemPython.Source @('-m','venv',(Join-Path $folioletRoot '.venv')) 180
     }
-    $requirements = @('django-service/requirements.txt','tools/requirements-dev.txt')
+    $requirements = @('django-service/requirements.txt','tools/requirements-dev.txt','tools/requirements-ocr.txt')
     $requirementsHash = ($requirements | ForEach-Object { (Get-FileHash -LiteralPath (Join-Path $folioletRoot $_) -Algorithm SHA256).Hash }) -join ':'
     $dependencyRecord = Join-Path $folioletData 'desktop-python.json'
     $previousHash = $null
     if (Test-Path -LiteralPath $dependencyRecord) { $previousHash=(Get-Content -LiteralPath $dependencyRecord -Raw | ConvertFrom-Json).requirements }
     $modulesReady = $false
-    try { Run-Step 'python-check' $python @('-c','import django,requests,watchdog,psycopg,Crypto,waitress; from importlib.metadata import version; assert version("Django")=="6.1"') 30; $modulesReady=$true } catch { }
+    try { Run-Step 'python-check' $python @('-c','import django,requests,watchdog,psycopg,Crypto,waitress,rapidocr,onnxruntime; from importlib.metadata import version; assert version("Django")=="6.1"; assert version("rapidocr")=="3.10.0"; assert version("onnxruntime")=="1.31.0"') 30; $modulesReady=$true } catch { }
     if (-not $modulesReady -or ($previousHash -and $previousHash -ne $requirementsHash)) {
         Status 'starting' 'Installing the project Python dependencies...' 22
-        Run-Step 'python-dependencies' $python @('-m','pip','install','-r',(Join-Path $folioletRoot $requirements[0]),'-r',(Join-Path $folioletRoot $requirements[1])) 600
+        Run-Step 'python-dependencies' $python @('-m','pip','install','-r',(Join-Path $folioletRoot $requirements[0]),'-r',(Join-Path $folioletRoot $requirements[1]),'-r',(Join-Path $folioletRoot $requirements[2])) 600
     }
     Write-FolioletJson $dependencyRecord @{requirements=$requirementsHash}
     $env:NODE_PATH=(Join-Path $runtimeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $runtimeRoot 'node_modules')

@@ -103,8 +103,25 @@ public class IntakeJobs {
         if(!config.isEnabled()) throw new FoliException(HttpStatus.SERVICE_UNAVAILABLE,"DISABLED","Local suggestions disabled. Enter facts manually.");
         proposed=suggestions.suggest(inspected.snapshot(),s -> progress(id,attempt,s));
         report.put("discarded",proposed.discarded()); report.put("suggestionWarnings",proposed.warnings());
-        if(proposed.fields().isEmpty()) { state="NO_VERIFIABLE_FIELDS"; stage="No verifiable fields found · enter facts manually"; }
-        else if(proposed.partial() || !inspected.snapshot().manifest().complete()) { state="PARTIAL"; stage="Partial reading · check coverage and original"; }
+        report.put("diagnostics",proposed.diagnostics());report.put("currentFields",proposed.fields());
+        report.put("model",proposed.diagnostics().getOrDefault("modelStatus",config.getModel()));
+        long supported=proposed.fields().stream().filter(f -> f.support()==null || f.support().quality().equals("SUPPORTED")).count();
+        long review=proposed.fields().size()-supported;
+        if(proposed.fields().isEmpty()) {
+          state="NO_VERIFIABLE_FIELDS";
+          stage=((Number)proposed.diagnostics().getOrDefault("candidates",0)).intValue()==0
+              ?"Document read · no safe field associations located. Check reading details."
+              :"Field candidates located · none passed the source checks. Check reading details.";
+          String linker=Objects.toString(proposed.diagnostics().get("modelStatus"),"");
+          if(!linker.isEmpty() && !Set.of("NOT_REQUIRED_FOR_STRUCTURED_SOURCE","LOCAL_SOURCE_LINKER_COMPLETE").contains(linker)) {
+            report.put("modelCode",linker);
+            state=Set.of("OFFLINE","MODEL_MISSING").contains(linker)?"MODEL_OFFLINE":linker.contains("TIME")?"TIMED_OUT":"MODEL_UNAVAILABLE";
+            stage="Document read · local source linking unavailable. Check reading details or enter facts manually.";
+          }
+        } else {
+          state=supported==0?"REVIEW_REQUIRED":proposed.partial() || !inspected.snapshot().manifest().complete()?"PARTIAL":"READY";
+          stage=supported+" source-supported fields · "+review+" need review against the original";
+        }
       } catch(FoliException e) {
         state=e.code().equals("OFFLINE") || e.code().equals("MODEL_MISSING")?"MODEL_OFFLINE":e.code().contains("TIMEOUT")?"TIMED_OUT":"MODEL_UNAVAILABLE";
         stage=e.getReason(); report.put("modelCode",e.code());
@@ -126,7 +143,7 @@ public class IntakeJobs {
         if(r.encryptedBaseline==null && r.confirmedAt==null && d.status.equals("DRAFT") && d.merkleRoot==null
             && fields!=null && !fields.fields().isEmpty()) {
           var baseline=new IntakeMetadata.Baseline(source.hash(),source.document().version(),inspected.snapshot().manifest().extractorVersion(),
-              inspected.snapshot().manifest().ocrEngine(),config.getModel(),FactSuggestions.VERSION,fields.fields());
+              inspected.snapshot().manifest().ocrEngine(),Objects.toString(fields.diagnostics().getOrDefault("modelStatus",config.getModel())),FactSuggestions.VERSION,fields.fields());
           r.encryptedBaseline=metadata.seal(baseline,id,"baseline");
         }
         metadata.save(r);
