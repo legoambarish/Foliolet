@@ -13,15 +13,22 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Preserve tracked source and exact revision only
+          fetch-depth: 0
+      - name: Preserve final tracked source, reports and patch without runtime data
         shell: bash
         run: |
+          set -euo pipefail
+          test ! -e .github/workflows/ps32-apply-reviewed-patch.yml
+          git merge-base --is-ancestor db55c2c6c1209e567713fa9ab08c5441bd55bc86 HEAD
+          git diff --check db55c2c6c1209e567713fa9ab08c5441bd55bc86 HEAD
           mkdir -p snapshot
           git rev-parse HEAD > snapshot/HEAD.txt
           git ls-tree -r HEAD > snapshot/TREE.txt
+          git log --format='%H %s' db55c2c6c1209e567713fa9ab08c5441bd55bc86..HEAD > snapshot/IMPLEMENTATION_COMMITS.txt
+          git diff --binary db55c2c6c1209e567713fa9ab08c5441bd55bc86 HEAD > snapshot/IMPLEMENTATION.patch
           git archive --format=zip HEAD -o snapshot/source.zip
           git bundle create snapshot/source.bundle HEAD
-          sha256sum snapshot/source.zip snapshot/source.bundle > snapshot/SHA256SUMS
+          sha256sum snapshot/source.zip snapshot/source.bundle snapshot/IMPLEMENTATION.patch > snapshot/SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ps32-source-${{ github.sha }}
