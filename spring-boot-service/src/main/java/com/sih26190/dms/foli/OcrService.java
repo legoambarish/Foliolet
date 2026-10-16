@@ -37,7 +37,7 @@ public class OcrService {
       if (System.nanoTime() >= deadline) break;
       BufferedImage frame=angle==0?input:rotate(input,angle);
       Result result;
-      try { result=run(frame,angle,deadline); }
+      try { result=run(frame,angle,deadline,3); }
       finally { if(frame!=input) frame.flush(); }
       if (result.confidence() > best.confidence() || best.text().isBlank()) best = result;
       if (!best.text().isBlank() && best.confidence() >= 78) break;
@@ -45,7 +45,12 @@ public class OcrService {
     return best;
   }
 
-  private Result run(BufferedImage image, int angle, long deadline) {
+  /** Fixed single-block mode for a bounded, geometrically selected logo crop. */
+  public Result recognizeBlock(BufferedImage image) {
+    return run(image,0,System.nanoTime()+TimeUnit.SECONDS.toNanos(config.getOcrTimeoutSeconds()),6);
+  }
+
+  private Result run(BufferedImage image, int angle, long deadline,int segmentation) {
     Path png = null, tsv = null;
     Process process = null;
     try {
@@ -55,7 +60,7 @@ public class OcrService {
       tsv = Files.createTempFile(root, "ocr-", ".tsv");
       ImageIO.write(image, "png", png.toFile());
       var builder = new ProcessBuilder(config.getTesseract(), png.toString(), "stdout", "-l",
-          config.getOcrLanguage(), "--psm", "3", "-c", "tessedit_create_tsv=1");
+          config.getOcrLanguage(), "--psm", Integer.toString(segmentation), "-c", "tessedit_create_tsv=1");
       if (!config.getOcrDataDir().isBlank()) builder.environment().put("TESSDATA_PREFIX", config.getOcrDataDir());
       builder.environment().put("OMP_THREAD_LIMIT", "2");
       process = builder.redirectOutput(tsv.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD).start();

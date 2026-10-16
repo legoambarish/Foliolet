@@ -106,7 +106,18 @@ public class FoliExtractionService {
                 status = "MIXED_OCR";
                 if (!nativeText.replaceAll("\\s+", " ").strip().equals(recognized.text().replaceAll("\\s+", " ").strip())) {
                   text = nativeText + "\n[Rendered-page OCR transcription]\n" + recognized.text();
+                  int offset=nativeText.length()+"\n[Rendered-page OCR transcription]\n".length();
+                  words=recognized.words().stream().map(w -> new Word(w.text(),w.start()+offset,w.end()+offset,w.left(),w.top(),w.width(),w.height(),w.confidence())).toList();
                   warnings.add("Embedded text and rendered-page OCR differ. Both readings retained; visually resolve contradictions.");
+                } else {
+                  // Map matching OCR words to native offsets without rewriting retained text.
+                  var mapped=new ArrayList<Word>(); int cursor=0;
+                  for(var w:recognized.words()) {
+                    int at=nativeText.indexOf(w.text(),cursor);
+                    if(at<0) {mapped.clear();break;}
+                    mapped.add(new Word(w.text(),at,at+w.text().length(),w.left(),w.top(),w.width(),w.height(),w.confidence()));cursor=at+w.text().length();
+                  }
+                  words=List.copyOf(mapped);
                 }
               }
             } else if (nativeText.isBlank()) { text = ""; status = "UNREADABLE";

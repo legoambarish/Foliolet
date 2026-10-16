@@ -35,6 +35,11 @@
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.4</version>
+        </dependency>
         <!-- Explicit local model only: no starter, auto-pulls, advisors or tools. -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
