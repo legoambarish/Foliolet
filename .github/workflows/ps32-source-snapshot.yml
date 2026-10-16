@@ -1,0 +1,29 @@
+name: PS32 source evidence
+on:
+  push:
+    branches: [feature/ps32-final-winning-audit-20261016-1645]
+    paths: ['.github/workflows/ps32-source-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Preserve tracked source and exact revision only
+        shell: bash
+        run: |
+          mkdir -p snapshot
+          git rev-parse HEAD > snapshot/HEAD.txt
+          git ls-tree -r HEAD > snapshot/TREE.txt
+          git archive --format=zip HEAD -o snapshot/source.zip
+          git bundle create snapshot/source.bundle HEAD
+          sha256sum snapshot/source.zip snapshot/source.bundle > snapshot/SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ps32-source-${{ github.sha }}
+          path: snapshot/
+          retention-days: 14
