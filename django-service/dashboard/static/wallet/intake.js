@@ -91,8 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const actual = [...rows.children].map(row => Object.fromEntries(['path','label','type','value'].map(key => [key, row.querySelector('[name=claim_' + key + ']').value])))
       .filter(f => f.path.trim() || f.value.trim());
     preview.textContent = semantic(actual) === semantic(baseline)
-      ? 'Preview: AI-suggested facts unchanged. Confirmation checks this again on the server.'
-      : 'Preview: facts edited since extraction. The original AI proposal remains saved for comparison.';
+      ? 'Preview: Source-suggested facts unchanged. Confirmation checks this again on the server.'
+      : 'Preview: facts edited since extraction. The original source proposal remains saved for comparison.';
   }
   rows?.addEventListener('input', () => { dirty = true; changed(); });
   rows?.addEventListener('change', () => { dirty = true; changed(); });
@@ -106,7 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = template.cloneNode(true); row.querySelector('.scan-note')?.remove();
       for (const key of ['path','label','type','value']) row.querySelector('[name=claim_' + key + ']').value = field[key];
       const note = document.createElement('p'); note.className = 'help scan-note';
-      note.textContent = 'Page ' + field.citation.page + ' · “' + field.evidence + '” · ' + field.citation.provenance + '. ';
+      note.textContent = 'Page ' + field.citation.page + ' · ' + field.citation.provenance + '. ';
+      const evidence = document.createElement('details'), summary = document.createElement('summary'), quote = document.createElement('pre');
+      summary.textContent = 'Show matching source text'; quote.textContent = field.evidence;
+      quote.style.whiteSpace = 'pre-wrap'; quote.style.overflowWrap = 'anywhere';
+      evidence.append(summary, quote);
       if (field.citation.provenance.includes('OCR')) note.append('OCR may misread characters; check the original. ');
       const source = document.createElement('a');
       const q = new URLSearchParams({documentId: field.citation.documentId, hash: field.citation.sourceHash, page: String(field.citation.page)});
@@ -114,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : '/wallet/' + encodeURIComponent(field.citation.documentId.slice(7)) + '/file/';
       source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = analysis.dataset.pdf === 'yes' ? 'View original page' : 'View original file';
       if (field.citation.documentId.startsWith('wallet:')) note.append(source);
-      row.appendChild(note); rows.appendChild(row);
+      row.append(note, evidence); rows.appendChild(row);
     }
     applied = true; changed();
   }
@@ -123,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const names = [body.indicator === 'POSSIBLE_DIGILOCKER_FORMAT' ? 'Possible DigiLocker document (unverified)'
       : body.indicator === 'NO_DIGILOCKER_INDICATOR' ? 'No DigiLocker indicator found' : 'DigiLocker indicator check inconclusive'];
     if (body.method === 'WATCHER_ASSISTED') names.push('Imported with Foliolet');
-    names.push(body.lineage === 'SUGGESTIONS_UNMODIFIED' ? 'AI-suggested facts unchanged'
+    names.push(body.lineage === 'SUGGESTIONS_UNMODIFIED' ? 'Source-suggested facts unchanged'
       : body.lineage === 'SUGGESTIONS_MODIFIED' ? 'Facts edited since extraction' : 'Manual facts / not compared', 'Issuer not verified');
     for (const text of names) { const tag = document.createElement('span'); tag.className = 'mark quiet'; tag.textContent = text; labels.appendChild(tag); }
   }
@@ -139,6 +143,37 @@ document.addEventListener('DOMContentLoaded', () => {
         ...(manifest?.pages || []).flatMap(p => p.warnings.map(w => 'Page ' + p.number + ': ' + w)),
         ...(indicators?.pages || []).flatMap(p => p.warnings.map(w => 'Page ' + p.page + ': ' + w))];
       const box = document.getElementById('intake-warnings'); box.replaceChildren();
+      const diagnostics = body.report?.suggestionDiagnostics || {};
+      const reasons = {
+        LOW_WORD_CONFIDENCE: 'Uncertain words or digits; check the original',
+        DUPLICATE_SCOPE: 'Repeated labels at different locations; choose the intended one manually',
+        MISSING_OR_MISMATCHED_HEADER: 'Several columns without a matching header',
+        AMBIGUOUS_VALUE_HEADER: 'More than one possible value column',
+        COLUMN_ALIGNMENT_MISMATCH: 'A row does not align with its header',
+        INVALID_NUMERIC_LITERAL: 'A score is not a plain readable number; no repair was guessed',
+        MIXED_LAYER_CONTRADICTION: 'Embedded text and the visible-page transcription disagree',
+        MIXED_TABLES_REQUIRE_REVIEW: 'Mixed text/image table association needs manual review',
+        PAGE_NOT_READABLE: 'Page reading is incomplete or uncertain',
+        LITERAL_GEOMETRY_MISMATCH: 'Text cannot be safely paired on one visual row',
+        NO_WORD_GEOMETRY: 'Position evidence is unavailable',
+        INVALID_SOURCE_GEOMETRY: 'Position evidence failed its integrity checks',
+        INVALID_LITERAL_OR_TYPE: 'Invalid value or date',
+        CGPA_RANGE: 'CGPA is outside the supported 0–10 range',
+        UNSUPPORTED_LABEL: 'Text is not a supported fact label',
+        OVERLAPPING_CELLS: 'Overlapping text needs manual review',
+        TIME_BUDGET: 'Source matching reached its time limit',
+        ROW_BUDGET: 'Source matching reached its row limit',
+        WORD_BUDGET: 'The page exceeded the word limit',
+        FIELD_BUDGET: 'Only the first 40 unambiguous proposals are shown',
+        EVIDENCE_SPAN_LIMIT: 'The supporting passage is too large for one safe proposal'
+      };
+      const detail = document.createElement('details'), title = document.createElement('summary');
+      title.textContent = 'Why some facts were not suggested'; detail.appendChild(title);
+      let reasonCount = 0;
+      for (const [key, description] of Object.entries(reasons)) if (Number.isSafeInteger(diagnostics[key]) && diagnostics[key] > 0) {
+        const p = document.createElement('p'); p.textContent = description + ' · ' + diagnostics[key]; detail.appendChild(p); reasonCount++;
+      }
+      if (reasonCount) box.appendChild(detail);
       for (const warning of [...new Set(warnings)].slice(0, 30)) { const p = document.createElement('p'); p.textContent = warning; box.appendChild(p); }
       if (['QUEUED','RUNNING'].includes(body.state)) timer = setTimeout(poll, 2500);
     } catch (e) { stage.textContent = e.message + ' The original is saved; manual fact entry remains available.'; }

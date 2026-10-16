@@ -94,12 +94,14 @@ public class OcrService {
       if (c.length < 12 || !c[0].equals("5") || c[11].isBlank()) continue;
       try {
         double confidence = Double.parseDouble(c[10]);
-        if (confidence < 0) continue;
+        if (!Double.isFinite(confidence) || confidence < 0 || confidence > 100) continue;
+        int left=Integer.parseInt(c[6]),top=Integer.parseInt(c[7]),width=Integer.parseInt(c[8]),height=Integer.parseInt(c[9]);
+        if(left<0 || top<0 || width<=0 || height<=0 || (long)left+width>1_000_000 || (long)top+height>1_000_000) continue;
+        if(c[11].codePoints().anyMatch(Character::isISOControl)) continue;
         String line = c[1] + ":" + c[2] + ":" + c[3] + ":" + c[4];
         if (!text.isEmpty()) text.append(line.equals(lastLine) ? ' ' : '\n');
         int start = text.length(); text.append(c[11]);
-        words.add(new Word(c[11], start, text.length(), Integer.parseInt(c[6]), Integer.parseInt(c[7]),
-            Integer.parseInt(c[8]), Integer.parseInt(c[9]), confidence));
+        words.add(new Word(c[11], start, text.length(), left, top, width, height, confidence));
         sum += confidence * c[11].length(); weight += c[11].length(); lastLine = line;
       } catch (NumberFormatException ignored) { }
     }
