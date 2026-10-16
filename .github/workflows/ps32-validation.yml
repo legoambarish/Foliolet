@@ -1,0 +1,151 @@
+name: PS32 isolated application validation
+
+on:
+  push:
+    branches:
+      - feature/ps32-verified-hardening-20261016-6db30e1
+    paths:
+      - '.github/workflows/ps32-validation.yml'
+      - 'spring-boot-service/**'
+      - 'django-service/**'
+      - 'tools/**'
+      - 'package*.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  application-regression:
+    if: github.ref == 'refs/heads/feature/ps32-verified-hardening-20261016-6db30e1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Clone immutable implementation commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --single-branch --branch feature/ps32-verified-hardening-20261016-6db30e1 https://github.com/legoambarish/Foliolet.git source
+          cd source
+          git checkout --detach "$GITHUB_SHA"
+          git merge-base --is-ancestor 6db30e1520211b0dae88c8b47200a9ed1b6089c7 HEAD
+          mkdir -p "$RUNNER_TEMP/ps32-receipts" "$RUNNER_TEMP/ps32-offline/wheels"
+          git rev-parse HEAD > "$RUNNER_TEMP/ps32-receipts/tested-sha.txt"
+      - name: Java baseline unit and regression tests
+        id: java
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        env:
+          FOLI_TESSERACT: /usr/bin/tesseract
+        run: |
+          set -euo pipefail
+          if ! command -v tesseract >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y tesseract-ocr; fi
+          mvn -B -ntp -f spring-boot-service/pom.xml test 2>&1 | tee "$RUNNER_TEMP/ps32-receipts/java.txt"
+      - name: Python dependency installation
+        id: python_deps
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/ps32-venv"
+          "$RUNNER_TEMP/ps32-venv/bin/python" -m pip install -r django-service/requirements.txt -r tools/requirements-dev.txt > "$RUNNER_TEMP/ps32-receipts/python-install.txt" 2>&1
+      - name: Django regression tests
+        id: django
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ps32-venv/bin/python" django-service/manage.py test dashboard 2>&1 | tee "$RUNNER_TEMP/ps32-receipts/django.txt"
+      - name: Watcher regression tests on Linux
+        id: watcher
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ps32-venv/bin/python" tools/test-intake-watcher.py 2>&1 | tee "$RUNNER_TEMP/ps32-receipts/watcher-linux.txt"
+      - name: Node dependencies and independent verification
+        id: node
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci > "$RUNNER_TEMP/ps32-receipts/npm-root.txt" 2>&1
+          npm ci --prefix spring-boot-service > "$RUNNER_TEMP/ps32-receipts/npm-service.txt" 2>&1
+          npm run test:verifier 2>&1 | tee "$RUNNER_TEMP/ps32-receipts/node-verifier.txt"
+      - name: Real disposable EVM contract regression
+        id: contracts
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:contracts 2>&1 | tee "$RUNNER_TEMP/ps32-receipts/contracts.txt"
+      - name: Preserve offline build prerequisites
+        if: always()
+        continue-on-error: true
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip download --python-version 3.13 --only-binary=:all: -d "$RUNNER_TEMP/ps32-offline/wheels" -r django-service/requirements.txt -r tools/requirements-dev.txt > "$RUNNER_TEMP/ps32-receipts/wheel-download.txt" 2>&1 || true
+          tar -czf "$RUNNER_TEMP/ps32-offline/maven-cache.tar.gz" -C "$HOME/.m2" repository
+          tar --dereference -czf "$RUNNER_TEMP/ps32-offline/maven-runtime.tar.gz" -C "$(dirname "$(dirname "$(readlink -f "$(command -v mvn)")")")" .
+      - name: Record actual gate outcomes
+        if: always()
+        shell: bash
+        env:
+          JAVA_RESULT: ${{ steps.java.outcome }}
+          PYTHON_DEPS_RESULT: ${{ steps.python_deps.outcome }}
+          DJANGO_RESULT: ${{ steps.django.outcome }}
+          WATCHER_RESULT: ${{ steps.watcher.outcome }}
+          NODE_RESULT: ${{ steps.node.outcome }}
+          CONTRACTS_RESULT: ${{ steps.contracts.outcome }}
+        run: |
+          python - <<'PY'
+          import os,json,pathlib
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'ps32-receipts'
+          p.mkdir(exist_ok=True)
+          result={k:os.environ[k] for k in ['JAVA_RESULT','PYTHON_DEPS_RESULT','DJANGO_RESULT','WATCHER_RESULT','NODE_RESULT','CONTRACTS_RESULT']}
+          result['tested_commit']=os.environ['GITHUB_SHA']
+          result['live_model']='NOT_TESTED'
+          result['original_failure_pdfs']='NOT_AVAILABLE'
+          result['windows_and_physical_nfc']='NOT_TESTED'
+          (p/'outcomes.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Upload test receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ps32-test-receipts-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/ps32-receipts
+            source/spring-boot-service/target/surefire-reports/*.xml
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload offline dependency cache
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ps32-offline-prerequisites-${{ github.sha }}
+          path: ${{ runner.temp }}/ps32-offline
+          retention-days: 1
+          if-no-files-found: warn
+      - name: Fail visibly when any required gate failed
+        if: always()
+        env:
+          JAVA_RESULT: ${{ steps.java.outcome }}
+          DJANGO_RESULT: ${{ steps.django.outcome }}
+          NODE_RESULT: ${{ steps.node.outcome }}
+          CONTRACTS_RESULT: ${{ steps.contracts.outcome }}
+        shell: bash
+        run: |
+          test "$JAVA_RESULT" = success
+          test "$DJANGO_RESULT" = success
+          test "$NODE_RESULT" = success
+          test "$CONTRACTS_RESULT" = success
