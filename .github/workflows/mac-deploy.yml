@@ -1,5 +1,8 @@
 name: Deploy tested image to Mac Docker Desktop
 on:
+  push:
+    branches: [codex/macos-docker]
+    paths: [.github/workflows/mac-deploy.yml]
   workflow_dispatch:
     inputs:
       digest:
@@ -12,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/codex/macos-docker'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/macos-docker'
     runs-on: [self-hosted, macOS, foliolet-docker]
     timeout-minutes: 45
     steps:

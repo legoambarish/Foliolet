@@ -70,7 +70,9 @@ class WatcherTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        # macOS /var is an OS symlink; fixture roots use its canonical /private
+        # spelling so the real no-symlink security policy remains exercised.
+        self.base = Path(self.temp.name).resolve()
         self.root = self.base / 'incoming'
         self.root.mkdir()
         self.state = self.base / 'private-state'

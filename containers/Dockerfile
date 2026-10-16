@@ -6,6 +6,7 @@ COPY spring-boot-service/package*.json ./spring-boot-service/
 RUN npm ci --ignore-scripts && npm ci --ignore-scripts --prefix spring-boot-service
 COPY spring-boot-service/contracts ./spring-boot-service/contracts
 COPY spring-boot-service/scripts ./spring-boot-service/scripts
+COPY spring-boot-service/src/test/resources ./spring-boot-service/src/test/resources
 COPY tools ./tools
 COPY django-service ./django-service
 RUN node tools/build-frontend-assets.cjs && node spring-boot-service/scripts/compile-contracts.cjs
