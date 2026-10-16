@@ -50,9 +50,10 @@ def sha256_of_file(path):
 
 
 class Agent:
-    def __init__(self, folder, config, state_path):
+    def __init__(self, folder, config, state_path, transport=None):
         self.folder = Path(folder).resolve()
         self.config = config
+        self.transport = transport or requests
         self.state_path = Path(state_path).resolve()
         self.lock = threading.Lock()
         self.state = json.loads(self.state_path.read_text(encoding="utf-8")) if self.state_path.exists() else {
@@ -72,7 +73,7 @@ class Agent:
             return True
         record = pending["record"]
         try:
-            response = requests.post(self.config.get("apiUrl", "http://localhost:8080").rstrip("/") + "/api/integrity/observations",
+            response = self.transport.post(self.config.get("apiUrl", "http://localhost:8080").rstrip("/") + "/api/integrity/observations",
                                      json=record, timeout=10)
             response.raise_for_status()
             reply = response.json()
@@ -118,6 +119,26 @@ class Agent:
             self.state["pending"] = {"record": record, "relative": relative}
             self.save()
             return self.flush()
+
+    def report_staged(self, relative, content):
+        """Optional intake adapter: sign immutable staged bytes using the unchanged v1 outbox."""
+        with self.lock:
+            if not self.flush():
+                return None
+            path = Path(relative)
+            if path.is_absolute() or any(p in ("..", ".") for p in path.parts):
+                raise ValueError("Invalid relative observation path")
+            fingerprint = hashlib.sha256(content).hexdigest()
+            item = self.state["items"].setdefault(str(path), {"id": str(uuid.uuid4()), "lastHash": None})
+            if item["lastHash"] == fingerprint:
+                return item.get("observationId")
+            record = {"agentId": self.config["agentId"], "itemId": item["id"], "filename": path.name,
+                      "sha256": fingerprint, "observedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+                      "sequence": self.state["sequence"] + 1, "previousDigest": self.state["digest"]}
+            record["signature"] = hmac.new(bytes.fromhex(self.config["secret"].removeprefix("0x")), message(record), hashlib.sha256).hexdigest()
+            self.state["pending"] = {"record": record, "relative": str(path)}
+            self.save()
+            return item.get("observationId") if self.flush() else None
 
 
 class IntakeHandler(FileSystemEventHandler):
