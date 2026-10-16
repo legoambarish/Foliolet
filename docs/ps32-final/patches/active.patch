@@ -1,0 +1,35 @@
+diff --git a/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java b/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java
+index ba89b7a6c65293b3583306ef9f4294e1e2ae7343..a489685b8a8bba12ae7deaa2010e0926a5512420 100644
+--- a/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java
++++ b/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java
+@@ -90,7 +90,8 @@ final class LayoutFacts {
+       boolean hasOcr=chosen.page().layers()!=null && chosen.page().layers().stream().anyMatch(l -> l.kind().startsWith("OCR"));
+       boolean needsRenderedCheck=hasOcr || Set.of("TEXT_UNCERTAIN","MIXED_OCR").contains(chosen.page().status());
+       if(nativeText && needsRenderedCheck && !chosen.layer().kind().equals("TEXT")) {
+-        boolean matched=options.stream().anyMatch(o -> o.page().number()==chosen.page().number() && o.layer().kind().startsWith("OCR")
++        boolean matched=options.stream().anyMatch(o -> o.layer().kind().startsWith("OCR")
++            && samePhysicalCell(chosen,o) && key(o.label()).equals(key(chosen.label()))
+             && normal(o.literal()).equals(normal(chosen.literal())) && strong(o));
+         if(!matched)issues.add("RENDERED_VALUE_NOT_CORROBORATED");
+       }
+@@ -211,7 +212,9 @@ final class LayoutFacts {
+       wordsSeen++;
+       if(!word.visible()){reject("INVISIBLE_SOURCE_TEXT");continue;}
+       if(word.start()<0 || word.end()>page.text().length() || word.end()<=word.start() || !page.text().substring(word.start(),word.end()).equals(word.text())
+-          || word.width()<=0 || word.height()<=0 || !Double.isFinite(word.confidence())){reject("WORD_OFFSET_OR_GEOMETRY_MISMATCH");continue;}
++          || word.left()<0 || word.top()<0 || word.width()<=0 || word.height()<=0
++          || (long)word.left()+word.width()>(long)layer.width()+1 || (long)word.top()+word.height()>(long)layer.height()+1
++          || !Double.isFinite(word.confidence()) || word.confidence()<0 || word.confidence()>100){reject("WORD_OFFSET_OR_GEOMETRY_MISMATCH");continue;}
+       words.add(word);wordsAligned++;
+     }
+     words.sort(Comparator.comparingDouble((Word w) -> w.top()+w.height()/2.0).thenComparingInt(Word::left));
+@@ -374,7 +377,8 @@ final class LayoutFacts {
+         if(number.signum()<0 || k.matches("(?:cgpa|sgpa|gpa)") && number.compareTo(BigDecimal.TEN)>0)issues.add("VALUE_OUTSIDE_EXPECTED_RANGE");
+       } else if(literal.matches(".*[OoIl|].*") && literal.matches("[0-9OoIl|., /-]+"))issues.add("OCR_CHARACTER_CONFUSION");
+       else issues.add("NON_NUMERIC_SCORE_LITERAL");
+-    } else if(k.contains("date") || k.equals("dob")) {
++    } else if(k.equals("dob") || Pattern.compile("(?i)(?:^|[^a-z])date(?:$|[^a-z])").matcher(label).find()
++        || Set.of("birthdate","issuedate","expirydate","expirationdate","purchasedate").contains(k)) {
+       LocalDate date=null;
+       try {
+         if(literal.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}"))date=LocalDate.parse(literal,DateTimeFormatter.ISO_LOCAL_DATE);
