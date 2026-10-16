@@ -20,7 +20,7 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 @Service
 public class FoliExtractionService {
-  public static final String VERSION = "foli-pages-2";
+  public static final String VERSION = "foli-pages-3-layout";
   private final FoliProperties config;
   private final OcrService ocr;
   public FoliExtractionService(FoliProperties config, OcrService ocr) { this.config = config; this.ocr = ocr; }
@@ -92,7 +92,7 @@ public class FoliExtractionService {
           if (stripper.tiny) warnings.add("Very small print detected; check the rendered original.");
           if (stripper.columns) warnings.add("Separated columns or table cells detected. Extracted reading order may differ from the visual page; inspect the original before interpreting scope.");
           String text = nativeText; String status = "TEXT"; Double confidence = null;
-          List<Word> words = List.of(); int rotation = 0;
+          List<Word> words = stripper.words(nativeText); int rotation = 0;
           if (suspicious || images || forms) {
             progress.accept("OCR page " + number + "/" + document.getNumberOfPages());
             var image = render(renderer, page, i, 200);
@@ -206,6 +206,42 @@ public class FoliExtractionService {
   private static class QualityStripper extends PDFTextStripper {
     boolean tiny,columns; int count; final int maximum; final long deadline;
     final Map<Integer,double[]> rows=new HashMap<>();
+    // PDFTextStripper emits positions in its sorted reading order, unlike
+    // processTextPosition (content-stream order). Keep only exact token mappings.
+    final List<TextPosition> emitted=new ArrayList<>();
+    @Override protected void writeString(String text,List<TextPosition> positions) throws IOException {
+      emitted.addAll(positions); super.writeString(text,positions);
+    }
+    List<Word> words(String text) {
+      var result=new ArrayList<Word>(); int cursor=0,start=-1,end=-1;
+      double left=0,top=0,right=0,bottom=0;
+      for(var p:emitted) {
+        String u=p.getUnicode(); if(u==null || u.isEmpty()) return List.of();
+        int at=text.indexOf(u,cursor);
+        // Ligatures, replacement characters or reordered glyphs are not guessed.
+        if(at<0 || !text.substring(cursor,at).isBlank()) return List.of();
+        double x=p.getXDirAdj(),y=p.getYDirAdj()-p.getHeightDir(),w=p.getWidthDirAdj(),h=p.getHeightDir();
+        if(!Double.isFinite(x+y+w+h) || x<0 || y<0 || w<=0 || h<=0) return List.of();
+        if(start>=0 && (at!=end || u.isBlank())) {
+          result.add(word(text,start,end,left,top,right,bottom)); start=-1;
+        }
+        cursor=at+u.length();
+        if(u.isBlank()) continue;
+        if(start<0) {start=at;left=x;top=y;right=x+w;bottom=y+h;}
+        else {left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+w);bottom=Math.max(bottom,y+h);}
+        end=cursor;
+      }
+      if(start>=0) result.add(word(text,start,end,left,top,right,bottom));
+      if(!text.substring(cursor).isBlank()) return List.of();
+      return List.copyOf(result);
+    }
+    private static Word word(String text,int start,int end,double l,double t,double r,double b) {
+      // Native coordinates are PDF points, OCR coordinates are pixels. Consumers
+      // use within-page height ratios, never compare the two coordinate systems.
+      return new Word(text.substring(start,end),start,end,(int)Math.floor(l),(int)Math.floor(t),
+          Math.max(1,(int)Math.ceil(r)-(int)Math.floor(l)),Math.max(1,(int)Math.ceil(b)-(int)Math.floor(t)),100);
+    }
+
     QualityStripper(int maximum, long deadline) throws IOException { super(); this.maximum=maximum; this.deadline=deadline; }
     @Override protected void processTextPosition(TextPosition position) {
       checkCancel();

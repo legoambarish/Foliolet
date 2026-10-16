@@ -97,13 +97,14 @@ public class IntakeJobs {
       var inspected=inspect(id,attempt,source);
       var report=new LinkedHashMap<String,Object>();
       report.put("manifest",inspected.snapshot().manifest()); report.put("indicators",inspected.indicators());
-      report.put("model",config.getModel()); report.put("prompt",FactSuggestions.VERSION);
+      report.put("model","not used — local source-layout rules"); report.put("prompt",FactSuggestions.VERSION);
       FactSuggestions.Result proposed=null; String state="READY",stage="Suggestions ready";
       try {
         if(!config.isEnabled()) throw new FoliException(HttpStatus.SERVICE_UNAVAILABLE,"DISABLED","Local suggestions disabled. Enter facts manually.");
         proposed=suggestions.suggest(inspected.snapshot(),s -> progress(id,attempt,s));
         report.put("discarded",proposed.discarded()); report.put("suggestionWarnings",proposed.warnings());
-        if(proposed.fields().isEmpty()) { state="NO_VERIFIABLE_FIELDS"; stage="No verifiable fields found · enter facts manually"; }
+        report.put("suggestionDiagnostics",proposed.diagnostics());
+        if(proposed.fields().isEmpty()) { state="NO_VERIFIABLE_FIELDS"; stage="No safe source matches · check reasons or enter facts manually"; }
         else if(proposed.partial() || !inspected.snapshot().manifest().complete()) { state="PARTIAL"; stage="Partial reading · check coverage and original"; }
       } catch(FoliException e) {
         state=e.code().equals("OFFLINE") || e.code().equals("MODEL_MISSING")?"MODEL_OFFLINE":e.code().contains("TIMEOUT")?"TIMED_OUT":"MODEL_UNAVAILABLE";
@@ -126,7 +127,7 @@ public class IntakeJobs {
         if(r.encryptedBaseline==null && r.confirmedAt==null && d.status.equals("DRAFT") && d.merkleRoot==null
             && fields!=null && !fields.fields().isEmpty()) {
           var baseline=new IntakeMetadata.Baseline(source.hash(),source.document().version(),inspected.snapshot().manifest().extractorVersion(),
-              inspected.snapshot().manifest().ocrEngine(),config.getModel(),FactSuggestions.VERSION,fields.fields());
+              inspected.snapshot().manifest().ocrEngine(),"not used — local source-layout rules",FactSuggestions.VERSION,fields.fields());
           r.encryptedBaseline=metadata.seal(baseline,id,"baseline");
         }
         metadata.save(r);
