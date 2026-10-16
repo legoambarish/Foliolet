@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.sih26190.dms.dto.AiAnalysisResponse;
 import com.sih26190.dms.model.User;
@@ -25,9 +26,10 @@ public class AiAnalysisController {
     private final UserRepository userRepository;
 
     @PostMapping("/{id}/analyze")
-    public AiAnalysisResponse analyze(@PathVariable Long id, Authentication authentication) {
+    public AiAnalysisResponse analyze(@PathVariable Long id, Authentication authentication,
+            @RequestHeader(value = "X-Foliolet-External-AI-Consent", required = false) String consent) {
         User requester = currentUser(authentication);
-        return aiAnalysisService.analyze(id, requester);
+        return aiAnalysisService.analyze(id, requester, "upload-to-openrouter".equals(consent));
     }
 
     @GetMapping("/{id}/analysis")

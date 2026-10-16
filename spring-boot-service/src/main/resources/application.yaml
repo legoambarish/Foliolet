@@ -6,6 +6,8 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:55432/wallet_dev}
     username: ${SPRING_DATASOURCE_USERNAME:wallet}
     password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
   jpa:
     properties:
       hibernate.hbm2ddl.halt_on_error: true
@@ -22,6 +24,7 @@ server:
   error:
     include-message: never
 dms:
+  external-ai-enabled: ${DMS_EXTERNAL_AI_ENABLED:false}
   storage:
     location: ${DMS_STORAGE_LOCATION:../.local-data/legacy/files}
   backup:
