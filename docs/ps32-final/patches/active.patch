@@ -1,39 +1,25 @@
-diff --git a/django-service/dashboard/signature_worker.py b/django-service/dashboard/signature_worker.py
---- a/django-service/dashboard/signature_worker.py
-+++ b/django-service/dashboard/signature_worker.py
-@@ -45,7 +45,11 @@
-             continue
-         stage='VALIDATION_CONTEXT'
-         try:
--            context=ValidationContext(trust_roots=[],allow_fetching=False,revocation_mode='hard-fail')
-+            # hard-fail with no CRLs and no fetching is an invalid library context.
-+            # This context inspects signature mathematics, NOT issuer assurance.
-+            # Missing revocation remains NOT_ESTABLISHED and an empty explicit
-+            # root store plus issuerVerified=False prevents any trust promotion.
-+            context=ValidationContext(trust_roots=[],allow_fetching=False,revocation_mode='soft-fail')
-             stage='CRYPTOGRAPHIC_VALIDATION'
-             status=loop.run_until_complete(async_validate_pdf_signature(signature,
-                 signer_validation_context=context,ts_validation_context=context))
-diff --git a/django-service/dashboard/pdf_signatures.py b/django-service/dashboard/pdf_signatures.py
---- a/django-service/dashboard/pdf_signatures.py
-+++ b/django-service/dashboard/pdf_signatures.py
-@@ -33,6 +33,7 @@
-                 result=subprocess.run([sys.executable,'-I',str(worker),str(path)],cwd=folder,env=env,
-                     stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=25,check=False)
-             except subprocess.TimeoutExpired:return failed('SIGNATURE_INSPECTION_TIMEOUT')
-+            except OSError:return failed('SIGNATURE_INSPECTOR_UNAVAILABLE')
-             if result.returncode or len(result.stdout)>32768:return failed('SIGNATURE_INSPECTOR_UNAVAILABLE')
-             try:report=json.loads(result.stdout)
-             except (ValueError,UnicodeError):return failed('INVALID_SIGNATURE_INSPECTION_RESULT')
-diff --git a/tools/ps32-live-checks.py b/tools/ps32-live-checks.py
---- a/tools/ps32-live-checks.py
-+++ b/tools/ps32-live-checks.py
-@@ -131,7 +131,7 @@
-         original=requests.get(w.BASE+f"/api/wallet/documents/{document['id']}/file",auth=owner,timeout=20)
-         check(original.status_code==200 and original.content==content, 'Encrypted original remains byte-exact after database, chain and backend restarts')
-         check(hashlib.sha256(vault_key.read_bytes()).hexdigest()==before,'Backend restart preserves the vault encryption key')
--        page=session.get(w.UI+'/wallet/',timeout=20)
-+        page=session.get(w.UI+'/',timeout=20)
-         check(page.status_code==200 and '/login/' not in page.url,'Existing holder session survives backend restart')
-     finally:
-         if database_stopped:subprocess.run(['docker','start',container],stdout=subprocess.DEVNULL)
+diff --git a/tools/start-digilocker-demo.ps1 b/tools/start-digilocker-demo.ps1
+--- a/tools/start-digilocker-demo.ps1
++++ b/tools/start-digilocker-demo.ps1
+@@ -1,9 +1,10 @@
+-param([string]$RuntimeRoot, [switch]$SkipBuild, [string]$OllamaUrl='http://127.0.0.1:11434')
++param([string]$RuntimeRoot, [switch]$SkipBuild, [string]$OllamaUrl='http://127.0.0.1:11434', [ValidateRange(512,4096)][int]$MaxHeapMb=768)
+ $ErrorActionPreference = 'Stop'
+ $intakeModelOrigin=[uri]$OllamaUrl
+ if ($intakeModelOrigin.Scheme -ne 'http' -or $intakeModelOrigin.Host -notin @('127.0.0.1','::1','[::1]') -or $intakeModelOrigin.Port -lt 1 -or $intakeModelOrigin.UserInfo -or $intakeModelOrigin.Query -or $intakeModelOrigin.Fragment -or $intakeModelOrigin.AbsolutePath -ne '/') { throw 'Use a numeric loopback HTTP Ollama origin with an explicit port.' }
+ $intakeRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
+-if ((git -C $intakeRoot branch --show-current).Trim() -notlike 'feature/digilocker-assisted-intake*') { throw 'Run this launcher only in the dedicated DigiLocker feature worktree.' }
++$intakeBranch = (git -C $intakeRoot branch --show-current).Trim()
++if ($intakeBranch -notlike 'feature/digilocker-assisted-intake*' -and $intakeBranch -ne 'feature/ps32-final-winning-audit-20261016-1645') { throw 'Run this launcher only in the dedicated DigiLocker or isolated PS32 audit worktree.' }
+ if (-not $RuntimeRoot) { $RuntimeRoot = $intakeRoot }
+ $RuntimeRoot = (Resolve-Path -LiteralPath $RuntimeRoot).Path
+ $intakePython = Join-Path $intakeRoot '.venv\Scripts\python.exe'
+@@ -78,7 +79,7 @@
+ $env:LOGGING_LEVEL_ORG_APACHE_PDFBOX='OFF'; $env:LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI='OFF'
+ $env:SERVER_TOMCAT_ACCESSLOG_ENABLED='false'
+ @{root=$intakeRoot;runtimeRoot=$RuntimeRoot;modelUrl=$OllamaUrl} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeData 'intake-runtime.json') -Encoding utf8
+-Intake-Launch 'intake-spring' (Get-Command java).Source @('-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
++Intake-Launch 'intake-spring' (Get-Command java).Source @("-Xmx${MaxHeapMb}m", '-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
+ Intake-Wait 8088 90
+ & node (Join-Path $intakeRoot 'tools\provision-digilocker-trust.cjs')
+ if ($LASTEXITCODE -ne 0) { throw 'Isolated registry trust provisioning failed' }
