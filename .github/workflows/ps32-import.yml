@@ -1,0 +1,77 @@
+name: PS32 verified local implementation import
+on:
+  push:
+    branches: [feature/ps32-verified-hardening-20261016-6db30e1]
+    paths: [.github/workflows/ps32-import.yml]
+permissions:
+  contents: write
+jobs:
+  exact-import:
+    if: github.ref == 'refs/heads/feature/ps32-verified-hardening-20261016-6db30e1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Retrieve transport and verify complete bundle hash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/import-receipts"
+          python - <<'PY'
+          import os,pathlib,urllib.request,json,base64,hashlib
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'import-receipts'
+          chunks=[]
+          for i,sha in enumerate(['de1940f2ce7a4350862a6c22634f913f5bb5a13b','21094426ced12abd23a3069a8cd01cb0632f299b']):
+              req=urllib.request.Request(f'https://api.github.com/repos/legoambarish/Foliolet/git/blobs/{sha}',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req,timeout=30) as response: item=json.load(response)
+              encoded=''.join(item['content'].split())
+              (root/f'chunk-{i}.b64').write_text(encoded)
+              chunks.append(encoded)
+          # The transport is inert until its complete SHA-256 matches the locally tested Git bundle.
+          repaired=''.join(chunks)
+          data=base64.b64decode(repaired)
+          (root/'received.bundle').write_bytes(data)
+          actual=hashlib.sha256(data).hexdigest()
+          (root/'transport.json').write_text(json.dumps({'expected':'d95dc2090fb4b2ddfff862bae196c96c7840ce88bf40ecdf5d006aa642ba826e','actual':actual,'bytes':len(data)},indent=2))
+          if actual!='d95dc2090fb4b2ddfff862bae196c96c7840ce88bf40ecdf5d006aa642ba826e': raise ValueError('Transport checksum mismatch; no repository source imported')
+          PY
+      - name: Import only verified application changes onto isolated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=feature/ps32-verified-hardening-20261016-6db30e1
+          git clone --single-branch --branch "$branch" https://github.com/legoambarish/Foliolet.git source
+          cd source
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git bundle verify "$RUNNER_TEMP/import-receipts/received.bundle"
+          git fetch "$RUNNER_TEMP/import-receipts/received.bundle" HEAD
+          test "$(git rev-parse FETCH_HEAD)" = 476e80a19537b31109263050e1d6c9904836da7a
+          git merge-base --is-ancestor 30120729fc29d79a0bd11d6b695024fcf1576d68 FETCH_HEAD
+          git diff --name-only 30120729fc29d79a0bd11d6b695024fcf1576d68 FETCH_HEAD > "$RUNNER_TEMP/import-receipts/changed-files.txt"
+          python - <<'PY'
+          import os,pathlib
+          names=(pathlib.Path(os.environ['RUNNER_TEMP'])/'import-receipts/changed-files.txt').read_text().splitlines()
+          allowed=('spring-boot-service/src/main/java/com/sih26190/dms/intake/','spring-boot-service/src/main/java/com/sih26190/dms/foli/','spring-boot-service/src/test/java/com/sih26190/dms/','django-service/dashboard/static/wallet/intake.js','django-service/dashboard/templates/wallet/','docs/ps32/','RESEARCH_PROGRESS.md')
+          if not names or any(not n.startswith(allowed) for n in names): raise ValueError('Unexpected import path')
+          PY
+          git config user.name 'Foliolet PS32 Engineering'
+          git config user.email 'ps32-engineering@users.noreply.github.com'
+          git merge --no-ff --no-edit 476e80a19537b31109263050e1d6c9904836da7a
+          test "$(git branch --show-current)" = "$branch"
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:refs/heads/$branch"
+          unset auth
+          git rev-parse HEAD > "$RUNNER_TEMP/import-receipts/imported-head.txt"
+          git bundle create "$RUNNER_TEMP/import-receipts/synchronized-source.bundle" HEAD
+      - name: Preserve checksum and import receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ps32-import-receipts-${{ github.sha }}
+          path: ${{ runner.temp }}/import-receipts
+          retention-days: 7
+          if-no-files-found: error
