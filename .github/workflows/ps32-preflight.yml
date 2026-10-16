@@ -1,0 +1,64 @@
+name: PS32 isolated source preflight
+
+on:
+  push:
+    branches:
+      - feature/ps32-verified-hardening-20261016-6db30e1
+    paths:
+      - .github/workflows/ps32-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-preflight:
+    if: github.ref == 'refs/heads/feature/ps32-verified-hardening-20261016-6db30e1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Clone exact isolated branch and verify writable source
+        shell: bash
+        env:
+          EXPECTED_BASE: 6db30e1520211b0dae88c8b47200a9ed1b6089c7
+          IMPLEMENTATION_BRANCH: feature/ps32-verified-hardening-20261016-6db30e1
+        run: |
+          set -euo pipefail
+          git clone --single-branch --branch "$IMPLEMENTATION_BRANCH" https://github.com/legoambarish/Foliolet.git source
+          cd source
+          git checkout --detach "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$EXPECTED_BASE" HEAD
+          test -f spring-boot-service/src/main/java/com/sih26190/dms/intake/FactSuggestions.java
+          test -f docs/DIGILOCKER_ASSISTED_INTAKE_RUNBOOK.md
+          probe=$(mktemp "$PWD/.ps32-write-probe-XXXXXX")
+          printf 'isolated source write probe\n' > "$probe"
+          test -s "$probe"
+          rm -- "$probe"
+          test -z "$(git status --porcelain)"
+          {
+            printf 'source_base=%s\n' "$EXPECTED_BASE"
+            printf 'checked_out_head=%s\n' "$(git rev-parse HEAD)"
+            printf 'source_tree=%s\n' "$(git rev-parse HEAD^{tree})"
+            printf 'tracked_files=%s\n' "$(git ls-files | wc -l)"
+            printf 'clone=PASS\nancestry=PASS\nwrite_probe=PASS\nclean_checkout=PASS\napplication_tests=NOT_RUN\n'
+            git --version
+            java -version 2>&1
+            mvn --version
+            python --version
+            node --version
+          } | tee "$RUNNER_TEMP/ps32-preflight.txt"
+          git bundle create "$RUNNER_TEMP/foliolet-source.bundle" HEAD
+          git bundle verify "$RUNNER_TEMP/foliolet-source.bundle"
+          cd "$RUNNER_TEMP"
+          sha256sum foliolet-source.bundle ps32-preflight.txt > ps32-preflight-sha256.txt
+      - name: Preserve source bundle and preflight receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ps32-verified-source-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/foliolet-source.bundle
+            ${{ runner.temp }}/ps32-preflight.txt
+            ${{ runner.temp }}/ps32-preflight-sha256.txt
+          if-no-files-found: error
+          retention-days: 7
