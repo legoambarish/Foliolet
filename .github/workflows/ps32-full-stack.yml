@@ -124,6 +124,7 @@ jobs:
         id: helpers
         continue-on-error: true
         run: |
+          set -euo pipefail
           python tools/test-intake-watcher.py > audit-evidence/watcher.txt 2>&1
           python tools/test-ocr-layout-worker.py > audit-evidence/ocr-worker.txt 2>&1
           node tools/test-share-qr.cjs > audit-evidence/qr.txt 2>&1
@@ -131,8 +132,15 @@ jobs:
         id: failures
         continue-on-error: true
         run: |
+          set -euo pipefail
           FOLI_LAYOUT_PYTHON='' FOLI_LAYOUT_SCRIPT='' python tools/test-intake-failures.py > audit-evidence/failures.txt 2>&1
           python -c "import runpy; runpy.run_path('tools/test-intake-live.py')['formats_only']()" > audit-evidence/formats.txt 2>&1
+      - name: Real dependency interruption and state-preserving restart
+        id: resilience
+        continue-on-error: true
+        env:
+          PS32_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: python tools/ps32-live-checks.py > audit-evidence/resilience.txt 2>&1
       - name: Preserve non-secret evidence only
         if: always()
         env:
@@ -141,11 +149,12 @@ jobs:
           BROWSER: ${{ steps.browser.outcome }}
           HELPERS: ${{ steps.helpers.outcome }}
           FAILURES: ${{ steps.failures.outcome }}
+          RESILIENCE: ${{ steps.resilience.outcome }}
         run: |
           python - <<'PY'
           import json, os, pathlib, re, shutil
           out=pathlib.Path('audit-evidence'); out.mkdir(exist_ok=True)
-          status={name:os.environ[name] for name in ('LIFECYCLE','ATTACKS','BROWSER','HELPERS','FAILURES')}
+          status={name:os.environ[name] for name in ('LIFECYCLE','ATTACKS','BROWSER','HELPERS','FAILURES','RESILIENCE')}
           (out/'outcomes.json').write_text(json.dumps(status,indent=2))
           for name in ('live-test-results.json','live-security-results.json','intake-tests/failure-results.json','intake-tests/format-results.json','ocr-p0/walkthrough/results.json'):
               source=pathlib.Path('.local-data')/name
