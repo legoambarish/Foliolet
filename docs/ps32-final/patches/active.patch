@@ -1,35 +1,128 @@
-diff --git a/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java b/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java
-index ba89b7a6c65293b3583306ef9f4294e1e2ae7343..a489685b8a8bba12ae7deaa2010e0926a5512420 100644
---- a/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java
-+++ b/spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java
-@@ -90,7 +90,8 @@ final class LayoutFacts {
-       boolean hasOcr=chosen.page().layers()!=null && chosen.page().layers().stream().anyMatch(l -> l.kind().startsWith("OCR"));
-       boolean needsRenderedCheck=hasOcr || Set.of("TEXT_UNCERTAIN","MIXED_OCR").contains(chosen.page().status());
-       if(nativeText && needsRenderedCheck && !chosen.layer().kind().equals("TEXT")) {
--        boolean matched=options.stream().anyMatch(o -> o.page().number()==chosen.page().number() && o.layer().kind().startsWith("OCR")
-+        boolean matched=options.stream().anyMatch(o -> o.layer().kind().startsWith("OCR")
-+            && samePhysicalCell(chosen,o) && key(o.label()).equals(key(chosen.label()))
-             && normal(o.literal()).equals(normal(chosen.literal())) && strong(o));
-         if(!matched)issues.add("RENDERED_VALUE_NOT_CORROBORATED");
-       }
-@@ -211,7 +212,9 @@ final class LayoutFacts {
-       wordsSeen++;
-       if(!word.visible()){reject("INVISIBLE_SOURCE_TEXT");continue;}
-       if(word.start()<0 || word.end()>page.text().length() || word.end()<=word.start() || !page.text().substring(word.start(),word.end()).equals(word.text())
--          || word.width()<=0 || word.height()<=0 || !Double.isFinite(word.confidence())){reject("WORD_OFFSET_OR_GEOMETRY_MISMATCH");continue;}
-+          || word.left()<0 || word.top()<0 || word.width()<=0 || word.height()<=0
-+          || (long)word.left()+word.width()>(long)layer.width()+1 || (long)word.top()+word.height()>(long)layer.height()+1
-+          || !Double.isFinite(word.confidence()) || word.confidence()<0 || word.confidence()>100){reject("WORD_OFFSET_OR_GEOMETRY_MISMATCH");continue;}
-       words.add(word);wordsAligned++;
-     }
-     words.sort(Comparator.comparingDouble((Word w) -> w.top()+w.height()/2.0).thenComparingInt(Word::left));
-@@ -374,7 +377,8 @@ final class LayoutFacts {
-         if(number.signum()<0 || k.matches("(?:cgpa|sgpa|gpa)") && number.compareTo(BigDecimal.TEN)>0)issues.add("VALUE_OUTSIDE_EXPECTED_RANGE");
-       } else if(literal.matches(".*[OoIl|].*") && literal.matches("[0-9OoIl|., /-]+"))issues.add("OCR_CHARACTER_CONFUSION");
-       else issues.add("NON_NUMERIC_SCORE_LITERAL");
--    } else if(k.contains("date") || k.equals("dob")) {
-+    } else if(k.equals("dob") || Pattern.compile("(?i)(?:^|[^a-z])date(?:$|[^a-z])").matcher(label).find()
-+        || Set.of("birthdate","issuedate","expirydate","expirationdate","purchasedate").contains(k)) {
-       LocalDate date=null;
-       try {
-         if(literal.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}"))date=LocalDate.parse(literal,DateTimeFormatter.ISO_LOCAL_DATE);
+diff --git a/tools/make-intake-fixtures.py b/tools/make-intake-fixtures.py
+index 05bcc48..18d508e 100644
+--- a/tools/make-intake-fixtures.py
++++ b/tools/make-intake-fixtures.py
+@@ -5,6 +5,7 @@ import os
+ from pathlib import Path
+ import subprocess
+ import fitz
++from fixture_fonts import fixture_font
+ from PIL import Image, ImageDraw, ImageFont
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+@@ -32,8 +33,8 @@ def graphic():
+     draw.ellipse((25, 25, 215, 215), fill='white')
+     draw.rounded_rectangle((70, 65, 160, 173), 8, fill=purple)
+     draw.polygon(((130, 65), (160, 95), (130, 95)), fill='white')
+-    draw.text((260, 65), 'Powered by', font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 28), fill='white')
+-    draw.text((255, 112), 'DigiLocker', font=ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 54), fill='white')
++    draw.text((260, 65), 'Powered by', font=fixture_font(28), fill='white')
++    draw.text((255, 112), 'DigiLocker', font=fixture_font(54, bold=True), fill='white')
+     return image
+ 
+ 
+@@ -57,7 +58,7 @@ def native(name, brand=False, code=None, pages=1, scanned=False, hybrid=False):
+             if brand: page.insert_image(fitz.Rect(280, 525, 550, 625), stream=png(graphic()))
+     if hybrid:
+         image = Image.new('RGB', (1000, 100), 'white'); draw = ImageDraw.Draw(image)
+-        draw.text((30, 15), 'Extra charge: INR 800 for dispatch', font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 32), fill='black')
++        draw.text((30, 15), 'Extra charge: INR 800 for dispatch', font=fixture_font(32), fill='black')
+         document[0].insert_image(fitz.Rect(60, 330, 540, 380), stream=png(image))
+     if scanned:
+         raster = fitz.open()
+diff --git a/tools/make-ocr-benchmark.py b/tools/make-ocr-benchmark.py
+index bc1f0a7..04ba12b 100644
+--- a/tools/make-ocr-benchmark.py
++++ b/tools/make-ocr-benchmark.py
+@@ -2,6 +2,7 @@
+ import io, json
+ from pathlib import Path
+ import fitz
++from fixture_fonts import fixture_font
+ from PIL import Image, ImageDraw, ImageFont, ImageFilter
+ 
+ ROOT=Path(__file__).resolve().parents[1]
+@@ -78,7 +79,7 @@ def main():
+         w=fitz.Widget();w.field_name=k;w.field_type=fitz.PDF_WIDGET_TYPE_TEXT;w.field_value=v;w.rect=fitz.Rect(190,y,450,y+28);w.text_fontsize=12;p.add_widget(w)
+     finish(d,'form-widgets.pdf')
+     d,p=base();write(p,45,150,'Name: Ananya Rao');write(p,45,190,'Mathematics: 91');write(p,45,230,'Physics: 86')
+-    im=Image.new('RGB',(550,110),'white');g=ImageDraw.Draw(im);g.text((10,10),'Mathematics: 71',font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf',36),fill='black')
++    im=Image.new('RGB',(550,110),'white');g=ImageDraw.Draw(im);g.text((10,10),'Mathematics: 71',font=fixture_font(36),fill='black')
+     b=io.BytesIO();im.save(b,format='PNG');p.insert_image(fitz.Rect(40,167,400,208),stream=b.getvalue());finish(d,'mixed-values.pdf')
+     d,p=base();write(p,45,150,'Name: Ananya Rao');p.insert_text((45,190),'Mathematics: 99',fontsize=11,render_mode=3)
+     write(p,45,230,'Physics: 86');finish(d,'native-hidden.pdf')
+diff --git a/tools/test-live-security.py b/tools/test-live-security.py
+index 36f10d5..33431fa 100644
+--- a/tools/test-live-security.py
++++ b/tools/test-live-security.py
+@@ -46,7 +46,7 @@ def main():
+             raise AssertionError('Database accepted duplicate username')
+ 
+     ui = requests.Session()
+-    origin = 'http://localhost:8000'
++    origin = w.UI
+     def post(path, data, files=None):
+         landing = ui.get(origin+path, timeout=30)
+         csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', landing.text).group(1)
+@@ -95,7 +95,7 @@ def main():
+     check(all(l['salt'] not in raw and l['value'] not in raw for l in hidden), 'selective bundle omits every hidden fixture value and salt')
+     path = ROOT / '.local-data/security-demo-proof.json'
+     path.write_text(json.dumps(selective))
+-    command = ['node', str(ROOT/'spring-boot-service/scripts/verify-proof.cjs'), str(path)]
++    command = ['node', str(ROOT/'spring-boot-service/scripts/verify-proof.cjs'), str(path), '--rpc', w.RPC]
+     trusted = ['--contract',pins['contract'],'--operator',pins['operator'],'--chain-id',str(pins['chainId'])]
+     good = subprocess.run(command+trusted,capture_output=True,text=True)
+     check(good.returncode == 0, 'separate Node accepts genuine live proof with local pins')
+diff --git a/tools/test-live-workflow.py b/tools/test-live-workflow.py
+index 195143c..65f1b25 100644
+--- a/tools/test-live-workflow.py
++++ b/tools/test-live-workflow.py
+@@ -23,6 +23,8 @@ from Crypto.Hash import keccak
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ BASE = os.environ.get("WALLET_TEST_API", "http://127.0.0.1:8080")
++UI = os.environ.get("WALLET_TEST_UI", "http://localhost:8000")
++RPC = os.environ.get("WALLET_TEST_RPC", "http://127.0.0.1:8545")
+ DB = os.environ.get("WALLET_TEST_DSN", "host=127.0.0.1 port=55432 dbname=wallet_dev user=wallet")
+ assert BASE.startswith(("http://127.0.0.1:", "http://localhost:")), "Use isolated local services"
+ checks = []
+@@ -126,7 +128,7 @@ def main():
+     artifact = ROOT / ".local-data" / "live-test-proof.json"
+     artifact.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+     result = subprocess.run(["node", str(ROOT / "spring-boot-service/scripts/verify-proof.cjs"), str(artifact),
+-        "--contract", network["contract"], "--operator", network["operator"], "--chain-id", str(network["chainId"])], capture_output=True, text=True)
++        "--contract", network["contract"], "--operator", network["operator"], "--chain-id", str(network["chainId"]), "--rpc", RPC], capture_output=True, text=True)
+     check(result.returncode == 0, "separate Node verifier recomputes Merkle/signature and reads actual EVM state")
+     mutations = {
+         "value": lambda b: b["claims"][0]["leaf"].update(value="false"),
+@@ -231,9 +233,9 @@ def main():
+     ui = requests.Session()
+     landing = ui.get(ui_share["shareUrl"], timeout=20)
+     csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', landing.text).group(1)
+-    released = ui.post(ui_share["shareUrl"], data={"csrfmiddlewaretoken": csrf}, headers={"Origin": "http://localhost:8000"}, timeout=70)
++    released = ui.post(ui_share["shareUrl"], data={"csrfmiddlewaretoken": csrf}, headers={"Origin": UI}, timeout=70)
+     check(released.status_code == 200 and "Service verification passed" in released.text, "real Django CSRF-protected one-time release succeeds")
+-    export_url = "http://localhost:8000/proof-download/"+ui_share["id"]+"/"
++    export_url = UI + "/proof-download/"+ui_share["id"]+"/"
+     exported = ui.get(export_url, timeout=70)
+     check(exported.status_code == 200 and "attachment" in exported.headers.get("Content-Disposition", "")
+           and len(exported.json()["claims"]) == 1 and "9.17" not in exported.text, "real HTTP attachment exports only the already released fact/proof")
+diff --git a/tools/test-ocr-intake-ui.cjs b/tools/test-ocr-intake-ui.cjs
+index 8f425d8..e3e4dd2 100644
+--- a/tools/test-ocr-intake-ui.cjs
++++ b/tools/test-ocr-intake-ui.cjs
+@@ -1,4 +1,4 @@
+-/* Real Edge upload -> source review -> confirmation -> EVM -> selective disclosure. Fictional data only. */
++/* Real Chromium/Edge upload -> source review -> confirmation -> EVM -> selective disclosure. Fictional data only. */
+ const {chromium}=require(process.env.FOLI_PLAYWRIGHT_MODULE||'playwright');
+ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
+ const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'.local-data','ocr-p0','walkthrough');
+@@ -10,7 +10,7 @@ async function main(){
+  const auth=['ocr-ui-'+crypto.randomBytes(6).toString('hex'),'isolated-'+crypto.randomBytes(20).toString('hex')];
+  const basic='Basic '+Buffer.from(auth.join(':')).toString('base64');
+  let r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:auth[0],password:auth[1],role:'HOLDER'})});assert(r.ok);
+- browser=await chromium.launch({headless:true,channel:'msedge'});
++ browser=await chromium.launch({headless:true,...(process.env.FOLI_BROWSER_CHANNEL ? {channel:process.env.FOLI_BROWSER_CHANNEL} : process.platform==='win32' ? {channel:'msedge'} : {})});
+  const ctx=await browser.newContext({viewport:{width:1365,height:1000}});
+  await ctx.route('**/*',async route=>{const u=route.request().url();if(![UI+'/',API+'/',RPC+'/','data:','blob:'].some(origin=>u.startsWith(origin))){external.push(u.split('/').slice(0,3).join('/'));await route.abort();}else await route.continue();});
+  const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
