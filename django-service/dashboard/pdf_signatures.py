@@ -32,6 +32,7 @@ def inspect_pdf(data):
                 result=subprocess.run([sys.executable,'-I',str(worker),str(path)],cwd=folder,env=env,
                     stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=25,check=False)
             except subprocess.TimeoutExpired:return failed('SIGNATURE_INSPECTION_TIMEOUT')
+            except OSError:return failed('SIGNATURE_INSPECTOR_UNAVAILABLE')
             if result.returncode or len(result.stdout)>32768:return failed('SIGNATURE_INSPECTOR_UNAVAILABLE')
             try:report=json.loads(result.stdout)
             except (ValueError,UnicodeError):return failed('INVALID_SIGNATURE_INSPECTION_RESULT')

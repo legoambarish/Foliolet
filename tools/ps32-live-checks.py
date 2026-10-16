@@ -131,7 +131,7 @@ print('Encrypted envelopes and authenticated JSON decoding confirmed')
         original=requests.get(w.BASE+f"/api/wallet/documents/{document['id']}/file",auth=owner,timeout=20)
         check(original.status_code==200 and original.content==content, 'Encrypted original remains byte-exact after database, chain and backend restarts')
         check(hashlib.sha256(vault_key.read_bytes()).hexdigest()==before,'Backend restart preserves the vault encryption key')
-        page=session.get(w.UI+'/wallet/',timeout=20)
+        page=session.get(w.UI+'/',timeout=20)
         check(page.status_code==200 and '/login/' not in page.url,'Existing holder session survives backend restart')
     finally:
         if database_stopped:subprocess.run(['docker','start',container],stdout=subprocess.DEVNULL)

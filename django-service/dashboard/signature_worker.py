@@ -48,7 +48,11 @@ def inspect_bytes(data, loop):
             continue
         stage='VALIDATION_CONTEXT'
         try:
-            context=ValidationContext(trust_roots=[],allow_fetching=False,revocation_mode='hard-fail')
+            # hard-fail with no CRLs and no fetching is an invalid library context.
+            # This context inspects signature mathematics, NOT issuer assurance.
+            # Missing revocation remains NOT_ESTABLISHED and an empty explicit
+            # root store plus issuerVerified=False prevents any trust promotion.
+            context=ValidationContext(trust_roots=[],allow_fetching=False,revocation_mode='soft-fail')
             stage='CRYPTOGRAPHIC_VALIDATION'
             status=loop.run_until_complete(async_validate_pdf_signature(signature,
                 signer_validation_context=context,ts_validation_context=context))
