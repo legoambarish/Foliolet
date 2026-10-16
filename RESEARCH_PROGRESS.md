@@ -1,36 +1,58 @@
-# PS32 final audit — execution ledger
+# PS32 final audit — durable execution ledger
 
 ## Scope and safety
 
-Assignment received 2026-10-16. The complete 807-line supplied master prompt was read before substantive work. This run works only on `feature/ps32-final-winning-audit-20261016-1645`. Do not merge into or modify `main`, `cf`, or `feature/digilocker-assisted-intake`.
+Assignment received 2026-10-16. The entire 807-line master prompt was read. Work only on `feature/ps32-final-winning-audit-20261016-1645`; never merge into or modify `main`, `cf`, or the source branch. Original runtime state has not been accessed or changed. All test services/records are disposable.
 
-## Verified baseline
+## Verified source and working environment
 
-- GitHub branch API verified source HEAD: `db55c2c6c1209e567713fa9ab08c5441bd55bc86`.
-- Source tree: `75e3b538a1e04b5a71fbbfc0dc644764d4403de8`.
-- Source parent: `6db30e1520211b0dae88c8b47200a9ed1b6089c7`.
-- A new remote branch was created directly at that exact source commit.
-- Original runtime state has not been accessed or changed.
+Source HEAD `db55c2c6c1209e567713fa9ab08c5441bd55bc86`, tree `75e3b538a1e04b5a71fbbfc0dc644764d4403de8`, parent `6db30e1520211b0dae88c8b47200a9ed1b6089c7`. The new remote branch was created directly at that exact source commit.
 
-## Execution environment — actual observations
+Direct container DNS prevented GitHub cloning. This was overcome using a commit-pinned GitHub Actions archive and Git bundle, downloaded through the GitHub connector and cloned into an isolated local directory. Both SHA-256 checks passed. This is the actual complete repository, not a substitute lab. Local snapshot `0627643118c28fc3bdedc4b2d8705d4d48739ea7` has unchanged baseline application source. Snapshot run: https://github.com/legoambarish/Foliolet/actions/runs/38935130981 . Actual application builds run in isolated GitHub Actions; local networked Maven compilation has not been claimed.
 
-The isolated Linux container is writable and has Java 21, Node 22, Python and Tesseract. `git ls-remote` failed with `Could not resolve host: github.com`; no full local clone has been established. GitHub connector read and branch creation succeed. Source is being inspected through commit-pinned connector reads. Alternative executable validation routes are being investigated. No build, benchmark or application test has yet passed in this run.
+## Preserved previous research
 
-## Preservation
+Recovered `Foliolet_PS32_Research_Test_Recovery_Package.zip` from the user's Library into isolated storage, without changing the original. Earlier independent laboratory results are not this branch's results. Existing repository reports remain inherited unchanged.
 
-The existing Library research archive `Foliolet_PS32_Research_Test_Recovery_Package.zip` was recovered into isolated working storage without modifying the original. Existing repository documents and baseline source remain inherited unchanged. Prior independent laboratory results must not be relabelled as tests of this branch.
+## Executed baseline — PASS
 
-## Initial work
+Run https://github.com/legoambarish/Foliolet/actions/runs/38934429615 at `d610a5e3d2e240c5f36d406503b9866ad4711b86` (baseline source plus audit docs/workflow):
 
-- Verified exact branch and created isolated remote implementation branch.
-- Retrieved baseline repository tree, README, package manifest and Maven configuration.
-- Started official organizer research; independently located the organizer's Commudle Hack Sprint event for 17–18 October 2026. Exact PS32 wording and authoritative rules still need verification.
-- Started recovery of previous research to avoid losing or repeating substantive work.
+- Ubuntu 24.04.5, Temurin Java 21.0.12, Python 3.13.16, Node 22.23.3, Tesseract 5.3.4.
+- Java: 108 tests; zero failures/errors/skips; 98 main sources compiled.
+- Django: 74 tests PASS; framework check no issues.
+- Node verifier: 22 tests PASS.
+- Solidity script: PASS, including authorization, immutable roots, unsupported assurance rejection, atomic supersession, revocation and seven Merkle shapes. No invented assertion count.
+- `pip check`: PASS.
+- Artifact ID 12060885684 downloaded and preserved locally; durable summaries are required because Actions artifacts expire.
 
-## Evidence rules
+## Dependency findings — unresolved
 
-Record executed commands and failures, preserve negative results, distinguish static inspection from dynamic tests, and mark blocked/unrun coverage explicitly. Reported historical 14-document OCR figures are not independently reproduced results.
+Spring-side npm reported 39 advisories: 2 low, 9 moderate, 23 high, 5 critical. Root npm was clean. Ganache's bundled transitive dependencies contribute; assess reachability rather than assuming every advisory is remotely exploitable. `npm audit fix --force` proposes a Ganache downgrade and is not an acceptable blind fix. Ganache's unavailable native uWS module falls back to Node successfully.
 
-## Remaining phases
+## First production corrections
 
-Source inspection and executable baseline; targeted defect reproduction and fixes; document corpus/licensing evaluation; security/lifecycle regression; product/standards research; full-stack demonstration when executable services are available; final coverage, claims, judge defense and readiness report.
+Eight independent regression tests added in `SourceAssociationRegressionTest`, commit `f5b0ed977b9e0fdc09cb08541086c7249cd911ee`:
+
+1. `Candidate Name` / `Candidate ID` accidentally match `contains("date")` and acquire date uncertainty.
+2. A matching OCR value elsewhere on the same page can falsely corroborate native evidence.
+3. A conflicting rendered label can still earn an OCR-corroborated citation label.
+4. Off-page/overflowing word geometry and finite confidence outside 0–100 are accepted.
+
+Production corrections: `dcfd3a5b1f2660d5b1fc4ec2ed698a3d4429bb6c`. Corroboration now requires the same physical cell/frame and matching label/value; geometry and confidence bounds are stricter; date labels use word boundaries/explicit aliases. Credential formats, keys and commitment canonicalization are unchanged. Post-fix execution is still pending; do not mark these cases green without retrieved evidence.
+
+A temporary branch-restricted workflow transports reviewed local patches. It checks the index and an exact branch-HEAD lease, executes no application code with its write credential, and fast-forwards only the isolated branch. Remove this privileged transport workflow before final delivery; retain patches as provenance.
+
+## Further audit findings under investigation
+
+`PrivateVault` defaults key/state file permissions and checks read paths lexically rather than against symlinks. The general Django wallet proxy lacks Foli's loopback-only origin validation, environment-proxy isolation, redirect refusal and bounded reads. Holder Basic credentials are retained in server-side sessions. These findings need targeted reproduction/remediation; receiver sessions are separate and released proof bodies are encrypted.
+
+## Research progress
+
+Organizer overview independently retrieved: 17–18 October 2026, metadata 09:00 Oct 17 through 15:00 Oct 18 while marketing says 24 hours. Exact PS32 tracks page live fetch currently fails; preserved earlier research is being rechecked. No numerical rubric or prebuilt-code rule established in this run. W3C VC Data Model 2.0 and RFC 9901 independently retrieved. DocLayNet and CORD official repositories and licenses located. No fresh real-world document accuracy result yet. Hosted sensitive-document processing is not enabled or authorized.
+
+## Remaining work
+
+Reproduce and verify fixes; complete relevant module/trust-boundary coverage; harden storage/proxy; execute PostgreSQL/EVM/browser workflow; benchmark synthetic and legally licensed held-out documents; resource, outage and restart tests; finalize challenge/issuer/competitor research, deployment guides, claims, judge defense and readiness report.
+
+Preserve commands and failures. Unit tests alone do not establish browser-to-proof readiness, issuer authenticity or universal OCR accuracy.
