@@ -1,5 +1,7 @@
 """Transport boundary tests: no document or credential leaves the local service."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 import requests
 from django.test import SimpleTestCase, override_settings
 from dashboard import wallet_api
@@ -7,7 +9,7 @@ from dashboard import wallet_api
 
 @override_settings(SPRING_BOOT_API_BASE_URL='http://localhost:8080')
 class WalletTransportTests(SimpleTestCase):
-    def client(self, body=b'{"ok":true}', status=200, headers=None):
+    def mock_transport(self, body=b'{"ok":true}', status=200, headers=None):
         patcher = patch('dashboard.wallet_api.requests.Session')
         session_class = patcher.start()
         self.addCleanup(patcher.stop)
@@ -19,7 +21,7 @@ class WalletTransportTests(SimpleTestCase):
         return client, response
 
     def test_loopback_is_numeric_and_environment_proxies_are_disabled(self):
-        client, _ = self.client()
+        client, _ = self.mock_transport()
         self.assertEqual(wallet_api.call('GET', '/api/wallet/documents', ['holder', 'private-password']), {'ok': True})
         args, kwargs = client.request.call_args
         self.assertEqual(args[:2], ('GET', 'http://127.0.0.1:8080/api/wallet/documents'))
@@ -29,7 +31,7 @@ class WalletTransportTests(SimpleTestCase):
         self.assertEqual(kwargs['auth'], ('holder', 'private-password'))
 
     def test_redirect_is_refused_without_reading_a_redirect_body(self):
-        client, response = self.client(status=307, headers={'Location': 'https://outside.invalid/upload'})
+        client, response = self.mock_transport(status=307, headers={'Location': 'https://outside.invalid/upload'})
         with self.assertRaises(wallet_api.WalletAPIError):
             wallet_api.call('POST', '/api/wallet/documents', ['holder', 'private-password'], payload={'private': 'document'})
         response.iter_content.assert_not_called()
@@ -53,27 +55,27 @@ class WalletTransportTests(SimpleTestCase):
                 constructor.assert_not_called()
 
     def test_json_response_size_is_bounded(self):
-        _, response = self.client()
+        _, response = self.mock_transport()
         response.iter_content.return_value = iter([b'x' * 65536] * 129)
         with self.assertRaises(wallet_api.WalletAPIError) as caught:
             wallet_api.call('GET', '/api/wallet/documents', ['holder', 'secret'])
         self.assertIn('limit', str(caught.exception))
 
     def test_binary_original_is_returned_without_json_coercion(self):
-        _, response = self.client(body=b'%PDF-fictional', headers={'Content-Disposition': 'attachment; filename="sample.pdf"'})
+        self.mock_transport(body=b'%PDF-fictional', headers={'Content-Disposition': 'attachment; filename="sample.pdf"'})
         content, disposition = wallet_api.call('GET', '/api/wallet/documents/abc/file', ['holder', 'secret'], binary=True)
         self.assertEqual(content, b'%PDF-fictional')
         self.assertEqual(disposition, 'attachment; filename="sample.pdf"')
 
     def test_non_json_error_body_is_not_reflected(self):
-        self.client(body=b'<script>private-error-secret</script>', status=400)
+        self.mock_transport(body=b'<script>private-error-secret</script>', status=400)
         with self.assertRaises(wallet_api.WalletAPIError) as caught:
             wallet_api.call('GET', '/api/wallet/documents', ['holder', 'secret'])
         self.assertNotIn('private-error-secret', str(caught.exception))
         self.assertEqual(caught.exception.status, 400)
 
     def test_offline_is_an_explicit_failure_not_a_verification_success(self):
-        client, _ = self.client()
+        client, _ = self.mock_transport()
         client.request.side_effect = requests.ConnectionError('internal diagnostic')
         with self.assertRaises(wallet_api.WalletAPIError) as caught:
             wallet_api.call('GET', '/api/public/network')
@@ -87,3 +89,32 @@ class WalletTransportTests(SimpleTestCase):
                 with self.assertRaises(wallet_api.WalletAPIError):
                     wallet_api.call('GET', '/api/wallet/documents', auth)
             constructor.assert_not_called()
+
+    def test_real_307_does_not_forward_the_private_document_body(self):
+        """Two disposable loopback servers; no internet access or real credentials."""
+        received = []
+        class Sink(BaseHTTPRequestHandler):
+            def do_POST(self):
+                received.append(self.rfile.read(int(self.headers.get('Content-Length', '0'))))
+                self.send_response(200); self.end_headers(); self.wfile.write(b'{}')
+            def log_message(self, *args): pass
+        sink = ThreadingHTTPServer(('127.0.0.1', 0), Sink)
+        class Redirect(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get('Content-Length', '0')))
+                self.send_response(307)
+                self.send_header('Location', f'http://127.0.0.1:{sink.server_port}/sink')
+                self.end_headers()
+            def log_message(self, *args): pass
+        origin = ThreadingHTTPServer(('127.0.0.1', 0), Redirect)
+        threads = [Thread(target=s.serve_forever, daemon=True) for s in (sink, origin)]
+        for t in threads: t.start()
+        try:
+            with override_settings(SPRING_BOOT_API_BASE_URL=f'http://127.0.0.1:{origin.server_port}'):
+                with self.assertRaises(wallet_api.WalletAPIError):
+                    wallet_api.call('POST', '/api/wallet/documents', ['fictional-holder', 'fictional-secret'],
+                                    payload={'private': 'fictional-private-body'})
+            self.assertEqual(received, [])
+        finally:
+            for server in (origin, sink): server.shutdown(); server.server_close()
+            for thread in threads: thread.join(timeout=2)
