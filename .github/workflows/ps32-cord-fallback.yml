@@ -1,0 +1,76 @@
+name: PS32 licensed corpus direct-file fallback
+on:
+  push:
+    branches: [feature/ps32-verified-hardening-20261016-6db30e1]
+    paths: [.github/workflows/ps32-cord-fallback.yml]
+permissions:
+  contents: read
+jobs:
+  retrieve:
+    if: github.ref == 'refs/heads/feature/ps32-verified-hardening-20261016-6db30e1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Read published dataset files instead of unavailable preview server
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/research"
+          "$RUNNER_TEMP/research/bin/pip" install requests pyarrow Pillow 'rapidocr==3.10.0' onnxruntime > "$RUNNER_TEMP/research-install.txt" 2>&1
+          "$RUNNER_TEMP/research/bin/python" - <<'PY'
+          import requests,pathlib,os,json,hashlib
+          import pyarrow.parquet as pq
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'public-inputs';root.mkdir()
+          base='https://huggingface.co';dataset='naver-clova-ix/cord-v2'
+          r=requests.get(f'{base}/api/datasets/{dataset}',timeout=60);r.raise_for_status();meta=r.json()
+          revision=meta['sha']; files=[s['rfilename'] for s in meta['siblings']]
+          (root/'dataset-metadata.json').write_text(json.dumps(meta,indent=2))
+          records=[]
+          for split,count,role in [('train',6,'development'),('test',12,'holdout')]:
+              matches=sorted(p for p in files if p.endswith('.parquet') and split in p)
+              if not matches: raise ValueError('Published parquet not found: '+str(files))
+              remote=matches[0];url=f'{base}/datasets/{dataset}/resolve/{revision}/{remote}'
+              response=requests.get(url,timeout=(30,180));response.raise_for_status()
+              if len(response.content)>600_000_000: raise ValueError('Dataset shard exceeds size budget')
+              path=pathlib.Path(os.environ['RUNNER_TEMP'])/(split+'.parquet');path.write_bytes(response.content)
+              shard_sha=hashlib.sha256(response.content).hexdigest()
+              table=pq.ParquetFile(path).read_row_group(0).slice(0,count)
+              if table.num_rows!=count: raise ValueError('Insufficient first row group')
+              for i,row in enumerate(table.to_pylist()):
+                  image=row['image']['bytes'];name=f'cord-{split}-{i:03d}'
+                  (root/(name+'.png')).write_bytes(image)
+                  truth=row['ground_truth'];truth=json.loads(truth) if isinstance(truth,str) else truth
+                  (root/(name+'.json')).write_text(json.dumps(truth,ensure_ascii=False,indent=2))
+                  records.append({'id':name,'role':role,'dataset_split':split,'index':i,'sha256':hashlib.sha256(image).hexdigest(),'bytes':len(image),'source':url,'dataset_revision':revision,'shard_sha256':shard_sha,'license':'CC-BY-4.0','attribution':'CORD authors / NAVER CLOVA; https://github.com/clovaai/cord','alterations':'none'})
+          (root/'provenance.json').write_text(json.dumps({'dataset':f'{base}/datasets/{dataset}','license':'CC-BY-4.0','selection':'first 6 train rows development; first 12 test rows holdout, fixed before inference','previous_preview_request':'HTTP 500; no corpus images or inference obtained','private_user_documents':False,'records':records},indent=2))
+          print('Public licensed samples saved:',len(records),'revision',revision)
+          PY
+      - name: Initialize optional OCR with synthetic pixels only
+        if: always()
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/research/bin/python" - <<'PY'
+          import os,pathlib,hashlib,json,shutil
+          from PIL import Image,ImageDraw
+          import rapidocr
+          from rapidocr import RapidOCR
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'ocr-models';root.mkdir(exist_ok=True)
+          image=Image.new('RGB',(800,180),'white');ImageDraw.Draw(image).text((30,55),'SYNTHETIC TEST 12345',fill='black')
+          engine=RapidOCR();result=engine(image)
+          records=[]
+          for p in pathlib.Path(rapidocr.__file__).parent.rglob('*.onnx'):
+              shutil.copy2(p,root/p.name);records.append({'name':p.name,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'bytes':p.stat().st_size})
+          (root/'models.json').write_text(json.dumps({'rapidocr':'3.10.0','models':records,'holdout_inference':'NOT_RUN'},indent=2))
+          print('Model files saved:',len(records))
+          PY
+      - name: Upload licensed inputs and model prerequisites
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ps32-cord-and-ocr-models
+          path: |
+            ${{ runner.temp }}/public-inputs
+            ${{ runner.temp }}/ocr-models
+            ${{ runner.temp }}/research-install.txt
+          retention-days: 7
+          if-no-files-found: warn
