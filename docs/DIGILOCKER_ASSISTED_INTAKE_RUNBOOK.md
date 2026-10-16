@@ -2,6 +2,8 @@
 
 Tested on 16 October 2026 with Windows PowerShell 7, Java 17.0.19, Python 3.12 and Node 25.9. All commands below run from the new feature worktree. Nothing is pushed. The original Evidentia checkout and `cf` checkout keep their own state.
 
+**Normal use now requires one desktop action:** double-click **Foliolet** on the Windows desktop, or `Foliolet.vbs` in this checkout. It handles local setup/startup and opens the browser. See the [desktop launcher guide](FOLIOLET_DESKTOP_LAUNCHER.md) for the Start/Stop window. The commands below remain available for developers and diagnostics.
+
 ## One-time setup on this machine
 
 ```powershell

@@ -11,7 +11,7 @@ function Stop-IntakeChildren([int]$ParentId) {
 }
 $intakeEntries=@()
 foreach ($intakeFile in @($intakeManifest,(Join-Path $intakeRoot '.local-data\intake-model-process.json'))) {
-    if (Test-Path -LiteralPath $intakeFile) { $intakeEntries+=@(Get-Content -LiteralPath $intakeFile -Raw | ConvertFrom-Json) }
+    if (Test-Path -LiteralPath $intakeFile) { $intakeParsed=Get-Content -LiteralPath $intakeFile -Raw | ConvertFrom-Json; $intakeEntries+=@($intakeParsed) }
 }
 if ($intakeEntries.Count) {
     foreach ($intakeEntry in $intakeEntries) {

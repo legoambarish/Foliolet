@@ -52,11 +52,14 @@ $intakePgConfig | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeDa
 # Direct native redirection can leave PowerShell waiting on a daemon's inherited
 # handles. Wait on pg_ctl itself, with output redirected to files at process creation.
 $intakePgStart=Start-Process -FilePath (Join-Path $intakePgBin 'pg_ctl.exe') -ArgumentList @('-D', ('"'+$intakePgData+'"'), '-l', ('"'+(Join-Path $intakeData 'intake-postgres.log')+'"'), '-o', '"-p 55438 -h 127.0.0.1"', '-w', 'start') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $intakeData 'intake-pgctl.stdout.log') -RedirectStandardError (Join-Path $intakeData 'intake-pgctl.stderr.log')
-if (-not $intakePgStart.WaitForExit(45000) -or $intakePgStart.ExitCode -ne 0) { throw 'Isolated PostgreSQL start failed; inspect this worktree logs' }
+$null=$intakePgStart.Handle
+$intakePgStarted=$intakePgStart.WaitForExit(45000)
+$intakePgStart.Refresh()
+if (-not $intakePgStarted -or $intakePgStart.ExitCode -ne 0) { throw 'Isolated PostgreSQL start failed; inspect this worktree logs' }
 $env:PGHOST='127.0.0.1'; $env:PGPORT='55438'; $env:PGUSER='wallet'; $env:PGDATABASE='postgres'
 & $intakePython -c "import psycopg; c=psycopg.connect(autocommit=True); exists=c.execute('SELECT 1 FROM pg_database WHERE datname=%s',('wallet_intake_demo',)).fetchone(); c.execute('CREATE DATABASE wallet_intake_demo') if not exists else None; c.close()"
 if ($LASTEXITCODE -ne 0) { throw 'Isolated database creation failed' }
-$env:NODE_PATH=(Join-Path $RuntimeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $RuntimeRoot 'node_modules')
+$env:NODE_PATH=(Join-Path $intakeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $intakeRoot 'node_modules') + ';' + (Join-Path $RuntimeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $RuntimeRoot 'node_modules')
 Intake-Launch 'intake-evm' (Get-Command node).Source @((Join-Path $intakeRoot 'tools\digilocker-evm.cjs')) $intakeRoot
 Intake-Wait 8548
 $env:BLOCKCHAIN_PRIVATE_KEY=(Get-Content -LiteralPath (Join-Path $intakeData 'development-relay.key') -Raw).Trim()
@@ -73,6 +76,7 @@ $env:FOLI_TESSERACT=$intakeOcr; $env:FOLI_OCR_DATA_DIR=(Join-Path $RuntimeRoot '
 $env:FOLI_TEMP_DIR=(Join-Path $intakeData 'foli\tmp')
 $env:LOGGING_LEVEL_ORG_APACHE_PDFBOX='OFF'; $env:LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI='OFF'
 $env:SERVER_TOMCAT_ACCESSLOG_ENABLED='false'
+@{root=$intakeRoot;runtimeRoot=$RuntimeRoot;modelUrl=$OllamaUrl} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeData 'intake-runtime.json') -Encoding utf8
 Intake-Launch 'intake-spring' (Get-Command java).Source @('-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
 Intake-Wait 8088 90
 & node (Join-Path $intakeRoot 'tools\provision-digilocker-trust.cjs')
