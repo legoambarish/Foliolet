@@ -1,41 +1,118 @@
-diff --git a/django-service/dashboard/templates/wallet/detail.html b/django-service/dashboard/templates/wallet/detail.html
-index 1545c90..3316dcb 100644
---- a/django-service/dashboard/templates/wallet/detail.html
-+++ b/django-service/dashboard/templates/wallet/detail.html
-@@ -100,6 +100,7 @@
-       <p class="help">Encrypted in your vault. Only you can download it.</p>
-       <div class="actions">
-         <a class="btn line small" href="{% url 'dashboard:original' document.id %}">Download original</a>
-+        {% if document.intake.format == 'pdf' %}<form method="post" action="{% url 'dashboard:signature-inspect' document.id %}">{% csrf_token %}<button class="btn line small">Inspect PDF signature locally</button></form>{% endif %}
-         {% if document.status == 'ACTIVE' %}
-         <form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<button class="btn line small">Check integrity</button></form>
-         <form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<input type="hidden" name="restore" value="yes"><button class="btn line small">Check and recover</button></form>
-diff --git a/django-service/dashboard/urls.py b/django-service/dashboard/urls.py
-index 357109a..4cbfb0e 100644
---- a/django-service/dashboard/urls.py
-+++ b/django-service/dashboard/urls.py
-@@ -3,6 +3,7 @@ from django.conf import settings
- from . import wallet_views as views
- from . import foli_views as foli
- from . import intake_views as intake
-+from . import signature_views as signatures
- app_name = 'dashboard'
- urlpatterns = [
-  path('intake/pair/', intake.pair, name='intake-pair'),
-@@ -26,6 +27,7 @@ urlpatterns = [
-  path('wallet/<str:credential_id>/', views.detail, name='detail'),
-  path('wallet/<str:credential_id>/share/', views.compose, name='compose'),
-  path('wallet/<str:credential_id>/file/', views.original, name='original'),
-+ path('wallet/<str:credential_id>/signature/', signatures.inspect, name='signature-inspect'),
-  path('wallet/<str:credential_id>/scan/', views.scan_fields, name='scan_fields'),
-  path('wallet/<str:credential_id>/<str:action>/', views.document_action, name='document_action'),
-  path('versions/<str:previous_id>/', views.enroll, name='version'),
-diff --git a/django-service/requirements.txt b/django-service/requirements.txt
-index 3563282..570f16c 100644
---- a/django-service/requirements.txt
-+++ b/django-service/requirements.txt
-@@ -9,3 +9,4 @@ tzdata==2026.3
- urllib3==2.7.0
- pycryptodome==3.23.0
- waitress==3.0.2
-+pyHanko==0.37.0
+diff --git a/spring-boot-service/src/main/java/com/sih26190/dms/controller/AiAnalysisController.java b/spring-boot-service/src/main/java/com/sih26190/dms/controller/AiAnalysisController.java
+index d7374ba..c6ce453 100644
+--- a/spring-boot-service/src/main/java/com/sih26190/dms/controller/AiAnalysisController.java
++++ b/spring-boot-service/src/main/java/com/sih26190/dms/controller/AiAnalysisController.java
+@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
+ import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestMapping;
+ import org.springframework.web.bind.annotation.RestController;
++import org.springframework.web.bind.annotation.RequestHeader;
+ 
+ import com.sih26190.dms.dto.AiAnalysisResponse;
+ import com.sih26190.dms.model.User;
+@@ -25,9 +26,10 @@ public class AiAnalysisController {
+     private final UserRepository userRepository;
+ 
+     @PostMapping("/{id}/analyze")
+-    public AiAnalysisResponse analyze(@PathVariable Long id, Authentication authentication) {
++    public AiAnalysisResponse analyze(@PathVariable Long id, Authentication authentication,
++            @RequestHeader(value = "X-Foliolet-External-AI-Consent", required = false) String consent) {
+         User requester = currentUser(authentication);
+-        return aiAnalysisService.analyze(id, requester);
++        return aiAnalysisService.analyze(id, requester, "upload-to-openrouter".equals(consent));
+     }
+ 
+     @GetMapping("/{id}/analysis")
+diff --git a/spring-boot-service/src/main/java/com/sih26190/dms/service/AiAnalysisService.java b/spring-boot-service/src/main/java/com/sih26190/dms/service/AiAnalysisService.java
+index ecc88fa..28d4613 100644
+--- a/spring-boot-service/src/main/java/com/sih26190/dms/service/AiAnalysisService.java
++++ b/spring-boot-service/src/main/java/com/sih26190/dms/service/AiAnalysisService.java
+@@ -6,6 +6,11 @@ import java.net.http.HttpRequest;
+ import java.net.http.HttpResponse;
+ import java.nio.file.Paths;
+ import java.time.LocalDateTime;
++import java.time.Duration;
++import java.io.InputStream;
++import java.nio.charset.StandardCharsets;
++import org.springframework.http.HttpStatus;
++import org.springframework.web.server.ResponseStatusException;
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+@@ -42,10 +47,24 @@ public class AiAnalysisService {
+     @Value("${openrouter.model}")
+     private String openRouterModel;
+ 
++    @Value("${dms.external-ai-enabled:false}")
++    private boolean externalAiEnabled;
++
+     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+-    private final HttpClient httpClient = HttpClient.newHttpClient();
++    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
+ 
++    /** Legacy callers never imply consent to transmit a private source document. */
+     public AiAnalysisResponse analyze(Long documentId, User requester) {
++        return analyze(documentId, requester, false);
++    }
++
++    public AiAnalysisResponse analyze(Long documentId, User requester, boolean explicitCloudConsent) {
++        // Guard before reading the source or touching a network client. An empty key
++        // is not a privacy boundary: a rejected HTTP request still sends its body.
++        if (!externalAiEnabled || !explicitCloudConsent || openRouterApiKey == null || openRouterApiKey.isBlank()) {
++            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
++                    "External document analysis is disabled. Local Foli remains available.");
++        }
+         DocumentRecord document = documentRecordRepository.findById(documentId)
+                 .orElseThrow(() -> new RuntimeException("Document not found"));
+ 
+@@ -110,19 +129,22 @@ public class AiAnalysisService {
+ 
+         HttpRequest request = HttpRequest.newBuilder()
+                 .uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
++                .timeout(Duration.ofSeconds(45))
+                 .header("Authorization", "Bearer " + openRouterApiKey)
+                 .header("Content-Type", "application/json")
+                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                 .build();
+ 
+-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+-
+-        if (response.statusCode() != 200) {
+-            throw new RuntimeException("OpenRouter returned status " + response.statusCode() + ": " + response.body());
++        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
++        try (InputStream input = response.body()) {
++            if (response.statusCode() != 200) {
++                throw new IllegalStateException("External analysis provider rejected the request");
++            }
++            byte[] body = input.readNBytes(1024 * 1024 + 1);
++            if (body.length > 1024 * 1024) throw new IllegalStateException("External analysis response exceeds its size limit");
++            JsonNode root = objectMapper.readTree(new String(body, StandardCharsets.UTF_8));
++            return root.at("/choices/0/message/content").asText();
+         }
+-
+-        JsonNode root = objectMapper.readTree(response.body());
+-        return root.at("/choices/0/message/content").asText();
+     }
+ 
+     private String buildPrompt(String documentText) {
+diff --git a/spring-boot-service/src/main/resources/application.yaml b/spring-boot-service/src/main/resources/application.yaml
+index 6213c00..0fb0b5a 100644
+--- a/spring-boot-service/src/main/resources/application.yaml
++++ b/spring-boot-service/src/main/resources/application.yaml
+@@ -6,6 +6,8 @@ spring:
+     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:55432/wallet_dev}
+     username: ${SPRING_DATASOURCE_USERNAME:wallet}
+     password: ${SPRING_DATASOURCE_PASSWORD:}
++    hikari:
++      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
+   jpa:
+     properties:
+       hibernate.hbm2ddl.halt_on_error: true
+@@ -22,6 +24,7 @@ server:
+   error:
+     include-message: never
+ dms:
++  external-ai-enabled: ${DMS_EXTERNAL_AI_ENABLED:false}
+   storage:
+     location: ${DMS_STORAGE_LOCATION:../.local-data/legacy/files}
+   backup:
