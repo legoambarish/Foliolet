@@ -9,7 +9,7 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 class IntakeLocalLiveIT {
   @Test void realLocalModelProposesLiteralMath90() {
-    var config=new FoliProperties();var model=new FoliLocalModel(config);
+    var config=new FoliProperties();config.setOllamaUrl(System.getenv().getOrDefault("FOLI_OLLAMA_URL",config.getOllamaUrl()));var model=new FoliLocalModel(config);
     assertEquals("READY",model.health().get("status"));
     var source=new Document("wallet:0x"+"a".repeat(64),"Synthetic local test","marks.txt","txt","DRAFT","1",true);
     var page=new Page(1,"Math: 90\nScience: 80\nName: Synthetic Student\nCGPA: unavailable\n","TEXT",null,1,4,0,List.of(),List.of());

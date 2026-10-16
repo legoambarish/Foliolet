@@ -154,6 +154,9 @@ public class WalletService {
 
   private List<ClaimInput> suggest(byte[] bytes, String filename) {
     // Deterministic convenience suggestions, never an authenticity source. No external AI calls.
+    // PDF parsing belongs exclusively to the bounded asynchronous child reader.
+    // Do not run the older in-process stripper while acknowledging a saved upload.
+    if(filename!=null && filename.toLowerCase(Locale.ROOT).endsWith(".pdf")) return List.of();
     var result = new ArrayList<ClaimInput>();
     try {
       String text = extraction.extractBytes(bytes, filename);

@@ -40,6 +40,7 @@ class IntakeWorkflowTest extends WalletTestContext {
   }
   @MockitoBean FoliReader reader;
   @MockitoBean FoliLocalModel model;
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean com.sih26190.dms.service.TextExtractionService legacyExtractor;
   @Autowired IntakeSessions sessions;
   @Autowired IntakeSessionRepository sessionRows;
   @Autowired IntakeJobs jobs;
@@ -78,6 +79,13 @@ class IntakeWorkflowTest extends WalletTestContext {
     var input=new ObservationInput(config.get("agentId").toString(),UUID.randomUUID().toString(),filename,PrivateVault.sha256(content),Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS),1,"0x"+"00".repeat(32),"00".repeat(32));
     var sig=IntegrityService.hmac(MerkleTreeService.hex32(config.get("secret").toString()),IntegrityService.message(input));
     return integrity.observe(new ObservationInput(input.agentId(),input.itemId(),input.filename(),input.sha256(),input.observedAt(),1,input.previousDigest(),sig)).get("observationId").toString();
+  }
+  @Test void pdfEnrollmentNeverInvokesTheUnboundedLegacyStripper() throws Exception {
+    byte[] bytes="%PDF-1.7\nmalformed synthetic input\n%%EOF".getBytes();
+    String id=wallet.enroll(new MockMultipartFile("file","untrusted.pdf","application/pdf",bytes),"Synthetic PDF","Other",null,null,owner).get("id").toString();
+    assertArrayEquals(bytes,resolver.open("wallet:"+id,owner).bytes());
+    assertTrue(((List<?>)wallet.detail(id,owner).get("suggestions")).isEmpty());
+    verify(legacyExtractor,never()).extractBytes(any(),eq("untrusted.pdf"));
   }
   @Test void scopedSessionsRearmStopExpiryAndOwnerIsolation() {
     assertThrows(IllegalArgumentException.class,() -> sessions.arm(owner,"C:\\Users\\User\\Downloads"));
