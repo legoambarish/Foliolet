@@ -100,6 +100,7 @@
       <p class="help">Encrypted in your vault. Only you can download it.</p>
       <div class="actions">
         <a class="btn line small" href="{% url 'dashboard:original' document.id %}">Download original</a>
+        {% if document.intake.format == 'pdf' %}<form method="post" action="{% url 'dashboard:signature-inspect' document.id %}">{% csrf_token %}<button class="btn line small">Inspect PDF signature locally</button></form>{% endif %}
         {% if document.status == 'ACTIVE' %}
         <form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<button class="btn line small">Check integrity</button></form>
         <form method="post" action="{% url 'dashboard:document_action' document.id 'integrity' %}">{% csrf_token %}<input type="hidden" name="restore" value="yes"><button class="btn line small">Check and recover</button></form>

@@ -9,3 +9,4 @@ tzdata==2026.3
 urllib3==2.7.0
 pycryptodome==3.23.0
 waitress==3.0.2
+pyHanko==0.37.0
