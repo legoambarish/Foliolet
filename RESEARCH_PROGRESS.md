@@ -1,58 +1,59 @@
-# PS32 final audit — durable execution ledger
+# PS32 final audit — durable progress
 
-## Scope and safety
+## Safety and baseline
 
-Assignment received 2026-10-16. The entire 807-line master prompt was read. Work only on `feature/ps32-final-winning-audit-20261016-1645`; never merge into or modify `main`, `cf`, or the source branch. Original runtime state has not been accessed or changed. All test services/records are disposable.
+The full 807-line master prompt was read. Work is confined to `feature/ps32-final-winning-audit-20261016-1645`, created at verified remote source `db55c2c6c1209e567713fa9ab08c5441bd55bc86`, tree `75e3b538a1e04b5a71fbbfc0dc644764d4403de8`, parent `6db30e1520211b0dae88c8b47200a9ed1b6089c7`. No edits or merges to main, cf or the source branch; no original runtime, documents, accounts, keys, EVM state or models touched.
 
-## Verified source and working environment
+Container GitHub DNS failed. Real source access and execution were recovered through GitHub Actions plus a SHA-256-checked archive/Git bundle cloned into an isolated local directory. Full local snapshot `0627643118c28fc3bdedc4b2d8705d4d48739ea7`; real builds and full-stack services run in disposable Ubuntu CI. Previous Library research archive recovered intact; its independent lab findings are not relabelled as repository test results.
 
-Source HEAD `db55c2c6c1209e567713fa9ab08c5441bd55bc86`, tree `75e3b538a1e04b5a71fbbfc0dc644764d4403de8`, parent `6db30e1520211b0dae88c8b47200a9ed1b6089c7`. The new remote branch was created directly at that exact source commit.
+## Executed evidence
 
-Direct container DNS prevented GitHub cloning. This was overcome using a commit-pinned GitHub Actions archive and Git bundle, downloaded through the GitHub connector and cloned into an isolated local directory. Both SHA-256 checks passed. This is the actual complete repository, not a substitute lab. Local snapshot `0627643118c28fc3bdedc4b2d8705d4d48739ea7` has unchanged baseline application source. Snapshot run: https://github.com/legoambarish/Foliolet/actions/runs/38935130981 . Actual application builds run in isolated GitHub Actions; local networked Maven compilation has not been claimed.
+### Original application baseline — PASS
 
-## Preserved previous research
+https://github.com/legoambarish/Foliolet/actions/runs/38934429615 at `d610a5e3d2e240c5f36d406503b9866ad4711b86`:
+108 Java, 74 Django, 22 Node verifier tests; all pass. Solidity integration script passes authorization, immutable roots, unsupported assurance rejection, supersession, revocation and seven Merkle shapes. No invented Solidity assertion count. `pip check` passes. Ubuntu 24.04.5, Java 21.0.12, Python 3.13.16, Node 22.23.3, Tesseract 5.3.4. Artifact 12060885684 downloaded.
 
-Recovered `Foliolet_PS32_Research_Test_Recovery_Package.zip` from the user's Library into isolated storage, without changing the original. Earlier independent laboratory results are not this branch's results. Existing repository reports remain inherited unchanged.
+### Independent adversarial reproduction — RED
 
-## Executed baseline — PASS
+https://github.com/legoambarish/Foliolet/actions/runs/38935483259 at `f5b0ed977b9e0fdc09cb08541086c7249cd911ee`:
+SourceAssociationRegressionTest has 8 tests: six fail against baseline, two valid controls pass. Failures are Candidate/date collision; different-cell OCR false corroboration; different-rotation false corroboration; conflicting-label corroboration; off-page geometry; confidence outside 0–100. Artifact 12060817348 downloaded; actual XML inspected.
 
-Run https://github.com/legoambarish/Foliolet/actions/runs/38934429615 at `d610a5e3d2e240c5f36d406503b9866ad4711b86` (baseline source plus audit docs/workflow):
+### Source and vault fixes — GREEN Java; Django helper error found and corrected
 
-- Ubuntu 24.04.5, Temurin Java 21.0.12, Python 3.13.16, Node 22.23.3, Tesseract 5.3.4.
-- Java: 108 tests; zero failures/errors/skips; 98 main sources compiled.
-- Django: 74 tests PASS; framework check no issues.
-- Node verifier: 22 tests PASS.
-- Solidity script: PASS, including authorization, immutable roots, unsupported assurance rejection, atomic supersession, revocation and seven Merkle shapes. No invented assertion count.
-- `pip check`: PASS.
-- Artifact ID 12060885684 downloaded and preserved locally; durable summaries are required because Actions artifacts expire.
+https://github.com/legoambarish/Foliolet/actions/runs/38938027342 at `2d5ca083370ba1ffe1c60b7dc468d16611aa2b4b`:
+124 Java tests PASS, including all eight SourceAssociationRegressionTest and eight PrivateVaultSecurityTest cases. Django discovered 83 tests but six new transport cases errored because the test helper `client()` collided with Django's own `self.client` object. This was an audit test defect, not a production regression; corrected at `a7637e22d41f30d244d3d7d2d59ecb8e15066cbf` and an additional two-loopback-server HTTP 307 body-forwarding test was added. Do not call the full regression run green until rerun evidence is retrieved. Artifact 12061503277 inspected.
 
-## Dependency findings — unresolved
+### Actual full-stack application — PASS
 
-Spring-side npm reported 39 advisories: 2 low, 9 moderate, 23 high, 5 critical. Root npm was clean. Ganache's bundled transitive dependencies contribute; assess reachability rather than assuming every advisory is remotely exploitable. `npm audit fix --force` proposes a Ganache downgrade and is not an acceptable blind fix. Ganache's unavailable native uWS module falls back to Node successfully.
+https://github.com/legoambarish/Foliolet/actions/runs/38938026869 at `2d5ca083370ba1ffe1c60b7dc468d16611aa2b4b`:
+- 51 real HTTP/PostgreSQL/Ganache/Web3j/Django lifecycle checks PASS: authentication, source review, anchoring, independent Node validation, nine proof tamper cases, one-time concurrent release, expiry, revocation, supersession, encrypted-original/backup tampering, restartable watcher and session-bound proof export.
+- 23 real security checks PASS: username race/DB uniqueness, Django login and confirmation, absence of extracted suggestion copies from sessions, canonical proof rejection, trust pins, hidden-fact exclusion and threshold-label protections.
+- 5 real Chromium browser checks PASS: 19 exact native-table facts; upload/review/anchor/selective share/independent browser verification; 19 scanned review cards with zero automatically accepted facts; server-side edit tracking from 91 to 95; no JS errors or document requests beyond loopback.
+- 12 failure/restart checks PASS: real missing local model and OCR; exact original preservation; interrupted-job marking and retry; oversized upload. Model metadata/injection/delay cases use a local HTTP test double, explicitly not real oversized weights or actual Ollama inference.
+- 3 CSV fallback checks PASS. Watcher, OCR-worker and QR suites also executed successfully; exact counts pending final extraction.
+- Disposable PostgreSQL 17, fresh private EVM, Java heap 768 MiB, independent deployment pins, bundled Chromium, Tesseract plus complementary offline OCR. Actual physical NFC, Windows/macOS and public internet tunnel not tested here.
+Artifact 12061479169 downloaded with result JSON and three fictional browser screenshots. Artifacts expire after 14 days; durable summaries/reports must be committed.
 
-## First production corrections
+## Meaningful production/test commits
 
-Eight independent regression tests added in `SourceAssociationRegressionTest`, commit `f5b0ed977b9e0fdc09cb08541086c7249cd911ee`:
+- `dcfd3a5b1f2660d5b1fc4ec2ed698a3d4429bb6c`: exact physical-cell/rotation/label/value corroboration, valid geometry/confidence, correct date-label classification.
+- `3bdf6d59b5683904a83b977812fd639f87f720e3`: numeric-loopback-only wallet bridge, no ambient proxies/redirects, bounded streamed responses, controlled errors.
+- `193a287417da68e931909fc0c3359be80f7913fe`: owner-only POSIX vault/key/ciphertext permissions, no-overwrite key retention, symlink/path rejection, bounded ciphertext reads, unchanged AES-GCM and commitment formats.
+- `53cc24ed8f4930ca3b4dd0c6196056cf19289595` and `4a3d0ad34374bf929de91282b633450c1117a11f`: explicit cross-platform fixture fonts, Linux Chromium, configurable test UI/RPC; no acceptance assertions weakened.
+- `cb641a54db1197364a312840bc5bb833c8a670be`: bounded cross-platform actual-pipeline evaluator with source hashes, unique-field recall and real RSS sampling; no implicit private inventory.
+- `5e7b1dd00f86ab725fbdd41465fa4c4291d8cb9a`: licensed public CORD corpus acquisition with frozen two-row calibration and six-row held-out split; no academic accuracy inferred.
+- `058cd0e7fb4035f0651e5dec9ebffe7295c1e652`: controlled exact-source before/after and held-out evaluation workflow. Results pending.
 
-1. `Candidate Name` / `Candidate ID` accidentally match `contains("date")` and acquire date uncertainty.
-2. A matching OCR value elsewhere on the same page can falsely corroborate native evidence.
-3. A conflicting rendered label can still earn an OCR-corroborated citation label.
-4. Off-page/overflowing word geometry and finite confidence outside 0–100 are accepted.
+## Verified challenge and research
 
-Production corrections: `dcfd3a5b1f2660d5b1fc4ec2ed698a3d4429bb6c`. Corroboration now requires the same physical cell/frame and matching label/value; geometry and confidence bounds are stricter; date labels use word boundaries/explicit aliases. Credential formats, keys and commitment canonicalization are unchanged. Post-fix execution is still pending; do not mark these cases green without retrieved evidence.
+Official PS32 wording now independently retrieved from the organizer's tracks page: https://www.commudle.com/communities/cdn-commudle-developer-network/hackathons/hack-sprint/tracks . It is open-ended Web3 ownership/identity/trust/value with explicit innovation priority. Sarvam/Gemini mandates belong to other problem statements, not PS32. Dates show 17 October 2026 09:00 IST to 18 October 2026 15:00 IST; overview markets 24 hours, so do not infer exact submission cutoffs. Numerical judging rubric and prebuilt-code eligibility are not verified.
 
-A temporary branch-restricted workflow transports reviewed local patches. It checks the index and an exact branch-HEAD lease, executes no application code with its write credential, and fast-forwards only the isolated branch. Remove this privileged transport workflow before final delivery; retain patches as provenance.
+Primary sources researched: W3C VC Data Model 2.0, RFC 9901 SD-JWT, final OpenID4VP 1.0, Blockcerts, walt.id, India's CCA signature-verification/root-certificate guidance, CORD and DocLayNet, local Ollama Qwen3:4b, pyHanko. Plain commitments do not establish issuer truth; CCA requires signer/issuer chain and relevant revocation evidence. No government API partnership, hosted private-document upload or paid model service is enabled.
 
-## Further audit findings under investigation
+## Unresolved / next work
 
-`PrivateVault` defaults key/state file permissions and checks read paths lexically rather than against symlinks. The general Django wallet proxy lacks Foli's loopback-only origin validation, environment-proxy isolation, redirect refusal and bounded reads. Holder Basic credentials are retained in server-side sessions. These findings need targeted reproduction/remediation; receiver sessions are separate and released proof bodies are encrypted.
+Complete controlled document benchmark and held-out label review; whole-module audit/coverage and dependency reachability; Django key/session-at-rest and upload bounds; issuer-assurance policy and feasible local validation; further outage/restart checks; final A–L reports, architecture, claims, judge defense, cross-platform guide and readiness verdict.
 
-## Research progress
+Spring npm baseline has 39 advisories (2 low, 9 moderate, 23 high, 5 critical), largely Ganache/bundled transitive dependencies. No blind forced downgrade. Legacy document path may store plaintext and must be separated from wallet confidentiality claims. POSIX hardening is not Windows ACL certification or protection from a compromised same-user/root host.
 
-Organizer overview independently retrieved: 17–18 October 2026, metadata 09:00 Oct 17 through 15:00 Oct 18 while marketing says 24 hours. Exact PS32 tracks page live fetch currently fails; preserved earlier research is being rechecked. No numerical rubric or prebuilt-code rule established in this run. W3C VC Data Model 2.0 and RFC 9901 independently retrieved. DocLayNet and CORD official repositories and licenses located. No fresh real-world document accuracy result yet. Hosted sensitive-document processing is not enabled or authorized.
-
-## Remaining work
-
-Reproduce and verify fixes; complete relevant module/trust-boundary coverage; harden storage/proxy; execute PostgreSQL/EVM/browser workflow; benchmark synthetic and legally licensed held-out documents; resource, outage and restart tests; finalize challenge/issuer/competitor research, deployment guides, claims, judge defense and readiness report.
-
-Preserve commands and failures. Unit tests alone do not establish browser-to-proof readiness, issuer authenticity or universal OCR accuracy.
+Before final delivery remove `.github/workflows/ps32-apply-reviewed-patch.yml`, the temporary exact-HEAD-leased, branch-only reviewed-patch transport. No private or secret material belongs in final artifacts. Preserve negative results, distinguish historical metrics from this run, and never equate green unit tests with universal real-document accuracy or issuer verification.
