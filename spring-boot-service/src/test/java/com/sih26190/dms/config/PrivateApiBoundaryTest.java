@@ -22,7 +22,7 @@ class PrivateApiBoundaryTest {
       for(String path:new String[]{"/api/wallet/documents/abc/anchor","/api/auth/register","/api/documents/1","/api/cases/1","/api/audit-log"})
         check("POST",path,origin,null,false);
   }
-  @Test void_crossSiteMetadataCannotBypassMissingOrigin() throws Exception {
+  @Test void crossSiteMetadataCannotBypassMissingOrigin() throws Exception {
     check("POST","/api/wallet/disclosures/abc/revoke",null,"cross-site",false);
     check("GET","/api/wallet/documents",null,"same-site",false);
   }
