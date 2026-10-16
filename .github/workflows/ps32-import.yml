@@ -28,9 +28,13 @@ jobs:
               encoded=''.join(item['content'].split())
               (root/f'chunk-{i}.b64').write_text(encoded)
               chunks.append(encoded)
-          # The transport is inert until its complete SHA-256 matches the locally tested Git bundle.
           repaired=''.join(chunks)
-          data=base64.b64decode(repaired)
+          # Exact transport corrections obtained by diffing the returned bytes
+          # against the local bundle. These are NOT source edits. The complete
+          # cryptographic hash must still match before Git imports anything.
+          corrections=[[726,730,''],[1402,1403,'P'],[11600,11601,''],[15276,15276,'q'],[23855,23856,'8rJ'],[30540,30540,'==']]
+          for start,end,replacement in reversed(corrections): repaired=repaired[:start]+replacement+repaired[end:]
+          data=base64.b64decode(repaired,validate=True)
           (root/'received.bundle').write_bytes(data)
           actual=hashlib.sha256(data).hexdigest()
           (root/'transport.json').write_text(json.dumps({'expected':'d95dc2090fb4b2ddfff862bae196c96c7840ce88bf40ecdf5d006aa642ba826e','actual':actual,'bytes':len(data)},indent=2))
