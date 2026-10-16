@@ -23,7 +23,7 @@ from urllib.parse import urlsplit
 import requests
 
 ROOT = Path(__file__).resolve().parents[2]
-STATE_DIR = ROOT / ".local-data" / "receiver"
+STATE_DIR = Path(os.environ.get('FOLIOLET_STATE_DIR', ROOT / '.local-data')) / 'receiver'
 QUICK_HOST = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\.trycloudflare\.com")
 TOKEN_PATH = re.compile(r"/verify/[0-9a-f]{64}/")
 

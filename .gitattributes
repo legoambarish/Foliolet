@@ -1,4 +1,5 @@
 foliolet text eol=lf
+Foliolet.command text eol=lf
 containers/*.sh text eol=lf
 containers/*.py text eol=lf
 containers/Dockerfile text eol=lf

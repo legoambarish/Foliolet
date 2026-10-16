@@ -4,6 +4,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 assert os.getuid()==1000,'Application image must run as its unprivileged user'
+assert not Path('/app/.local-data').exists(),'Build-time tests left initialized runtime state in the image'
 for file in ('/app/.local-data/django.key','/app/.local-data/vault.key',
              '/app/.local-data/development-relay.key','/run/foliolet-secrets/postgres-password',
              '/app/django-service/db.sqlite3','/app/spring-boot-service/uploaded-documents',

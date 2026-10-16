@@ -13,6 +13,11 @@ From this checkout on an Intel or Apple Silicon Mac:
 ./foliolet up
 ```
 
+You can also double-click **Foliolet.command** in Finder. To obtain this branch
+on another Mac, clone with
+`git clone --branch codex/macos-docker --single-branch https://github.com/legoambarish/Foliolet.git`
+and enter the resulting `Foliolet` folder first.
+
 The command downloads and installs Docker Desktop into `~/Applications` if
 Docker is missing, starts Docker Desktop, builds the application with its
 regression tests, starts every service, downloads the missing Qwen model,

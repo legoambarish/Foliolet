@@ -2,6 +2,7 @@ name: Mac Docker product
 on:
   push:
     branches: [codex/macos-docker]
+    paths-ignore: ['docs/**', README.md]
   pull_request:
     branches: [codex/macos-docker]
   workflow_dispatch:
@@ -36,7 +37,7 @@ jobs:
         env:
           FOLIOLET_STATE_DIR: ${{ runner.temp }}/foliolet-host-tests
         run: |
-          bash -n foliolet containers/install-docker-mac.sh
+          bash -n foliolet Foliolet.command containers/install-docker-mac.sh
           python containers/test_launcher.py
           python containers/test_container_config.py
           python tools/test-intake-watcher.py

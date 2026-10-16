@@ -22,7 +22,7 @@ PUBLIC_RECEIVER_INSTANCE = os.environ.get("FOLIOLET_RECEIVER_INSTANCE", "")
 
 # Separate storage, secret and cookie names prevent private holder sessions being
 # accepted by the public application, even if somebody copies a session cookie.
-_receiver_dir = BASE_DIR.parent / ".local-data" / "receiver"
+_receiver_dir = Path(os.environ.get('FOLIOLET_STATE_DIR', BASE_DIR.parent / '.local-data')) / 'receiver'
 _receiver_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 _receiver_key = _receiver_dir / "django.key"
 if not _receiver_key.exists():

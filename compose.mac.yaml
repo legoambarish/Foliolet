@@ -60,7 +60,7 @@ services:
       - '127.0.0.1:8088:8098'
       - '127.0.0.1:8548:8549'
     healthcheck:
-      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8008/login/']
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8008/gateway-health']
       interval: 10s
       timeout: 5s
       retries: 90
@@ -72,7 +72,7 @@ services:
     volumes: [app-state:/app/.local-data]
     depends_on:
       init: {condition: service_completed_successfully}
-      gateway: {condition: service_started}
+      gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, python, /app/containers/health.py, evm]
       interval: 5s
@@ -89,6 +89,8 @@ services:
       OLLAMA_KEEP_ALIVE: 10m
     volumes: [models:/root/.ollama]
     restart: unless-stopped
+    depends_on:
+      gateway: {condition: service_healthy}
     healthcheck:
       test: [CMD, ollama, list]
       interval: 5s

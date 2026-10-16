@@ -116,7 +116,9 @@ def main():
                 'BLOCKCHAIN_PRIVATE_KEY': (ROOT / '.local-data/development-relay.key').read_text().strip(), 'WALLET_DATA_DIR': str(state),
                 'WALLET_SHARE_BASE_URL': 'http://127.0.0.1:8008', 'DMS_STORAGE_LOCATION': str(state / 'legacy/files'), 'DMS_BACKUP_LOCATION': str(state / 'legacy/backups'),
                 'OPENROUTER_API_KEY': '', 'OPENROUTER_MODEL': 'disabled', 'FOLI_OLLAMA_URL': 'http://127.0.0.1:11439', 'FOLI_MODEL': 'qwen3:4b-instruct',
-                'FOLI_TESSERACT': str(state / 'missing-tesseract.exe'), 'FOLI_TEMP_DIR': str(state / 'tmp'), 'FOLI_MODEL_TIMEOUT_SECONDS': '3',
+                'FOLI_TESSERACT': str(state / 'missing-tesseract.exe'),
+                'FOLI_LAYOUT_PYTHON': str(state / 'missing-python'), 'FOLI_LAYOUT_SCRIPT': '',
+                'FOLI_TEMP_DIR': str(state / 'tmp'), 'FOLI_MODEL_TIMEOUT_SECONDS': '3',
                 'FOLI_OCR_TIMEOUT_SECONDS': '2', 'FOLI_EXTRACTION_TIMEOUT_SECONDS': '15', 'LOGGING_LEVEL_ORG_APACHE_PDFBOX': 'OFF', 'LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI': 'OFF',
                 'SERVER_TOMCAT_ACCESSLOG_ENABLED': 'false', 'SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE': '20MB', 'SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE': '21MB'})
     log = (state / 'backend.log').open('w', encoding='utf-8')
