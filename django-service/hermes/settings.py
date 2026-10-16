@@ -23,11 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 _private_dir = BASE_DIR.parent / '.local-data'
-_private_dir.mkdir(exist_ok=True)
+from .private_state import load_secret
 _key_file = _private_dir / 'django.key'
-if not os.environ.get('DJANGO_SECRET_KEY') and not _key_file.exists():
-    _key_file.write_text(secrets.token_urlsafe(48), encoding='utf-8')
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or _key_file.read_text(encoding='utf-8')
+SECRET_KEY = load_secret(_key_file, os.environ.get('DJANGO_SECRET_KEY'))
 DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
 SESSION_COOKIE_HTTPONLY = True
@@ -35,6 +33,7 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_SERIALIZER = 'dashboard.private_sessions.EncryptedJSONSerializer'
 ENABLE_LEGACY_UI = os.environ.get('ENABLE_LEGACY_UI', 'false').lower() == 'true'
 PRODUCT_LABEL = os.environ.get('PRODUCT_LABEL', 'Foliolet')
 FOLIOLET_SHARE_MODE = os.environ.get('FOLIOLET_SHARE_MODE', 'quick')

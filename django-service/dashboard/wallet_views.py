@@ -101,9 +101,16 @@ def enroll(request, previous_id=None):
             file = request.FILES.get("file")
             if not file:
                 raise api.WalletAPIError("Choose a document to enroll.", 400)
+            # Check both metadata and a bounded read: a custom upload handler can lie about size.
+            limit = 20 * 1024 * 1024
+            if file.size > limit:
+                raise api.WalletAPIError("Documents must be 20 MiB or smaller.", 413)
+            original = file.read(limit + 1)
+            if len(original) > limit:
+                raise api.WalletAPIError("Documents must be 20 MiB or smaller.", 413)
             endpoint = f"/api/wallet/documents/{previous_id}/versions" if previous_id else "/api/wallet/documents"
             result = api.call("POST", endpoint, request.session["sb_auth"],
-                              files={"file": (file.name, file.read(), file.content_type)},
+                              files={"file": (file.name, original, file.content_type)},
                               data={"displayName": request.POST.get("display_name", ""), "category": request.POST.get("category", "Other"), "observationId": request.POST.get("observation_id", "")})
             return redirect("dashboard:detail", credential_id=result["id"])
     except api.WalletAPIError as exc:
