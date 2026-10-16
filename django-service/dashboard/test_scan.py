@@ -78,9 +78,10 @@ class ScanButtonTests(TestCase):
 
     def test_draft_review_offers_the_scan(self):
         response = self.page("DRAFT")
-        self.assertContains(response, 'id="scan-fields"')
-        self.assertContains(response, 'data-url="/wallet/abc/scan/"')
-        self.assertContains(response, "Nothing is saved until you confirm")
+        self.assertContains(response, 'id="retry-intake"')
+        self.assertContains(response, 'data-retry="/intake/documents/abc/retry/"')
+        self.assertContains(response, "Reading stays on your computer")
+        self.assertNotContains(response, 'id="scan-fields"')
 
     def test_anchored_document_has_no_scan(self):
         self.assertNotContains(self.page("ACTIVE"), 'id="scan-fields"')

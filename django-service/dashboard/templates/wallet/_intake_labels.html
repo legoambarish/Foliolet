@@ -1,0 +1,8 @@
+{% if intake.indicator == 'POSSIBLE_DIGILOCKER_FORMAT' %}<span class="mark caution">Possible DigiLocker document (unverified)</span>
+{% elif intake.indicator == 'NO_DIGILOCKER_INDICATOR' %}<span class="mark quiet">No DigiLocker indicator found</span>{% else %}<span class="mark quiet">DigiLocker indicator check inconclusive</span>{% endif %}
+{% if intake.method == 'WATCHER_ASSISTED' %}<span class="mark quiet">Imported with Foliolet</span>{% endif %}
+{% if intake.lineage == 'SUGGESTIONS_UNMODIFIED' %}<span class="mark quiet">AI-suggested facts unchanged</span>
+{% elif intake.lineage == 'SUGGESTIONS_MODIFIED' %}<span class="mark caution">Facts edited since extraction</span>
+{% elif intake.lineage == 'STALE_SOURCE' %}<span class="mark caution">Fact comparison needs current source</span>
+{% else %}<span class="mark quiet">Manual facts / not compared</span>{% endif %}
+<span class="mark quiet">Issuer not verified</span>

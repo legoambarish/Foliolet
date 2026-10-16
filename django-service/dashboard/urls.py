@@ -2,8 +2,14 @@ from django.urls import path, include
 from django.conf import settings
 from . import wallet_views as views
 from . import foli_views as foli
+from . import intake_views as intake
 app_name = 'dashboard'
 urlpatterns = [
+ path('intake/pair/', intake.pair, name='intake-pair'),
+ path('intake/sessions/', intake.sessions, name='intake-sessions'),
+ path('intake/sessions/<uuid:session_id>/stop/', intake.stop, name='intake-stop'),
+ path('intake/documents/<str:credential_id>/', intake.analysis, name='intake-analysis'),
+ path('intake/documents/<str:credential_id>/retry/', intake.retry, name='intake-retry'),
  path('', views.home, name='index'),
  path('login/', views.login, name='login'),
  path('register/', views.register, name='register'),

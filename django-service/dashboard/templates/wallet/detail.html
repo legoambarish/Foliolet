@@ -12,6 +12,15 @@
   {% if document.status == 'ACTIVE' %}<a class="btn seal" href="{% url 'dashboard:compose' document.id %}">Share a proof</a>{% endif %}
 </div>
 {% include 'wallet/_lifecycle.html' %}
+<section class="sheet section-tight stack" id="intake-analysis" data-url="{% url 'dashboard:intake-analysis' document.id %}" data-retry="{% url 'dashboard:intake-retry' document.id %}" data-pdf="{% if document.intake.format == 'pdf' %}yes{% else %}no{% endif %}" data-editable="{% if document.status == 'DRAFT' and not document.merkleRoot %}yes{% else %}no{% endif %}">
+  <div class="intake-labels" id="intake-labels">{% include 'wallet/_intake_labels.html' with intake=document.intake %}</div>
+  <p class="help" id="intake-stage" role="status" aria-live="polite">{{ document.intake.stage|default:'Original saved. Local reading status is loading.' }}</p>
+  <p class="help">Indicators are provisional. Fact comparison describes changes relative to AI suggestions; OCR and suggestions can be wrong. Your confirmed facts remain holder assertions.</p>
+  <p class="help" id="intake-coverage"></p>
+  <div id="intake-warnings" class="help"></div>
+  {% if document.intake.changes %}<p class="help">{{ document.intake.changes.edited }} edited · {{ document.intake.changes.added }} added · {{ document.intake.changes.removed }} removed.</p>{% endif %}
+  {% if document.intake.fields %}<details><summary>Review the original AI proposal</summary><ul class="lines">{% for f in document.intake.fields %}<li class="line"><span class="wrap-any">{{ f.label }}: {{ f.value }} <span class="help">({{ f.type }})</span><br><span class="help">Page {{ f.citation.page }} · “{{ f.evidence }}”</span></span></li>{% endfor %}</ul><p class="help">This saved proposal stays fixed. Compare it with your review rows or committed facts below.</p></details>{% endif %}
+</section>
 
 <div class="work section">
   <div class="stack-lg">
@@ -22,8 +31,8 @@
       <h2 id="review-title">{% if document.merkleRoot %}Edit facts{% else %}Check these facts against your document{% endif %}</h2>
       <p class="help">Suggestions are a convenience and can be wrong. Each row you keep becomes a fact you state about this document. A proof later shows that a fact was committed. It does not show that the fact was read correctly from the file.</p>
       <div class="cluster section-tight" id="scan-box">
-        <button type="button" class="btn line small" id="scan-fields" data-url="{% url 'dashboard:scan_fields' document.id %}">Scan for fields</button>
-        <span class="help" id="scan-status" role="status" aria-live="polite">Optional. An AI model reads this document and suggests facts for you to check. The document's text (or page images, for a scanned PDF) is sent to the model provider. Nothing is saved until you confirm.</span>
+        <button type="button" class="btn line small" id="retry-intake">Read again locally</button>
+        <span class="help" id="scan-status" role="status" aria-live="polite">Reading stays on your computer. Your original is saved even when reading or the model is unavailable. The first accepted proposal stays fixed for fact comparison.</span>
       </div>
       <form method="post" id="claim-form" class="section-tight">
         {% csrf_token %}
@@ -33,14 +42,15 @@
             <div class="field"><label>Label<input name="claim_label" value="{{ c.label }}" maxlength="100"></label></div>
             <div class="field"><label>Value<input name="claim_value" value="{{ c.value }}" maxlength="1000"></label></div>
             <div class="field"><label>Type<select name="claim_type"><option value="string" {% if c.type == 'string' %}selected{% endif %}>Text</option><option value="decimal" {% if c.type == 'decimal' %}selected{% endif %}>Decimal</option><option value="date" {% if c.type == 'date' %}selected{% endif %}>Date</option><option value="boolean" {% if c.type == 'boolean' %}selected{% endif %}>Yes / no</option></select></label></div>
-            <div class="field"><label>Field path<input name="claim_path" value="{{ c.path }}" maxlength="100" spellcheck="false" autocapitalize="off"></label></div>
+            <details class="field"><summary>Advanced</summary><label>Field path<input name="claim_path" value="{{ c.path }}" maxlength="100" spellcheck="false" autocapitalize="off"></label></details>
+            {% if c.evidence %}<p class="help scan-note">Page {{ c.citation.page }} · “{{ c.evidence }}”{% if c.citation.provenance == 'OCR transcription' %} · OCR transcription: check the original.{% endif %}</p>{% endif %}
             <button type="button" class="remove-fact" aria-label="Remove this fact">Remove</button>
           </div>
           {% endfor %}
         </div>
         <div class="cluster section-tight">
           <button type="button" class="btn line small" id="add-fact">Add a fact</button>
-          <span class="help">Paths are lowercase words joined by dots, e.g. <code>education.cgpa</code>. Dates use YYYY-MM-DD.</span>
+          <span class="help">Names and values are enough. Dates use YYYY-MM-DD; field paths are assigned automatically unless set under Advanced.</span>
         </div>
         <div class="notice info section-tight"><strong>About “CGPA at least 8.5”</strong>If you confirm <code>education.cgpa</code> as a decimal, the platform also commits a yes/no fact, “CGPA at least 8.5”. The platform computes it from your value. It is not a zero-knowledge range proof.</div>
         <label class="check section-tight"><input type="checkbox" name="confirm" value="yes" required><span><strong>I checked these values against my document</strong>I understand they are my statements, not verified by an issuer.</span></label>
@@ -124,3 +134,4 @@
 </div>
 {% endwith %}{% endif %}
 {% endblock %}
+{% block scripts %}<script src="{% asset 'wallet/intake.js' %}" defer></script>{% endblock %}
