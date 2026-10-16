@@ -151,11 +151,11 @@ class IntakeWorkflowTest extends WalletTestContext {
   }
   @Test void manualConfirmationDuringReaderWorkCannotAcquireALateBaseline() throws Exception {
     var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
-    when(reader.inspect(any(),any())).thenAnswer(call -> {
+    doAnswer(call -> {
       entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));
       FoliData.Source source=call.getArgument(0);var snapshot=extraction.extract(source,s -> {});
       return new FoliReader.Response(snapshot,null,null,null,200,new IntakeIndicators.Report("test",source.hash(),"NO_DIGILOCKER_INDICATOR",1,1,List.of(),List.of()));
-    });
+    }).when(reader).inspect(any(),any());
     String id=draft();jobs.automatically(id,owner);assertTrue(entered.await(4,TimeUnit.SECONDS));
     try {wallet.confirm(id,new ConfirmClaims(List.of(new ClaimInput("education.math","Math","decimal","95"))),owner);}finally{release.countDown();}
     done(id);assertNull(records.findById(id).orElseThrow().encryptedBaseline);assertEquals("NOT_ASSESSED",metadata.summary(id).get("lineage"));

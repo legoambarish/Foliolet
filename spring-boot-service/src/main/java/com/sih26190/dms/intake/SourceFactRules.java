@@ -33,7 +33,7 @@ final class SourceFactRules {
       if(System.nanoTime()>deadline) {reject("TIME_BUDGET");partial=true;break;}
       count("PAGES_ACCOUNTED"); progress.accept("Matching source facts · page "+page.number()+" of "+source.pages().size());
       if(page.status().equals("MIXED_OCR") && page.text().contains("\n[Rendered-page OCR transcription]\n")) {
-        mixedLiterals(source,page); continue;
+        mixedLiterals(source,page,deadline); continue;
       }
       if(!Set.of("TEXT","OCR","OCR_UNCERTAIN","MIXED_OCR").contains(page.status())) {
         // A contradictory hidden/native layer must not be resolved by guessing.
@@ -112,15 +112,16 @@ final class SourceFactRules {
     return new FactSuggestions.Result(accepted,discarded,partial,warnings,diagnostics);
   }
 
-  private void mixedLiterals(Snapshot source,Page page) {
+  private void mixedLiterals(Snapshot source,Page page,long deadline) {
     String marker="\n[Rendered-page OCR transcription]\n";
     int boundary=page.text().indexOf(marker),offset=boundary+marker.length();
     if(page.words().size()>MAX_WORDS || page.words().stream().anyMatch(w -> !validWord(page,w))) {reject("INVALID_SOURCE_GEOMETRY");return;}
     var nativeLines=LITERAL.matcher(page.text().substring(0,boundary));
     while(nativeLines.find()) {
+      if(System.nanoTime()>deadline || Thread.currentThread().isInterrupted()) {reject("TIME_BUDGET");partial=true;break;}
       count("LITERAL_ROWS_SEEN");boolean matched=false;
       var rendered=LITERAL.matcher(page.text().substring(offset));
-      while(rendered.find()) if(nativeLines.group(1).strip().equals(rendered.group(1).strip()) && nativeLines.group(2).strip().equals(rendered.group(2).strip())) {
+      while(System.nanoTime()<=deadline && rendered.find()) if(nativeLines.group(1).strip().equals(rendered.group(1).strip()) && nativeLines.group(2).strip().equals(rendered.group(2).strip())) {
         var relevant=within(page.words(),offset+rendered.start(),offset+rendered.end());
         if(relevant.isEmpty() || !sameRow(relevant) || !covered(page.text(),offset+rendered.start(),offset+rendered.end(),relevant)) continue;
         offer(source,page,nativeLines.group(1),nativeLines.group(2),nativeLines.start(),nativeLines.end(),relevant,false);
@@ -141,9 +142,11 @@ final class SourceFactRules {
       boolean numeric=NUMBER.matcher(raw).matches();
       boolean score=label.matches(MARKS) || normalize(label).matches(".*(?:marks|score|cgpa).*");
       boolean identifier=normalize(label).matches(".*(?:identifier|(?:^| )id(?: |$)|number|code|registration|roll|account|postcode|pin).*" );
-      String type=identifier?"string":numeric?"decimal":raw.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")?"date":raw.matches("(?i)true|false")?"boolean":"string";
+      boolean monetary=!score && normalize(label).matches(".*(?:total|tax|vat|amount|price|paid|change).*" );
+      // Locale-dependent amounts remain verbatim: 26.000 must not silently become 26.
+      String type=(identifier || monetary)?"string":numeric?"decimal":raw.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")?"date":raw.matches("(?i)true|false")?"boolean":"string";
       if(score && !numeric) {reject("INVALID_NUMERIC_LITERAL");return;}
-      boolean percent=numeric && raw.endsWith("%");
+      boolean percent=type.equals("decimal") && raw.endsWith("%");
       String value=raw;
       if(type.equals("decimal")) {if(percent) value=value.substring(0,value.length()-1);value=value.replace(",","");}
       value=canonical.value(type,value);
@@ -179,7 +182,8 @@ final class SourceFactRules {
   private static double top(List<Word> row) {return row.stream().mapToInt(Word::top).min().orElse(0);}
   private static boolean sameRow(List<Word> row) {
     double mid=row.stream().mapToDouble(SourceFactRules::center).average().orElse(0);
-    return row.stream().allMatch(w -> Math.abs(center(w)-mid)<=Math.max(2,height(row)*0.45));
+    double tolerance=Math.max(2,height(row)*0.45);
+    return row.stream().allMatch(w -> Math.abs(center(w)-mid)<=tolerance);
   }
   private static List<List<Word>> rows(List<Word> words) {
     var sorted=words.stream().sorted(Comparator.comparingDouble(SourceFactRules::center).thenComparingInt(Word::left)).toList();

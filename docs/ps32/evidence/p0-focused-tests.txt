@@ -31,7 +31,7 @@
 [INFO] 
 [INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ dms ---
 [INFO] Recompiling the module because of changed dependency.
-[INFO] Compiling 21 source files with javac [debug parameters release 17] to target/test-classes
+[INFO] Compiling 22 source files with javac [debug parameters release 17] to target/test-classes
 [INFO] Annotation processing is enabled because one or more processors were found
   on the class path. A future release of javac may disable annotation processing
   unless at least one processor is specified by name (-processor), or a search
@@ -50,26 +50,43 @@
 [INFO] -------------------------------------------------------
 [INFO] Running com.sih26190.dms.intake.SourceFactRulesTest
 Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
 WARNING: A Java agent has been loaded dynamically (/mnt/data/Foliolet/.local-tools/m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
 WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
 WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
 WARNING: Dynamic loading of agents will be disallowed by default in a future release
-OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
-[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.221 s -- in com.sih26190.dms.intake.SourceFactRulesTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.174 s -- in com.sih26190.dms.intake.SourceFactRulesTest
+[INFO] Running com.sih26190.dms.intake.IntakeWorkflowTest
+14:58:01.420 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.sih26190.dms.intake.IntakeWorkflowTest]: IntakeWorkflowTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:58:01.553 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.sih26190.dms.DmsApplication for test class com.sih26190.dms.intake.IntakeWorkflowTest
+14:58:01.625 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.sih26190.dms.intake.IntakeWorkflowTest]: IntakeWorkflowTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:58:01.626 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.sih26190.dms.selective.WalletTestContext]: WalletTestContext does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+14:58:01.629 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.sih26190.dms.DmsApplication for test class com.sih26190.dms.intake.IntakeWorkflowTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 9.880 s -- in com.sih26190.dms.intake.IntakeWorkflowTest
 [INFO] Running com.sih26190.dms.intake.FactSuggestionsTest
-[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.152 s -- in com.sih26190.dms.intake.FactSuggestionsTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.064 s -- in com.sih26190.dms.intake.FactSuggestionsTest
 [INFO] Running com.sih26190.dms.foli.OcrTsvValidationTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.sih26190.dms.foli.OcrTsvValidationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.sih26190.dms.foli.OcrTsvValidationTest
 [INFO] Running com.sih26190.dms.foli.NativeGeometryTest
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.432 s -- in com.sih26190.dms.foli.NativeGeometryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.420 s -- in com.sih26190.dms.foli.NativeGeometryTest
 [INFO] 
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 37, Failures: 0, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  8.485 s
-[INFO] Finished at: 2026-10-16T14:44:58Z
+[INFO] Total time:  18.298 s
+[INFO] Finished at: 2026-10-16T14:58:11Z
 [INFO] ------------------------------------------------------------------------

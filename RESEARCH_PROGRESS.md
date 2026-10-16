@@ -32,3 +32,6 @@ Implemented locally: PDFBox native token geometry with exact text mapping; bound
 Focused application tests: 26 passed (12 source-layout, 1 real PDFBox, 3 TSV validation, 10 existing strict fact-validation). First run exposed an invalid-date exception; fixed and rerun. This is not a real-world accuracy claim. Original failure PDFs remain unavailable.
 
 Next: whole application regression, actual Tesseract before/after corpus, licensed real data, alternative-engine feasibility, whole-repository risk audit and end-to-end gates. All suggestions remain holder-reviewed; issuer stays NOT_VERIFIED.
+
+### Actual integration follow-up
+37 focused tests passed including the 10 database/AES/MockMvc intake workflows; source proposals work without a model. Monetary literals retain original locale-dependent notation. Added a CLI which exercises the actual application extraction classes; corpus evaluation pending.
