@@ -1,0 +1,7 @@
+foliolet text eol=lf
+containers/*.sh text eol=lf
+containers/*.py text eol=lf
+containers/Dockerfile text eol=lf
+containers/*.conf text eol=lf
+compose.mac.yaml text eol=lf
+.github/workflows/*.yml text eol=lf

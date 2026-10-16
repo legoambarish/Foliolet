@@ -31,7 +31,8 @@ def private(view):
 def pair(request):
     if int(request.META.get('CONTENT_LENGTH') or 0) > 4096:
         raise ValueError()
-    folder = request.POST.get('folder', '')
+    managed = getattr(settings, 'FOLIOLET_MANAGED_WATCHER', False)
+    folder = settings.FOLIOLET_CONTAINER_INTAKE_FOLDER if managed else request.POST.get('folder', '')
     if not folder or request.POST.get('consent') != 'yes':
         raise ValueError()
     origin = urlsplit(settings.SPRING_BOOT_API_BASE_URL)
@@ -41,6 +42,15 @@ def pair(request):
     config = api.call('POST', '/api/wallet/intake/sessions', request.session['sb_auth'], payload={'folder': folder})
     host = '[::1]' if origin.hostname == '::1' else '127.0.0.1'
     config['apiUrl'] = f'http://{host}:{origin.port}'
+    if managed:
+        from .managed_watcher import enqueue
+        try:
+            enqueue(config)
+        except (OSError, ValueError):
+            # Do not leave an armed capability behind when local delivery fails.
+            api.call('POST', f"/api/wallet/intake/sessions/{config['sessionId']}/stop", request.session['sb_auth'])
+            return JsonResponse({'error': 'The local companion is unavailable. Retry or use manual upload.'}, status=503)
+        return JsonResponse({'managed': True, 'sessionId': config['sessionId']})
     response = JsonResponse(config)
     response['Content-Disposition'] = 'attachment; filename="foliolet-intake.json"'
     return response
@@ -49,7 +59,12 @@ def pair(request):
 @require_GET
 @private
 def sessions(request):
-    return JsonResponse({'sessions': api.call('GET', '/api/wallet/intake/sessions', request.session['sb_auth'])})
+    rows = api.call('GET', '/api/wallet/intake/sessions', request.session['sb_auth'])
+    if getattr(settings, 'FOLIOLET_MANAGED_WATCHER', False):
+        for row in rows:
+            if row.get('folder') == settings.FOLIOLET_CONTAINER_INTAKE_FOLDER:
+                row['folder'] = settings.FOLIOLET_HOST_INTAKE_FOLDER
+    return JsonResponse({'sessions': rows})
 
 
 @require_POST

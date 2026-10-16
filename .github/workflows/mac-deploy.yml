@@ -1,0 +1,34 @@
+name: Deploy tested image to Mac Docker Desktop
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: 'Tested mac-product manifest SHA-256 from the successful Mac Docker product run'
+        required: true
+        type: string
+permissions: {contents: read, packages: read}
+concurrency:
+  group: foliolet-local-mac-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/codex/macos-docker'
+    runs-on: [self-hosted, macOS, foliolet-docker]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - name: Deploy to the explicitly registered local Mac; retain all state
+        env:
+          DIGEST: ${{ inputs.digest }}
+          REPOSITORY: ${{ github.repository }}
+          FOLIOLET_NO_OPEN: '1'
+        shell: bash
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid manifest digest'; exit 1; }
+          repository="$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          export FOLIOLET_IMAGE="ghcr.io/$repository/mac-product@$DIGEST"
+          ./foliolet deploy
+          ./foliolet status
+      - name: Functional acceptance on this real Mac
+        run: ./foliolet test

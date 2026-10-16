@@ -22,7 +22,8 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / '.local-data/intake-tests'
-API = 'http://127.0.0.1:8098'
+PORT = int(os.environ.get('INTAKE_FAILURE_PORT', '8098'))
+API = f'http://127.0.0.1:{PORT}'
 HTTP = requests.Session(); HTTP.trust_env = False
 checks = []
 mode = 'missing'
@@ -78,7 +79,7 @@ def done(auth, identifier):
 
 
 def start_backend(env, logfile):
-    child = subprocess.Popen(['java', '-jar', str(ROOT / 'spring-boot-service/target/dms-0.0.1-SNAPSHOT.jar')], cwd=ROOT / 'spring-boot-service', env=env,
+    child = subprocess.Popen(['java', '-jar', os.environ.get('FOLIOLET_TEST_JAR', str(ROOT / 'spring-boot-service/target/dms-0.0.1-SNAPSHOT.jar'))], cwd=ROOT / 'spring-boot-service', env=env,
                              stdout=logfile, stderr=logfile, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     deadline = time.monotonic() + 45
     while time.monotonic() < deadline:
@@ -94,7 +95,7 @@ def start_backend(env, logfile):
 def main():
     global mode
     OUT.mkdir(parents=True, exist_ok=True)
-    for port in (8098, 11439):
+    for port in (PORT, 11439):
         with socket.socket() as probe: probe.bind(('127.0.0.1', port))
     import fitz
     with fitz.open() as pdf:
@@ -106,11 +107,11 @@ def main():
     suffix = uuid.uuid4().hex[:10]
     database = 'intake_fault_' + suffix
     state = OUT / ('failure-runtime-' + suffix); state.mkdir()
-    with psycopg.connect('host=127.0.0.1 port=55438 dbname=postgres user=wallet', autocommit=True) as db:
+    with psycopg.connect(os.environ.get('INTAKE_TEST_ADMIN_DSN', 'host=127.0.0.1 port=55438 dbname=postgres user=wallet'), autocommit=True) as db:
         db.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(database)))
     env = os.environ.copy()
-    env.update({'SERVER_ADDRESS': '127.0.0.1', 'SERVER_PORT': '8098', 'SPRING_DATASOURCE_URL': 'jdbc:postgresql://127.0.0.1:55438/' + database,
-                'SPRING_DATASOURCE_USERNAME': 'wallet', 'SPRING_DATASOURCE_PASSWORD': '', 'SPRING_JPA_HIBERNATE_DDL_AUTO': 'update', 'SPRING_JPA_OPEN_IN_VIEW': 'false',
+    env.update({'SERVER_ADDRESS': '127.0.0.1', 'SERVER_PORT': str(PORT), 'SPRING_DATASOURCE_URL': os.environ.get('INTAKE_TEST_JDBC_PREFIX', 'jdbc:postgresql://127.0.0.1:55438/') + database,
+                'SPRING_DATASOURCE_USERNAME': os.environ.get('INTAKE_TEST_DB_USER', 'wallet'), 'SPRING_DATASOURCE_PASSWORD': os.environ.get('INTAKE_TEST_DB_PASSWORD', ''), 'SPRING_JPA_HIBERNATE_DDL_AUTO': 'update', 'SPRING_JPA_OPEN_IN_VIEW': 'false',
                 'BLOCKCHAIN_RPC_URL': 'http://127.0.0.1:8548', 'BLOCKCHAIN_EXPECTED_CHAIN_ID': '1337',
                 'BLOCKCHAIN_PRIVATE_KEY': (ROOT / '.local-data/development-relay.key').read_text().strip(), 'WALLET_DATA_DIR': str(state),
                 'WALLET_SHARE_BASE_URL': 'http://127.0.0.1:8008', 'DMS_STORAGE_LOCATION': str(state / 'legacy/files'), 'DMS_BACKUP_LOCATION': str(state / 'legacy/backups'),

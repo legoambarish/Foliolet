@@ -54,15 +54,30 @@ async function main() {
   await page.emulateMedia({colorScheme:'light'});await page.setViewportSize({width:1365,height:1000});
   await page.locator('summary').filter({hasText:'Use an optional local folder watcher'}).click();
   const folder=path.join(OUT,'ui-incoming');fs.mkdirSync(folder,{recursive:true});
-  await page.locator('#intake-folder').fill(folder);await page.locator('[name=consent]').check();
-  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Enable folder intake'}).click();
-  const download=await downloadPromise;assert.equal(download.suggestedFilename(),'foliolet-intake.json');
-  const privateFile=path.join(OUT,'ui-pair-private.json');await download.saveAs(privateFile);
-  const pair=JSON.parse(fs.readFileSync(privateFile,'utf8'));assert.equal(pair.folder,folder);assert.equal(pair.apiUrl,SPRING);assert.equal(pair.maxFiles,10);
+  const managed=await page.locator('#digilocker-intake').getAttribute('data-managed')==='yes';
+  if(!managed) await page.locator('#intake-folder').fill(folder);
+  else assert(await page.locator('#intake-folder').getAttribute('readonly')!==null);
+  await page.locator('[name=consent]').check();let pair;
+  if(managed) {
+    const paired=page.waitForResponse(r=>r.url().endsWith('/intake/pair/')&&r.request().method()==='POST');
+    await page.getByRole('button',{name:'Enable folder intake'}).click();
+    const response=await paired;assert.equal(response.status(),200);
+    const body=await response.json();assert.deepEqual(Object.keys(body).sort(),['managed','sessionId']);
+    await page.waitForFunction(()=>document.getElementById('intake-connection').textContent.includes('Watcher connected'),null,{timeout:30000});
+    pass('Docker consent connects the included companion without a configuration download');
+  } else {
+    const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Enable folder intake'}).click();
+    const download=await downloadPromise;assert.equal(download.suggestedFilename(),'foliolet-intake.json');
+    const privateFile=path.join(OUT,'ui-pair-private.json');await download.saveAs(privateFile);
+    pair=JSON.parse(fs.readFileSync(privateFile,'utf8'));assert.equal(pair.folder,folder);assert.equal(pair.apiUrl,SPRING);assert.equal(pair.maxFiles,10);
+  }
   await page.locator('#intake-stop').waitFor({state:'visible'});await page.waitForFunction(()=>!document.getElementById('intake-stop').disabled);
   await Promise.all([page.waitForResponse(response=>response.url().includes('/stop/') && response.request().method()==='POST'),page.locator('#intake-stop').click()]);
-  const refused=await fetch(SPRING+'/api/intake-agent/heartbeat',{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({folderHash:pair.folderHash})});
-  assert.equal(refused.status,401);pass('CSRF-protected UI pairing downloads scoped configuration; Stop revokes it');
+  if(pair) {
+    const refused=await fetch(SPRING+'/api/intake-agent/heartbeat',{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({folderHash:pair.folderHash})});
+    assert.equal(refused.status,401);
+  } else assert((await backend('/api/wallet/intake/sessions',auth)).every(s=>!s.active));
+  pass('CSRF-protected UI Stop revokes the armed session');
   const csrf=await page.locator('[name=csrfmiddlewaretoken]').first().inputValue();
   assert.equal((await context.request.post(UI+'/intake/pair/',{form:{folder,consent:'yes'}})).status(),403);
   pass('Real Django intake POST rejects missing CSRF token');

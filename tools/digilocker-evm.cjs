@@ -1,7 +1,7 @@
 // Isolated local demo chain. Never reads another worktree's keys or state.
 const fs = require('node:fs'), path = require('node:path');
 const ganache = require('ganache'), {Wallet} = require('ethers');
-const root = path.resolve(__dirname, '..'), data = path.join(root, '.local-data');
+const root = path.resolve(__dirname, '..'), data = process.env.FOLIOLET_DATA_DIR || path.join(root, '.local-data');
 const dir = path.join(data, 'evm'), keyFile = path.join(data, 'development-relay.key');
 fs.mkdirSync(dir, {recursive: true});
 if (!fs.existsSync(keyFile)) {

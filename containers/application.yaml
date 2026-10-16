@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: foliolet
+  datasource:
+    url: jdbc:postgresql://postgres:5432/foliolet
+    username: foliolet
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate.hbm2ddl.halt_on_error: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
+server:
+  address: 127.0.0.1
+  port: 8088
+  error:
+    include-message: never
+blockchain:
+  rpc-url: http://127.0.0.1:8548
+  expected-chain-id: 1337
+  private-key: ${BLOCKCHAIN_PRIVATE_KEY}
+wallet:
+  data-dir: /app/.local-data
+  share-base-url: ${WALLET_SHARE_BASE_URL:http://127.0.0.1:8008}
+dms:
+  storage:
+    location: /app/.local-data/legacy/files
+  backup:
+    location: /app/.local-data/legacy/backups
+openrouter:
+  api-key: ''
+  model: disabled-for-local-docker
+foli:
+  enabled: true
+  ollama-url: http://127.0.0.1:11434
+  model: qwen3:4b-instruct
+  tesseract: /usr/bin/tesseract
+  ocr-data-dir: /usr/share/tesseract-ocr/5/tessdata
+  layout-python: /usr/local/bin/python
+  layout-script: /app/tools/ocr-layout-worker.py
+  temp-dir: /app/.local-data/foli/tmp
+logging:
+  level:
+    org.apache.pdfbox: OFF
+    org.springframework.ai: OFF

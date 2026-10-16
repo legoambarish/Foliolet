@@ -2,6 +2,10 @@
 
 **Share the fact, not the file.**
 
+On the Mac Docker branch, run `./foliolet up` to build and start the complete
+local product, install missing container dependencies/model, and open localhost.
+See the [Mac setup, demonstration and CI/CD guide](docs/MAC_DOCKER.md).
+
 On the existing `cf` branch, **Ask Foli** adds private local Ollama conversation,
 authorized PDF/TXT/CSV reading, scanned-page OCR, exact source citations and
 whole-document fine-print review. Start it with the [Foli runbook](docs/FOLI_IMPLEMENTATION.md),

@@ -10,6 +10,15 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / '.local-data/intake-tests/fixtures'
 
+def font(size, bold=False):
+    candidates = ([os.environ.get('FOLIOLET_TEST_FONT_BOLD' if bold else 'FOLIOLET_TEST_FONT', '')]
+        + (['C:/Windows/Fonts/arialbd.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf'] if bold
+           else ['C:/Windows/Fonts/arial.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/System/Library/Fonts/Supplemental/Arial.ttf']))
+    for file in candidates:
+        if file and Path(file).is_file():
+            return ImageFont.truetype(file, size)
+    raise RuntimeError('Install a test TrueType font or set FOLIOLET_TEST_FONT.')
+
 
 def qr(payload):
     code = "const q=require('qrcode-generator')(0,'M');q.addData(process.argv[1]);q.make();console.log(JSON.stringify(Array.from({length:q.getModuleCount()},(_,r)=>Array.from({length:q.getModuleCount()},(_,c)=>q.isDark(r,c)))));"
@@ -32,8 +41,8 @@ def graphic():
     draw.ellipse((25, 25, 215, 215), fill='white')
     draw.rounded_rectangle((70, 65, 160, 173), 8, fill=purple)
     draw.polygon(((130, 65), (160, 95), (130, 95)), fill='white')
-    draw.text((260, 65), 'Powered by', font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 28), fill='white')
-    draw.text((255, 112), 'DigiLocker', font=ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 54), fill='white')
+    draw.text((260, 65), 'Powered by', font=font(28), fill='white')
+    draw.text((255, 112), 'DigiLocker', font=font(54, True), fill='white')
     return image
 
 
@@ -57,7 +66,7 @@ def native(name, brand=False, code=None, pages=1, scanned=False, hybrid=False):
             if brand: page.insert_image(fitz.Rect(280, 525, 550, 625), stream=png(graphic()))
     if hybrid:
         image = Image.new('RGB', (1000, 100), 'white'); draw = ImageDraw.Draw(image)
-        draw.text((30, 15), 'Extra charge: INR 800 for dispatch', font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf', 32), fill='black')
+        draw.text((30, 15), 'Extra charge: INR 800 for dispatch', font=font(32), fill='black')
         document[0].insert_image(fitz.Rect(60, 330, 540, 380), stream=png(image))
     if scanned:
         raster = fitz.open()

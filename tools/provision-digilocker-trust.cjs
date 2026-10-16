@@ -5,7 +5,7 @@ const path = require('node:path');
 const {Wallet, JsonRpcProvider, Contract} = require('ethers');
 const root = path.resolve(__dirname, '..');
 async function main() {
-  const state = path.join(root, '.local-data');
+  const state = process.env.FOLIOLET_DATA_DIR || path.join(root, '.local-data');
   const operator = new Wallet(fs.readFileSync(path.join(state, 'development-relay.key'), 'utf8').trim()).address;
   const address = fs.readFileSync(path.join(state, 'chain', `SelectiveDisclosureRegistry-1337-${operator.toLowerCase()}.address`), 'utf8').trim();
   const provider = new JsonRpcProvider('http://127.0.0.1:8548', undefined, {batchMaxCount:1});

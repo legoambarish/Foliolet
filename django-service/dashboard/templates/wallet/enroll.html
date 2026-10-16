@@ -14,7 +14,7 @@
 </ol>
 
 {% if not previous_id %}
-<section class="sheet section-tight stack" id="digilocker-intake" data-sessions="{% url 'dashboard:intake-sessions' %}">
+<section class="sheet section-tight stack" id="digilocker-intake" data-managed="{% if managed_intake %}yes{% else %}no{% endif %}" data-sessions="{% url 'dashboard:intake-sessions' %}">
   <div class="sheet-head"><h2>Bring a document from DigiLocker</h2>
     <a class="btn line" id="open-digilocker" href="https://www.digilocker.gov.in/" target="_blank" rel="noopener noreferrer">Import from DigiLocker</a>
   </div>
@@ -24,16 +24,18 @@
     <p class="help section-tight">Only new PDF, TXT and CSV files in your chosen dedicated folder are eligible during this ten-minute session, up to ten files. Subfolders are included. Keep other personal downloads elsewhere.</p>
     <form method="post" action="{% url 'dashboard:intake-pair' %}" id="intake-arm" class="section-tight">
       {% csrf_token %}
-      <div class="field"><label for="intake-folder">Import folder</label><input id="intake-folder" name="folder" value="{{ intake_folder }}" required maxlength="500"></div>
+      <div class="field"><label for="intake-folder">Import folder</label><input id="intake-folder" name="folder" value="{{ intake_folder }}" required maxlength="500" {% if managed_intake %}readonly{% endif %}></div>
       <label class="check"><input type="checkbox" name="consent" value="yes" required><span>I allow new documents in this folder to be imported for ten minutes.</span></label>
       <div class="form-foot"><button class="btn line small">Enable folder intake</button><button class="btn quiet small" id="intake-stop" type="button" disabled>Stop watching</button></div>
     </form>
     <p class="help" id="intake-connection" role="status" aria-live="polite">Local watcher not connected. Manual upload is always available.</p>
-    <details class="section-tight"><summary>Start the local companion</summary>
+    {% if managed_intake %}
+    <p class="help">The local companion is included. Enable intake here, then save your download to the folder shown above. Stop watching ends the session immediately.</p>
+    {% else %}<details class="section-tight"><summary>Start the local companion</summary>
       <p class="help">The enable button downloads a pairing file. From this feature checkout, run the command below once, then download your document into the selected folder. The pairing expires after ten minutes.</p>
       <pre class="wrap-any">.\tools\start-digilocker-watcher.ps1</pre>
       <p class="help">Create the folder first. The launcher uses the latest Foliolet pairing download, or asks you to pick it if it was renamed. Setup instructions are in docs/DIGILOCKER_ASSISTED_INTAKE_RUNBOOK.md.</p>
-    </details>
+    </details>{% endif %}
   </details>
   <ul id="intake-received" class="lines" aria-label="Received documents"></ul>
   <a class="text-btn" href="#file" id="manual-import">Downloaded? Import now using the file picker</a>

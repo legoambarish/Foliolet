@@ -22,8 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-_private_dir = BASE_DIR.parent / '.local-data'
-_private_dir.mkdir(exist_ok=True)
+_private_dir = Path(os.environ.get('FOLIOLET_STATE_DIR', BASE_DIR.parent / '.local-data'))
+_private_dir.mkdir(exist_ok=True, parents=True)
 _key_file = _private_dir / 'django.key'
 if not os.environ.get('DJANGO_SECRET_KEY') and not _key_file.exists():
     _key_file.write_text(secrets.token_urlsafe(48), encoding='utf-8')
@@ -32,12 +32,16 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = os.environ.get('DJANGO_COOKIE_SECURE', str(not DEBUG)).lower() == 'true'
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 ENABLE_LEGACY_UI = os.environ.get('ENABLE_LEGACY_UI', 'false').lower() == 'true'
 PRODUCT_LABEL = os.environ.get('PRODUCT_LABEL', 'Foliolet')
 FOLIOLET_SHARE_MODE = os.environ.get('FOLIOLET_SHARE_MODE', 'quick')
+FOLIOLET_MANAGED_WATCHER = os.environ.get('FOLIOLET_MANAGED_WATCHER', 'false').lower() == 'true'
+FOLIOLET_PAIRING_DIR = os.environ.get('FOLIOLET_PAIRING_DIR', '/pairings')
+FOLIOLET_CONTAINER_INTAKE_FOLDER = '/host/intake/documents-inbox'
+FOLIOLET_HOST_INTAKE_FOLDER = os.environ.get('FOLIOLET_HOST_INTAKE_FOLDER', 'Downloads/Foliolet Intake')
 from copy import deepcopy
 from django.utils.log import DEFAULT_LOGGING
 LOGGING = deepcopy(DEFAULT_LOGGING)

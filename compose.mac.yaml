@@ -1,0 +1,199 @@
+name: foliolet-mac
+x-app: &app
+  image: ${FOLIOLET_IMAGE:-foliolet-local:mac}
+  build:
+    context: .
+    dockerfile: containers/Dockerfile
+    target: runtime
+  init: false
+  read_only: true
+  tmpfs: ['/tmp:size=128m,mode=1777']
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  stop_grace_period: 20s
+  network_mode: service:gateway
+
+services:
+  init:
+    <<: *app
+    user: '0:0'
+    network_mode: none
+    restart: 'no'
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    command: [python, /app/containers/init.py]
+    volumes:
+      - app-state:/app/.local-data
+      - db-secret:/run/foliolet-secrets
+      - pairings:/pairings
+      - watcher-state:/watcher-state
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: foliolet
+      POSTGRES_USER: foliolet
+      POSTGRES_PASSWORD_FILE: /run/foliolet-secrets/postgres-password
+    volumes:
+      - database:/var/lib/postgresql/data
+      - db-secret:/run/foliolet-secrets:ro
+    depends_on:
+      init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U foliolet -d foliolet']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  gateway:
+    image: nginx:1.28-alpine
+    user: '101:101'
+    read_only: true
+    tmpfs: ['/tmp:size=64m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    entrypoint: [nginx, -g, 'daemon off;']
+    volumes:
+      - ./containers/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - '127.0.0.1:8008:8008'
+      - '127.0.0.1:8088:8098'
+      - '127.0.0.1:8548:8549'
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8008/login/']
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 60s
+  evm:
+    <<: *app
+    command: [node, /app/tools/digilocker-evm.cjs]
+    environment: {FOLIOLET_DATA_DIR: /app/.local-data}
+    volumes: [app-state:/app/.local-data]
+    depends_on:
+      init: {condition: service_completed_successfully}
+      gateway: {condition: service_started}
+    healthcheck:
+      test: [CMD, python, /app/containers/health.py, evm]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  ollama:
+    image: ollama/ollama:0.34.2
+    network_mode: service:gateway
+    environment:
+      OLLAMA_HOST: '127.0.0.1:11434'
+      OLLAMA_NO_CLOUD: '1'
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+      OLLAMA_KEEP_ALIVE: 10m
+    volumes: [models:/root/.ollama]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, ollama, list]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  model-init:
+    image: ollama/ollama:0.34.2
+    network_mode: service:gateway
+    environment: {OLLAMA_HOST: '127.0.0.1:11434'}
+    entrypoint: [/bin/sh, -ec]
+    command: ['ollama show qwen3:4b-instruct >/dev/null 2>&1 || ollama pull qwen3:4b-instruct; ollama show qwen3:4b-instruct >/dev/null; echo "Local Qwen model ready; cached downloads retained."']
+    restart: 'no'
+    depends_on:
+      ollama: {condition: service_healthy}
+  backend:
+    <<: *app
+    command: [python, /app/containers/backend.py]
+    environment: {WALLET_SHARE_BASE_URL: 'http://127.0.0.1:8008'}
+    volumes:
+      - app-state:/app/.local-data
+      - db-secret:/run/foliolet-secrets:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+      evm: {condition: service_healthy}
+      model-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, /app/containers/health.py, backend]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 40s
+  trust-init:
+    <<: *app
+    command: [node, /app/tools/provision-digilocker-trust.cjs]
+    environment: {FOLIOLET_DATA_DIR: /app/.local-data}
+    volumes: [app-state:/app/.local-data]
+    restart: 'no'
+    depends_on:
+      backend: {condition: service_healthy}
+  frontend:
+    <<: *app
+    command: [python, /app/containers/frontend.py]
+    environment:
+      DJANGO_DEBUG: 'false'
+      DJANGO_COOKIE_SECURE: 'false'
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      SPRING_BOOT_API_BASE_URL: http://127.0.0.1:8088
+      PUBLIC_EVM_RPC_URL: http://127.0.0.1:8548
+      FOLIOLET_SHARE_MODE: local
+      FOLIOLET_MANAGED_WATCHER: 'true'
+      FOLIOLET_HOST_INTAKE_FOLDER: ${FOLIOLET_INTAKE_DIR:-~/Downloads/Foliolet Intake}
+    volumes:
+      - app-state:/app/.local-data
+      - pairings:/pairings
+    depends_on:
+      trust-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, /app/containers/health.py, frontend]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  watcher:
+    <<: *app
+    command: [python, /app/containers/watcher.py]
+    volumes:
+      - pairings:/pairings
+      - watcher-state:/watcher-state
+      - type: bind
+        source: ${FOLIOLET_INTAKE_DIR:?Use ./foliolet up to create the dedicated intake folder}
+        target: /host/intake/documents-inbox
+        read_only: true
+        bind: {create_host_path: false}
+    depends_on:
+      init: {condition: service_completed_successfully}
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, 'import pathlib,time; assert time.time()-pathlib.Path("/watcher-state/heartbeat").stat().st_mtime<20']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  test-runner:
+    <<: *app
+    image: ${FOLIOLET_TEST_IMAGE:-foliolet-test:mac}
+    build:
+      context: .
+      dockerfile: containers/Dockerfile
+      target: acceptance
+    profiles: [test]
+    restart: 'no'
+    command: [python, /app/containers/test_stack.py]
+    volumes:
+      - app-state:/app/.local-data
+      - db-secret:/run/foliolet-secrets:ro
+      - type: bind
+        source: ${FOLIOLET_INTAKE_DIR:?Set intake folder}
+        target: /test-intake
+        bind: {create_host_path: false}
+    depends_on:
+      frontend: {condition: service_healthy}
+      watcher: {condition: service_healthy}
+
+volumes:
+  app-state:
+  database:
+  db-secret:
+  models:
+  pairings:
+  watcher-state:

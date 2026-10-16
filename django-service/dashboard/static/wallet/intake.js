@@ -25,10 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
           const body = await response.json();
           throw new Error(body.error || 'Pairing failed. Sign in and check the folder.');
         }
-        const blob = await response.blob();
-        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'foliolet-intake.json';
-        link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-        status.textContent = 'Pairing file downloaded. Start the local companion, then download to your chosen folder. Watching expires after ten minutes.';
+        if (intake.dataset.managed === 'yes') {
+          const body = await response.json();
+          if (!body.managed) throw new Error('Managed watcher did not accept this session.');
+          status.textContent = 'Connecting the folder watcher. Download to your Foliolet Intake folder; watching expires after ten minutes.';
+        } else {
+          const blob = await response.blob();
+          const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'foliolet-intake.json';
+          link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          status.textContent = 'Pairing file downloaded. Start the local companion, then download to your chosen folder. Watching expires after ten minutes.';
+        }
         await refresh();
       } catch (e) { status.textContent = e.message + ' Manual upload remains available.'; }
       finally { button.disabled = false; }

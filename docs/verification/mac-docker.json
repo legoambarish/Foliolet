@@ -1,0 +1,18 @@
+{
+  "branch": "codex/macos-docker",
+  "base": "db55c2c6c1209e567713fa9ab08c5441bd55bc86",
+  "localHost": "Windows",
+  "localChecks": {
+    "django": {"passed": 80},
+    "watcher": {"passed": 11},
+    "ocrWorker": {"passed": 4},
+    "privateControl": {"passed": 6, "skipped": 1, "skipReason": "Windows symlink permission unavailable"},
+    "bashSyntax": "PASS",
+    "composeConfiguration": "PASS"
+  },
+  "dockerOnWindows": "UNAVAILABLE: Docker Desktop Linux engine socket is absent; no reset/cleanup attempted",
+  "remoteCi": "PENDING FIRST BRANCH PUSH",
+  "physicalMacDockerDesktop": "NOT TESTED",
+  "authenticDigiLockerDocuments": "NOT TESTED",
+  "physicalNfc": "NOT TESTED"
+}
