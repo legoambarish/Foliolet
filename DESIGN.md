@@ -65,7 +65,7 @@ Medium-high, like a well-set form rather than a marketing page.
 ## 4. Color roles
 
 Two themes share every role: **light** (paper on a desk) and **dark** (the same desk at night,
-not a neon inversion). The masthead switch offers Light / Dark / Auto; Auto follows the
+not a neon inversion). The theme switch (sidebar foot, or the masthead on public pages) offers Light / Dark / Auto; Auto follows the
 system. The choice is stored per browser (`theme.js`, loaded in `<head>` so there is no flash).
 Light values are below; the dark set redefines the same tokens under `:root[data-theme="dark"]`
 and `prefers-color-scheme: dark`. Colors are roles, not decoration; the CSS custom properties
@@ -143,12 +143,13 @@ Titles use weight 500, never bold.
 
 ## 7. Geometry, surfaces and depth
 
-- **Radius:** sheets, slips, lists and the ledger `10px`; controls `6px`; mark glyphs and
-  redaction bars `3–5px`. Softened, never pill-shaped: status marks stay glyph-plus-word, not
-  capsules. Circles are reserved for the stepper dot.
+- **Radius:** sheets, slips, lists and the ledger `14px`; home tiles `16px`; controls `10px`;
+  status marks `6px`; redaction bars `3px`. Softened, never pill-shaped. Circles are reserved
+  for the stepper dot.
 - **Levels:**
   - 0 desk: flat, no border.
-  - 1 sheet: `--sheet` fill, 1px `--rule-strong` edge, shadow `0 1px 0 rgb(27 29 33 / 5%), 0 2px 6px rgb(27 29 33 / 5%)`.
+  - 1 sheet: `--sheet` fill, 1px `--rule` edge, shadow `--lift` (`0 1px 2px rgb(27 29 33 / 5%)`).
+    Hover-able cards (tiles, open grants) rise to `--lift-hover`; nothing glows.
   - Wells: `--desk-deep` fill, no shadow (recessed).
   - Nothing floats above a sheet. There are no modals; confirmation happens inline with
     `<details>` or a dedicated step.
@@ -157,11 +158,17 @@ Titles use weight 500, never bold.
 
 ## 8. Navigation
 
-- A sticky **masthead** strip with a 3px seal rule along its top edge, not a sidebar. Three destinations matter: **Documents**,
-  **Shared**, **First-seen**. The wordmark is on the left and the account on the right.
-  Current page uses `aria-current` with a 2px seal underline.
-- Under 720px the destinations sit in a scrollable row beneath the wordmark. All three
-  stay visible; there is no hamburger.
+- Signed-in pages use a **left sidebar** (`base.html`, `shell.js`): wordmark, then **Home**,
+  **Documents**, **Upload**, **Ask Foli**, **Shared**, **First-seen**; the theme switch,
+  account and Sign out (a POST form) sit at the foot. The current page uses `aria-current`
+  with a raised `--nav-active` row and a seal icon.
+- The sidebar collapses to a 72px icon rail (`html[data-sidebar="collapsed"]`, stored in
+  `localStorage` and applied before first paint by `theme.js`). Icons never move between
+  states; labels fade and are revealed again as tooltips on hover and keyboard focus.
+- Under 900px the sidebar becomes a drawer opened from a slim top bar. Escape, the scrim
+  and the close button dismiss it; the page behind is `inert` while it is open.
+- Home (`/`) is the product home: the large mark-and-wordmark lockup, three real counts,
+  four quick-access tiles, then the full document register at `#documents`.
 - Detail pages carry a single breadcrumb link back to their list.
 - Public verification uses a stripped masthead: wordmark plus "Disclosure verification",
   and no account navigation.
@@ -237,8 +244,16 @@ Horizontal steps: **Uploaded · Facts confirmed · Anchored · Shareable**. Term
 replace the last step: *Revoked* (fail), *Superseded* (quiet, with link to replacement).
 The current step uses a seal dot; completed steps use a filled ink dot.
 
+### Status marks (`.mark`)
+A compact tag: 6px radius, glyph plus word, wrapping cleanly in groups (`.intake-labels`).
+Tone comes only from the class the server or script assigns, never from the styling:
+`pass` (check, green wash), `fail` (cross, red wash), `caution` (!, amber wash), `seal`
+(filled dot, seal wash), `quiet` (dash, outline only) and `none` (dashed ring and dashed
+outline, "Not established"). Glyphs are same-origin SVG masks in `static/wallet/icons/`.
+Neutral and not-established states stay unfilled, so the few washed marks carry meaning.
+
 ### Notices (`.notice`)
-Inline, full-width, 3px left edge in the status color, wash fill, text in ink. `.info`
+Inline, full-width, 1px edge and wash in the status colour, a leading status glyph, text in ink. `.info`
 (seal) is for explanations of platform behavior, never for results.
 `role="status"` for results and `role="alert"` for errors. The variants are `.success`,
 `.warning`, `.error` and a neutral base. Notices explain consequences ("Revocation is
@@ -283,8 +298,12 @@ Trust words are exact: *passed*, *failed*, *not run*, *service-reported*,
 ## 11. Motion
 
 Motion explains change; it never loops or decorates.
-- **Arrival:** the page rises 8px and fades in once (360ms). List rows, fact lines, grants
-  and ledger rows follow in a short stagger (40ms steps, capped at 320ms).
+- **Navigation:** same-origin page loads cross-fade with a 6px settle (CSS
+  `@view-transition`, progressive enhancement; ordinary links and forms, no client routing).
+  The sidebar is a named transition group, so it stays still while the page changes.
+- **Arrival:** list rows, fact lines, grants, ledger rows and home tiles follow in a short
+  stagger (30–40ms steps, capped at 260ms). The home mark's bars draw in once.
+- **Sidebar:** width and content offset ease together over 280ms; labels fade first.
 - **Progress:** completed lifecycle segments draw left-to-right in seal.
 - **State:** ledger marks pop (scale) when the browser check sets them; the composer's
   slip lines slide in and redaction bars collapse one-for-one as facts are chosen.
@@ -293,7 +312,7 @@ Motion explains change; it never loops or decorates.
 - **Theme change:** colors cross-fade for 280ms.
 - Durations stay 140–520ms with ease-out curves. All animations use `backwards` fill, so no
   final state is held after they finish. `prefers-reduced-motion: reduce` removes every
-  transition and animation.
+  transition, animation and view transition.
 
 ## 12. Responsive behavior
 
