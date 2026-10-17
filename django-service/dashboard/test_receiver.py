@@ -212,6 +212,21 @@ class PublicationTests(TestCase):
 
 
 class TunnelTests(SimpleTestCase):
+    def test_control_key_initializes_fresh_clone_directory_and_is_retained(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "fresh" / "receiver"
+            with patch.object(tunnel, "STATE_DIR", state):
+                key = tunnel.control_key()
+                self.assertRegex(key, r"^[0-9a-f]{64}$")
+                self.assertEqual(tunnel.control_key(), key)
+                self.assertEqual((state / "control.key").read_text(), key)
+
+    @patch.dict(os.environ, {"WALLET_SHARE_BASE_URL": "http://localhost:8008"})
+    def test_isolated_desktop_share_origin_is_validated(self):
+        self.assertEqual(tunnel.share_path("http://localhost:8008" + PATH), PATH)
+        with self.assertRaises(tunnel.TunnelError):
+            tunnel.share_path("http://localhost:8009" + PATH)
+
     def test_origin_and_token_validation(self):
         self.assertEqual(tunnel.validate_origin(ORIGIN), ORIGIN)
         self.assertEqual(tunnel.validate_origin("https://proofs.example.com", quick=False), "https://proofs.example.com")

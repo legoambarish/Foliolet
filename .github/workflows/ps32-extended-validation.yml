@@ -1,0 +1,129 @@
+name: PS32 extended independent validation
+on:
+  push:
+    branches: [feature/ps32-final-winning-audit-20261016-1645]
+    paths: ['.github/workflows/ps32-extended-validation.yml']
+permissions:
+  contents: read
+jobs:
+  local-model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Install verified runtime and public model in disposable storage
+        run: |
+          set -euo pipefail
+          mkdir -p audit-evidence "$RUNNER_TEMP/ollama" "$RUNNER_TEMP/ollama-home" "$RUNNER_TEMP/models"
+          curl --fail --location --retry 3 https://github.com/ollama/ollama/releases/download/v0.40.5/ollama-linux-amd64.tar.zst -o "$RUNNER_TEMP/ollama.tar.zst"
+          echo "dc5eabc292f9949546c90a97c820f924b035e05243b0de13c7f366182562169c  $RUNNER_TEMP/ollama.tar.zst" | sha256sum --check
+          tar --zstd -xf "$RUNNER_TEMP/ollama.tar.zst" -C "$RUNNER_TEMP/ollama"
+          rm "$RUNNER_TEMP/ollama.tar.zst"
+          export PATH="$RUNNER_TEMP/ollama/bin:$PATH" HOME="$RUNNER_TEMP/ollama-home" OLLAMA_MODELS="$RUNNER_TEMP/models" OLLAMA_HOST=127.0.0.1:11434 OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1
+          ollama serve > "$RUNNER_TEMP/model-download.log" 2>&1 & pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/version > audit-evidence/ollama-version.json && break; sleep 1; done
+          ollama pull qwen3:4b-instruct > audit-evidence/model-pull.txt 2>&1
+          curl -fsS http://127.0.0.1:11434/api/tags > audit-evidence/model-inventory.json
+          kill "$pid"; wait "$pid" || true; trap - EXIT
+          (cd spring-boot-service && bash mvnw -B -ntp -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/model.classpath) > audit-evidence/model-java-build.txt 2>&1
+          git rev-parse HEAD > audit-evidence/HEAD.txt
+      - name: Real inference with no external network interface
+        id: model
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          export PS32_PYTHON="$(command -v python)" PS32_JAVA="$(command -v java)"
+          sudo env -i PATH="$RUNNER_TEMP/ollama/bin:/usr/sbin:/usr/bin:/bin" HOME="$RUNNER_TEMP/ollama-home" OLLAMA_MODELS="$RUNNER_TEMP/models" OLLAMA_HOST=127.0.0.1:11434 OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ROOT="$GITHUB_WORKSPACE" PYTHON="$PS32_PYTHON" JAVA="$PS32_JAVA" unshare --net bash -c '
+            set -euo pipefail
+            ip link set lo up
+            cd "$ROOT"
+            ip -json address > audit-evidence/offline-interfaces.json
+            ollama serve > audit-evidence/ollama-offline.log 2>&1 & pid=$!
+            trap '\''kill "$pid" 2>/dev/null || true'\'' EXIT
+            for n in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/status > audit-evidence/offline-status.json && break; sleep 1; done
+            /usr/bin/time -v "$PYTHON" tools/benchmark-foli-models.py --models qwen3:4b-instruct --output audit-evidence/real-model.json > audit-evidence/model-cases.txt 2> audit-evidence/model-process-resources.txt
+            cp="spring-boot-service/target/test-classes:spring-boot-service/target/classes:$(cat spring-boot-service/target/model.classpath)"
+            "$JAVA" -Xmx512m -cp "$cp" com.sih26190.dms.foli.LocalModelAcceptanceMain audit-evidence/real-foli-transport.json > audit-evidence/real-foli-transport.txt 2>&1
+          '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ps32-real-local-model-${{ github.sha }}
+          path: audit-evidence/
+          retention-days: 14
+      - name: Require recorded real-model success
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          report=json.load(open('audit-evidence/real-model.json'))
+          assert report['models'] and all(m.get('passed')==m.get('total')==10 for m in report['models']), 'Keep actual negative cases; do not weaken the rubric'
+          assert json.load(open('audit-evidence/real-foli-transport.json'))['allPassed']
+          PY
+  supply-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Collect actual dependency and static findings without treating warnings as fixes
+        run: |
+          set -euo pipefail
+          mkdir -p audit-evidence
+          python -m pip install -r django-service/requirements.txt -r tools/requirements-ocr.txt pip-audit bandit
+          python -m pip freeze > audit-evidence/auditor-environment.txt
+          python -m pip_audit --format=json --output audit-evidence/python-audit.json > audit-evidence/python-audit.txt 2>&1 || true
+          bandit -r django-service tools -f json -o audit-evidence/bandit.json > audit-evidence/bandit.txt 2>&1 || true
+          npm ci > audit-evidence/npm-root-install.txt 2>&1
+          npm --prefix spring-boot-service ci > audit-evidence/npm-install.txt 2>&1
+          npm --prefix spring-boot-service audit --json > audit-evidence/npm-audit.json || true
+          (cd spring-boot-service && bash mvnw -B -ntp dependency:list -DoutputFile=target/dependencies.txt -DincludeScope=runtime) > audit-evidence/java-dependency-build.txt 2>&1
+          cp spring-boot-service/target/dependencies.txt audit-evidence/java-dependencies.txt
+          git ls-files > audit-evidence/tracked-files.txt
+          git rev-parse HEAD > audit-evidence/HEAD.txt
+          python - <<'PY'
+          import json, re, pathlib, requests
+          queries=[]
+          for line in pathlib.Path('audit-evidence/java-dependencies.txt').read_text().splitlines():
+              match=re.match(r'\s+([\w.\-]+):([\w.\-]+):jar:([^: ]+):(compile|runtime)',line)
+              if match:
+                  group,artifact,version,_=match.groups()
+                  queries.append({'package':{'ecosystem':'Maven','name':group+':'+artifact},'version':version})
+          assert queries, 'No dependency records were parsed'
+          # Only public dependency names and versions are sent, never source or user data.
+          try:
+              response=requests.post('https://api.osv.dev/v1/querybatch',json={'queries':queries},timeout=90);response.raise_for_status()
+              result=response.json()
+              records=[{'dependency':q,**r} for q,r in zip(queries,result['results'])]
+              pathlib.Path('audit-evidence/java-osv.json').write_text(json.dumps(records,indent=2))
+          except Exception as error:
+              pathlib.Path('audit-evidence/java-osv.json').write_text(json.dumps({'status':'UNAVAILABLE','error':type(error).__name__,'queries':queries},indent=2))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ps32-supply-chain-${{ github.sha }}
+          path: audit-evidence/
+          retention-days: 14

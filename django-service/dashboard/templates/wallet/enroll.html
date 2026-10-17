@@ -1,4 +1,4 @@
-{% extends 'wallet/base.html' %}{% load wallet_time %}
+{% extends 'wallet/base.html' %}{% load wallet_time wallet_ui %}
 {% block title %}{% if previous_id %}New version{% else %}Enroll a document{% endif %} · {{ product_label }}{% endblock %}
 {% block content %}
 {% if previous_id %}<a class="crumb" href="{% url 'dashboard:detail' previous_id %}">Current version</a>{% else %}<a class="crumb" href="{% url 'dashboard:index' %}">Documents</a>{% endif %}
@@ -13,11 +13,45 @@
   <li class="now"><span>Upload</span></li><li><span>Confirm facts</span></li><li><span>Anchor</span></li><li><span>Share</span></li>
 </ol>
 
+{% if not previous_id %}
+<section class="sheet section-tight stack" id="digilocker-intake" data-sessions="{% url 'dashboard:intake-sessions' %}" data-files="{% url 'dashboard:intake-files' %}" data-import="{% url 'dashboard:intake-file-import' %}" data-managed="{{ managed_intake|yesno:'yes,no' }}">
+  <div class="sheet-head"><h2>Bring a document from DigiLocker</h2>
+    <a class="btn line" id="open-digilocker" href="https://www.digilocker.gov.in/" target="_blank" rel="noopener noreferrer">Import from DigiLocker</a>
+  </div>
+  <p class="help">Foliolet is not affiliated with DigiLocker; sign in and download your document on the official website in the new tab. A downloaded file or a DigiLocker logo does not authenticate its origin, and the issuer remains unverified.</p>
+  <ol class="lifecycle" aria-label="Assisted import progress"><li><span>Open DigiLocker</span></li><li><span>Download to your folder</span></li><li><span>File received</span></li><li><span>Review facts</span></li></ol>
+  <details><summary>Use an optional local folder watcher</summary>
+    <p class="help section-tight">New PDF, TXT and CSV files in your chosen dedicated folder are imported while Foliolet is running, until you choose Stop watching. Subfolders are included. Keep other personal downloads elsewhere.</p>
+    <form method="post" action="{% url 'dashboard:intake-pair' %}" id="intake-arm" class="section-tight">
+      {% csrf_token %}
+      <div class="field"><label for="intake-folder">Import folder</label><input id="intake-folder" name="folder" value="{{ intake_folder }}" required maxlength="500" {% if managed_intake %}readonly{% endif %}></div>
+      {% if managed_intake %}<p class="help">This is your mounted Foliolet Intake folder. The watcher connects automatically after you enable it and resumes with Foliolet. No pairing download or terminal command is needed.</p>{% endif %}
+      <label class="check"><input type="checkbox" name="consent" value="yes" required><span>I allow new documents in this folder to be imported while Foliolet is running, until I stop watching.</span></label>
+      <div class="form-foot"><button class="btn line small">Enable folder intake</button><button class="btn quiet small" id="intake-stop" type="button" disabled>Stop watching</button></div>
+    </form>
+    <p class="help" id="intake-connection" role="status" aria-live="polite">Local watcher not connected. Manual upload is always available.</p>
+    {% if not managed_intake %}<details class="section-tight"><summary>Start the local companion</summary>
+      <p class="help">The enable button downloads a pairing file. From this feature checkout, run the command below once, then download your document into the selected folder. There is no timer; the watcher stops with Foliolet and resumes on its next launch unless you choose Stop watching.</p>
+      <pre class="wrap-any">.\tools\start-digilocker-watcher.ps1 -Background</pre>
+      <p class="help">Create the folder first. The launcher uses the latest Foliolet pairing download, or asks you to pick it if it was renamed. Setup instructions are in docs/DIGILOCKER_ASSISTED_INTAKE_RUNBOOK.md.</p>
+    </details>{% endif %}
+  </details>
+  <section class="tracked-folder" aria-labelledby="tracked-files-heading">
+    <div class="tracked-heading"><h3 id="tracked-files-heading">Documents in your watched folder</h3><span class="tracked-count" id="intake-file-count">0 files</span></div>
+    <p class="help">Newest files appear first. Select a document to import it and review its facts.</p>
+    <p class="tracked-feedback" id="intake-file-feedback" role="status" aria-live="polite">Checking your watcher…</p>
+    <p class="help" id="intake-files-empty">Enable a folder watcher to see its documents here.</p>
+    <ul id="intake-files" class="tracked-files" aria-label="Documents in the current watched folder"></ul>
+  </section>
+  <a class="text-btn" href="#file" id="manual-import">Choose a file manually</a>
+</section>
+{% endif %}
+
 <div class="work section">
   <form class="sheet" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <div class="field">
-      <label for="file">Original document</label>
+        <label for="file">Upload normally · original document</label>
       <div class="file-drop">
         <input id="file" type="file" name="file" required aria-describedby="file-help">
         <span class="help" id="file-help">Up to 20 MB. For PDF, text and CSV files, facts are suggested automatically; for other formats you enter them yourself.</span>
@@ -61,3 +95,4 @@
   </aside>
 </div>
 {% endblock %}
+{% block scripts %}<script src="{% asset 'wallet/intake.js' %}" defer></script>{% endblock %}

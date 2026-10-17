@@ -6,6 +6,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,10 +47,24 @@ public class AiAnalysisService {
     @Value("${openrouter.model}")
     private String openRouterModel;
 
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    @Value("${dms.external-ai-enabled:false}")
+    private boolean externalAiEnabled;
 
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
+
+    /** Legacy callers never imply consent to transmit a private source document. */
     public AiAnalysisResponse analyze(Long documentId, User requester) {
+        return analyze(documentId, requester, false);
+    }
+
+    public AiAnalysisResponse analyze(Long documentId, User requester, boolean explicitCloudConsent) {
+        // Guard before reading the source or touching a network client. An empty key
+        // is not a privacy boundary: a rejected HTTP request still sends its body.
+        if (!externalAiEnabled || !explicitCloudConsent || openRouterApiKey == null || openRouterApiKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "External document analysis is disabled. Local Foli remains available.");
+        }
         DocumentRecord document = documentRecordRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 
@@ -110,19 +129,22 @@ public class AiAnalysisService {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://openrouter.ai/api/v1/chat/completions"))
+                .timeout(Duration.ofSeconds(45))
                 .header("Authorization", "Bearer " + openRouterApiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("OpenRouter returned status " + response.statusCode() + ": " + response.body());
+        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        try (InputStream input = response.body()) {
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("External analysis provider rejected the request");
+            }
+            byte[] body = input.readNBytes(1024 * 1024 + 1);
+            if (body.length > 1024 * 1024) throw new IllegalStateException("External analysis response exceeds its size limit");
+            JsonNode root = objectMapper.readTree(new String(body, StandardCharsets.UTF_8));
+            return root.at("/choices/0/message/content").asText();
         }
-
-        JsonNode root = objectMapper.readTree(response.body());
-        return root.at("/choices/0/message/content").asText();
     }
 
     private String buildPrompt(String documentText) {

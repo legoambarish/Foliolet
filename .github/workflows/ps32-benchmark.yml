@@ -1,0 +1,102 @@
+name: PS32 controlled document evaluation
+on:
+  push:
+    branches: [feature/ps32-final-winning-audit-20261016-1645]
+    paths: ['.github/workflows/ps32-benchmark.yml', 'tools/ps32-benchmark.py', 'tools/ps32-public-corpus.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ps32-controlled-document-evaluation
+  cancel-in-progress: false
+jobs:
+  evaluate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      PYTHONUNBUFFERED: '1'
+      MAVEN_OPTS: '-Xmx1536m'
+      FOLI_OLLAMA_URL: http://127.0.0.1:11444
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Prepare frozen corpus and identical local engines
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p audit-evidence
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
+          python -m pip install -r tools/requirements-foli-test.txt -r tools/requirements-ocr.txt psutil==7.0.0 requests==2.32.5
+          python tools/make-ocr-benchmark.py
+          echo "FOLI_LAYOUT_PYTHON=$(command -v python)" >> "$GITHUB_ENV"
+          echo "FOLI_LAYOUT_SCRIPT=$GITHUB_WORKSPACE/tools/ocr-layout-worker.py" >> "$GITHUB_ENV"
+          git worktree add --detach "$RUNNER_TEMP/ps32-before" db55c2c6c1209e567713fa9ab08c5441bd55bc86
+          git rev-parse HEAD > audit-evidence/after-HEAD.txt
+          git -C "$RUNNER_TEMP/ps32-before" rev-parse HEAD > audit-evidence/before-HEAD.txt
+          sha256sum tools/ocr-layout-worker.py "$RUNNER_TEMP/ps32-before/tools/ocr-layout-worker.py" > audit-evidence/engine-source-hashes.txt
+          python -m pip freeze > audit-evidence/python-freeze.txt
+          { java -version; tesseract --version; free -b; nproc; } > audit-evidence/environment.txt 2>&1
+          cp .local-data/ocr-p0/cases.json audit-evidence/synthetic-cases.json
+      - name: Compile both actual repository revisions
+        run: |
+          set -euo pipefail
+          for root in "$RUNNER_TEMP/ps32-before" "$GITHUB_WORKSPACE"; do
+            (cd "$root/spring-boot-service" && bash mvnw -B -ntp -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/ocr-benchmark.classpath)
+          done > audit-evidence/builds.txt 2>&1
+      - name: Baseline synthetic accuracy and resources
+        id: before
+        continue-on-error: true
+        run: python tools/ps32-benchmark.py --source "$RUNNER_TEMP/ps32-before" --cases .local-data/ocr-p0/cases.json --case-root "$GITHUB_WORKSPACE" --out audit-evidence/before > audit-evidence/before.txt 2>&1
+      - name: Repaired synthetic accuracy and resources
+        id: after
+        continue-on-error: true
+        run: python tools/ps32-benchmark.py --source "$GITHUB_WORKSPACE" --cases .local-data/ocr-p0/cases.json --case-root "$GITHUB_WORKSPACE" --out audit-evidence/after > audit-evidence/after.txt 2>&1
+      - name: Obtain licensed public calibration and held-out cases
+        id: corpus
+        continue-on-error: true
+        run: python tools/ps32-public-corpus.py > audit-evidence/public-corpus.txt 2>&1
+      - name: Real receipt generalization stress test
+        id: real
+        if: steps.corpus.outcome == 'success'
+        continue-on-error: true
+        run: python tools/ps32-benchmark.py --source "$GITHUB_WORKSPACE" --cases .local-data/ps32-cord/cases.json --case-root "$GITHUB_WORKSPACE" --out audit-evidence/real-receipts > audit-evidence/real-receipts.txt 2>&1
+      - name: Record exact boundaries and negative results
+        if: always()
+        env:
+          BEFORE: ${{ steps.before.outcome }}
+          AFTER: ${{ steps.after.outcome }}
+          CORPUS: ${{ steps.corpus.outcome }}
+          REAL: ${{ steps.real.outcome }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil
+          out=pathlib.Path('audit-evidence');out.mkdir(exist_ok=True)
+          status={key:os.environ[key] for key in ('BEFORE','AFTER','CORPUS','REAL')}
+          (out/'outcomes.json').write_text(json.dumps(status,indent=2))
+          source=pathlib.Path('.local-data/ps32-cord')
+          if source.exists():shutil.copytree(source,out/'public-cord',dirs_exist_ok=True)
+          # Scratch folders are transient render/model inputs, never evidence.
+          for scratch in out.glob('*/scratch'):
+              if scratch.is_dir():shutil.rmtree(scratch)
+          print(json.dumps(status,indent=2))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ps32-document-evaluation-${{ github.sha }}
+          path: audit-evidence/
+          retention-days: 14
+      - name: Require completed evaluation phases
+        if: always()
+        run: python -c "import json; r=json.load(open('audit-evidence/outcomes.json')); assert all(v=='success' for v in r.values()),r"

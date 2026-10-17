@@ -141,6 +141,9 @@ class FoliQaTest {
       assertEquals("object",generalBody.path("format").path("type").asText());
       assertEquals("string",generalBody.path("format").path("properties").path("answer").path("type").asText());
       assertEquals("answer",generalBody.path("format").path("required").get(0).asText());
+      model.ask("s","p",false);
+      assertFalse(json.readTree(requests.get(2)).hasNonNull("format"),
+          "Unstructured requests must not inherit a boolean format from model defaults");
       assertFalse(model.promptFits("s","x".repeat(8192)));
       assertEquals("CONTEXT_LIMIT",assertThrows(FoliException.class,() -> model.ask("s","x".repeat(8192),true)).code());
     } finally { server.stop(0); }

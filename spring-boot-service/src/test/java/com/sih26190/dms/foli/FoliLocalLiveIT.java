@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class FoliLocalLiveIT {
   @Test void realOllamaInferenceWithNonLoopbackJavaNetworkingDenied() throws Exception {
     var config=new FoliProperties(); config.setOutputTokens(180);
+    config.setOllamaUrl(System.getenv().getOrDefault("FOLI_OLLAMA_URL",config.getOllamaUrl()));
     var model=new FoliLocalModel(config);
     assertEquals("READY",model.health().get("status"),"Start the documented local cloud-disabled runtime first");
     SecurityManager previous=System.getSecurityManager(); var denied=new AtomicInteger();

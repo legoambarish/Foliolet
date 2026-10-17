@@ -1,0 +1,716 @@
+{
+  "generatedAt": "2026-10-16T16:22:07.781506+00:00",
+  "branch": "feature/digilocker-assisted-intake",
+  "baseCommit": "6db30e1520211b0dae88c8b47200a9ed1b6089c7",
+  "result": "PASS",
+  "runtime": {
+    "OS": "Windows",
+    "shell": "Windows PowerShell 5.1",
+    "Java": 17,
+    "Python": "3.12",
+    "Django": "6.1",
+    "OCR": "Tesseract + RapidOCR 3.10.0 / ONNX Runtime 1.31.0",
+    "localModel": "qwen3:4b-instruct; cloud disabled",
+    "compactModelBytes": 31749509
+  },
+  "suiteCounting": "Counts are each suite own cases or acceptance checks; contract gate and concurrent status IO are one gate each. Do not count 101 status updates or benchmark fields as 101 tests.",
+  "suites": [
+    {
+      "name": "Java unit",
+      "result": "PASS",
+      "count": 108,
+      "counts": {
+        "tests": 108,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "command": "spring-boot-service/mvnw.cmd -q -f spring-boot-service/pom.xml package",
+      "evidence": [
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.DmsApplicationTests.xml",
+          "sha256": "a045a79e933131e1f428b3a56f69035c426d5d366387ff7d021a574fedbd8b78"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliAuthorizationTest.xml",
+          "sha256": "0bfb01b6e4c7740e747001187ab4e9b68ffd6ac37f24d30b7ee22395182e1b4a"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliQaTest.xml",
+          "sha256": "cc682a760691e643aba438afc18f20ad5d63c4d467ada8aba2acd4efbddd37e5"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliReaderTest.xml",
+          "sha256": "3c60b2d25985a3221aaa06b969d6569a0419945a85c5389b5472c2af912640ed"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliReadingTest.xml",
+          "sha256": "38d60abd80965a0108b1c8b8f02b10b6dce61a2cb34de31ec5569a42e19f620c"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliReviewTest.xml",
+          "sha256": "cb8ab4c948ec0a98fc83a7e937fac29693dd389786069851be21a2e8531e0425"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.IntakeIndicatorsTest.xml",
+          "sha256": "6aaf61e5c815fd27a4588d87d34a47469733466d53433aeef754a6ce485c1852"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.intake.FactSuggestionsTest.xml",
+          "sha256": "7d7f513b0366ef7f40f0975f07879c2dcb20247487114aa7a894254a673a4872"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.intake.IntakeWorkflowTest.xml",
+          "sha256": "6d099f390fe95b896d0c54c7597b88e14d592cedb550d460006541adce177b6b"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.intake.LayoutFactsTest.xml",
+          "sha256": "97c6d8fb570b7b1e41cc1d34858eca4ea4608939376fd7e2810ad85774f97586"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.selective.FieldScanParserTest.xml",
+          "sha256": "f47261521f0b4187a326bff716e8c7af58bb4605eedc76ce417e5f38c08287c6"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.selective.MerkleTreeServiceTest.xml",
+          "sha256": "ddd1bbbba7d7eceafa10708f6ce01f8292ba05409c5d5ea5b8b8da93bfa0c145"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.selective.UsernameUniquenessTest.xml",
+          "sha256": "e63437df55fcecb1056dc2d98ec9cafcff3caf9550232f6f552fba47e00c9d61"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.selective.WalletWorkflowTest.xml",
+          "sha256": "cfbb3271dba3d6adc84115a34236873ef5bca9c869166e411db147e6f5715822"
+        }
+      ]
+    },
+    {
+      "name": "Java live",
+      "result": "PASS",
+      "count": 7,
+      "counts": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "command": "spring-boot-service/mvnw.cmd -q -f spring-boot-service/pom.xml -Dtest=FoliLocalLiveIT,FoliOcrLiveIT,IntakeOcrLiveIT,IntakeLocalLiveIT test",
+      "evidence": [
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliLocalLiveIT.xml",
+          "sha256": "4874be85b3c5cd2877920bf87c28f05cbad9a75a6134590e5c0d2fa1fd99d582"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.FoliOcrLiveIT.xml",
+          "sha256": "5cd987ed1d3776a0ebd779797b9b5eb367d6187421976fdc7ad3cd343850811c"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.foli.IntakeOcrLiveIT.xml",
+          "sha256": "afd13292423925d4ad74d75d96c649e3537587f631f621a4ef9665c932cef3a9"
+        },
+        {
+          "localArtifact": "spring-boot-service/target/surefire-reports/TEST-com.sih26190.dms.intake.IntakeLocalLiveIT.xml",
+          "sha256": "236365d3348b079f22f5b5aa9415fd7ec5d998314a2fda3a5db63b638dd5951d"
+        }
+      ]
+    },
+    {
+      "name": "Django",
+      "command": ".venv/Scripts/python.exe django-service/manage.py test dashboard",
+      "result": "PASS",
+      "count": 74,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/django-final.log",
+          "sha256": "a2336e3518661cfa7e530d92dfa673314e08c5a676cae73ff63f0ed2fbdfd850"
+        }
+      ]
+    },
+    {
+      "name": "Recursive watcher",
+      "command": ".venv/Scripts/python.exe tools/test-intake-watcher.py",
+      "result": "PASS",
+      "count": 11,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/watcher.log",
+          "sha256": "14190f39992c511e915886bfea40dcd4875c9053e997ddeed3de140985ac72c4"
+        }
+      ]
+    },
+    {
+      "name": "PowerShell companion",
+      "command": ".venv/Scripts/python.exe tools/test-intake-launcher.py",
+      "result": "PASS",
+      "count": 3,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/launcher.log",
+          "sha256": "346fdb69c503d3e6890a9d07454a109d521915d86d015f69d38fa33665f23b37"
+        }
+      ]
+    },
+    {
+      "name": "Node proof/security/UI/QR",
+      "command": "node --test spring-boot-service/scripts/test-proof-security.cjs spring-boot-service/scripts/test-verifier-ui.cjs tools/test-share-qr.cjs",
+      "result": "PASS",
+      "count": 23,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/node-final.log",
+          "sha256": "f595f9b035a1d2f0c39adecf9f221e5302396ee9270c386a5ce104e0911e50dd"
+        }
+      ]
+    },
+    {
+      "name": "Registry contract gate",
+      "command": "node spring-boot-service/scripts/test-contracts.cjs",
+      "result": "PASS",
+      "count": 1,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/contracts.log",
+          "sha256": "9e1578c9625a5f47c9cd8aa6ce8a7b5d597ad105295ff17b7bbd45f5d214aab9"
+        }
+      ]
+    },
+    {
+      "name": "Compact OCR boundaries",
+      "command": ".venv/Scripts/python.exe tools/test-ocr-layout-worker.py",
+      "result": "PASS",
+      "count": 4,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/worker-tests.log",
+          "sha256": "d53e415a3a7b369180124642517560633b6d279987b06a8009f88815016752c0"
+        }
+      ]
+    },
+    {
+      "name": "CSV manual fallback",
+      "command": ".venv/Scripts/python.exe tools/test-intake-live.py --formats-only",
+      "result": "PASS",
+      "count": 3,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/csv-final.log",
+          "sha256": "4bbc33a036ec05631a87ad316d205aeaa7e8fde0427f1e4821a7c93e6fc2a930"
+        }
+      ]
+    },
+    {
+      "name": "Packaged Boot reader",
+      "command": ".venv/Scripts/python.exe tools/test-foli-packaged-reader.py",
+      "result": "PASS",
+      "count": 1,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/packaged-final.log",
+          "sha256": "47622b3e73f71e7369725c06a38dc099d2af21d80b8a3fec3f3adace0d95560f"
+        }
+      ]
+    },
+    {
+      "name": "Concurrent desktop status IO",
+      "command": ".venv/Scripts/python.exe tools/test-foliolet-desktop.py --status-io-only",
+      "result": "PASS",
+      "count": 1,
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/status-io-final.log",
+          "sha256": "50c0acdacd9bc1b83fbb03516a568a783251072893e2b6065f5089a02c717c5b"
+        }
+      ]
+    },
+    {
+      "name": "Live intake, Foli and disclosure",
+      "command": ".venv/Scripts/python.exe tools/test-intake-live.py",
+      "result": "PASS",
+      "count": 46,
+      "checks": [
+        {
+          "name": "Existing local Qwen model is ready; no model downloaded",
+          "result": "PASS"
+        },
+        {
+          "name": "Private session API requires holder authentication",
+          "result": "PASS"
+        },
+        {
+          "name": "Capability rejects browser Origin, full-wallet access and cross-owner stop",
+          "result": "PASS"
+        },
+        {
+          "name": "Real recursive companion heartbeat connects to armed session",
+          "result": "PASS"
+        },
+        {
+          "name": "Partial browser download and pre-existing files are ignored",
+          "result": "PASS"
+        },
+        {
+          "name": "Finished recursive rename imports one document automatically",
+          "result": "PASS"
+        },
+        {
+          "name": "Repeated file events do not duplicate enrollment",
+          "result": "PASS"
+        },
+        {
+          "name": "Download, observation-bound upload and decrypted vault bytes match exactly",
+          "result": "PASS"
+        },
+        {
+          "name": "Copied synthetic indicators remain possible and issuer-unverified",
+          "result": "PASS"
+        },
+        {
+          "name": "Live local Ollama proposes Math 90 with deterministic source validation",
+          "result": "PASS"
+        },
+        {
+          "name": "Unavailable CGPA is never fabricated",
+          "result": "PASS"
+        },
+        {
+          "name": "Every accepted field has an owner-authorized exact source quote, page and retained-byte hash",
+          "result": "PASS"
+        },
+        {
+          "name": "Reordered canonical facts confirm as AI suggestions unchanged",
+          "result": "PASS"
+        },
+        {
+          "name": "Changing Math 90 to 95 is recorded server-side",
+          "result": "PASS"
+        },
+        {
+          "name": "Client-supplied unaltered flag and replacement baseline cannot erase edits",
+          "result": "PASS"
+        },
+        {
+          "name": "Adding a holder field changes lineage",
+          "result": "PASS"
+        },
+        {
+          "name": "Removing an AI field changes lineage",
+          "result": "PASS"
+        },
+        {
+          "name": "Explicit analysis retry preserves the immutable initial proposal",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing explicit anchor retains the original first-seen assurance class",
+          "result": "PASS"
+        },
+        {
+          "name": "Passive GET cannot release or consume a proof",
+          "result": "PASS"
+        },
+        {
+          "name": "Selective disclosure releases only the chosen committed fact",
+          "result": "PASS"
+        },
+        {
+          "name": "Independent pinned verifier accepts real chain proof and rejects altered fact value",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing share revocation remains effective",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing one-time grant rejects a second release",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing expired grant rejects release",
+          "result": "PASS"
+        },
+        {
+          "name": "Stop watching revokes the companion capability",
+          "result": "PASS"
+        },
+        {
+          "name": "Manual import works with watcher stopped",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: logo-only.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: qr-only.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: neither.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Absent indicators preserve the existing self-enrolled assurance class",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: unrelated-qr.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: last-page.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: scanned.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Scanned PDF supplies source-aligned Math 90 with OCR provenance",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: hybrid.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Hybrid PDF retains native text, OCR text and uncertainty",
+          "result": "PASS"
+        },
+        {
+          "name": "Failure retains exact original and manual fallback: malformed.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Failure retains exact original and manual fallback: protected.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Failure retains exact original and manual fallback: unsupported.docx",
+          "result": "PASS"
+        },
+        {
+          "name": "New version gets independent source-bound baseline and unassessed lineage",
+          "result": "PASS"
+        },
+        {
+          "name": "Original Foli write-shaped requests still require the private-client boundary header",
+          "result": "PASS"
+        },
+        {
+          "name": "Original general Foli chat works without fabricated document citations",
+          "result": "PASS"
+        },
+        {
+          "name": "Original document Foli chat retains exact source citations",
+          "result": "PASS"
+        },
+        {
+          "name": "Original complete fine-print review retains fee and exception evidence",
+          "result": "PASS"
+        },
+        {
+          "name": "Foli general chat, document chat and review leave wallet facts, lineage and chain unchanged",
+          "result": "PASS"
+        }
+      ],
+      "evidence": [
+        {
+          "localArtifact": ".local-data/intake-tests/live-results.json",
+          "sha256": "70a42883876d9c77cfa1db9277ece8bb652ca64dfff8eb8034b86476cf2dc286"
+        }
+      ]
+    },
+    {
+      "name": "Injected failures",
+      "command": ".venv/Scripts/python.exe tools/test-intake-failures.py",
+      "result": "PASS",
+      "count": 12,
+      "checks": [
+        {
+          "name": "Structured source facts survive a real refused local model connection",
+          "result": "PASS"
+        },
+        {
+          "name": "Model outage preserves exact encrypted original",
+          "result": "PASS"
+        },
+        {
+          "name": "Holder confirmation remains available during model outage with server-side removal tracking",
+          "result": "PASS"
+        },
+        {
+          "name": "Missing OCR is explicit; independent QR can remain possible without invented facts",
+          "result": "PASS"
+        },
+        {
+          "name": "Local model preflight rejects missing without inference",
+          "result": "PASS"
+        },
+        {
+          "name": "Local model preflight rejects oversized without inference",
+          "result": "PASS"
+        },
+        {
+          "name": "Local model preflight rejects cloud without inference",
+          "result": "PASS"
+        },
+        {
+          "name": "Forged model cell references cannot invent a field or supply a value",
+          "result": "PASS"
+        },
+        {
+          "name": "Delayed local inference times out without a baseline or lost upload",
+          "result": "PASS"
+        },
+        {
+          "name": "Real backend restart marks an interrupted job and retains its original",
+          "result": "PASS"
+        },
+        {
+          "name": "Owner retry after restart can create a source-bound proposal; model-supplied values are ignored",
+          "result": "PASS"
+        },
+        {
+          "name": "Oversized upload is refused before enrollment",
+          "result": "PASS"
+        }
+      ],
+      "evidence": [
+        {
+          "localArtifact": ".local-data/intake-tests/failure-results.json",
+          "sha256": "ff27617e20a8054194782f11a0d665c9ced79a0934fccf2d63e436592d551921"
+        }
+      ]
+    },
+    {
+      "name": "Existing Edge intake UI",
+      "command": "node tools/test-intake-ui.cjs",
+      "result": "PASS",
+      "count": 11,
+      "checks": [
+        {
+          "name": "Official HTTPS action opens a separate tab without an opener; closing it preserves the local form",
+          "result": "PASS"
+        },
+        {
+          "name": "Desktop enrollment shows honest disconnected state and normal file picker",
+          "result": "PASS"
+        },
+        {
+          "name": "390px enrollment fits both actual light and dark palettes",
+          "result": "PASS"
+        },
+        {
+          "name": "CSRF-protected UI pairing downloads scoped configuration; Stop revokes it",
+          "result": "PASS"
+        },
+        {
+          "name": "Real Django intake POST rejects missing CSRF token",
+          "result": "PASS"
+        },
+        {
+          "name": "Real Ollama fields populate review rows with Math 90, source quote and immediate edited preview",
+          "result": "PASS"
+        },
+        {
+          "name": "Owner can open the exact retained original PDF page from a suggested fact",
+          "result": "PASS"
+        },
+        {
+          "name": "390px light and dark review has no horizontal overflow with long title and several fields",
+          "result": "PASS"
+        },
+        {
+          "name": "Review exposes labeled form controls, keyboard focus and live progress to accessibility tree",
+          "result": "PASS"
+        },
+        {
+          "name": "Confirmed edit is recorded by server and shown separately from issuer status",
+          "result": "PASS"
+        },
+        {
+          "name": "Private browser workflow sends no document requests to external services and has no JavaScript errors",
+          "result": "PASS"
+        }
+      ],
+      "evidence": [
+        {
+          "localArtifact": ".local-data/intake-tests/ui-results.json",
+          "sha256": "9e1fd8fcabfa46205639a081ac263b0f64dd8766e3d894030d2a9936aea8dda6"
+        }
+      ]
+    },
+    {
+      "name": "Realistic marksheet Edge walkthrough",
+      "command": "node tools/test-ocr-intake-ui.cjs",
+      "result": "PASS",
+      "count": 5,
+      "checks": [
+        {
+          "name": "Realistic five-subject marksheet yields 19 exact source-supported facts with original-page preview",
+          "result": "PASS"
+        },
+        {
+          "name": "Holder confirms all facts, anchors, shares only Mathematics 91; independent browser verifies the chain proof",
+          "result": "PASS"
+        },
+        {
+          "name": "Scanned table has 19 review cards and no automatically accepted facts; explicit checking adds one editable value",
+          "result": "PASS"
+        },
+        {
+          "name": "Changing scanned Mathematics 91 to 95 is recorded server-side as an edit",
+          "result": "PASS"
+        },
+        {
+          "name": "Walkthrough had no JavaScript errors or document requests outside loopback",
+          "result": "PASS"
+        }
+      ],
+      "evidence": [
+        {
+          "localArtifact": ".local-data/ocr-p0/walkthrough/results.json",
+          "sha256": "e19c981a90e96dee9719cedb8e49d52aa2c443fc8ed209d7d255e0018cea9b25"
+        }
+      ]
+    },
+    {
+      "name": "Native desktop acceptance",
+      "command": ".venv/Scripts/python.exe tools/test-foliolet-desktop.py",
+      "result": "PASS",
+      "count": 8,
+      "checks": [
+        {
+          "name": "Built-in Windows PowerShell recognizes actual owned services, Python child and PostgreSQL slash paths",
+          "result": "PASS"
+        },
+        {
+          "name": "Repeated start reuses healthy services without changing their PIDs",
+          "result": "PASS"
+        },
+        {
+          "name": "Concurrent startup is refused without creating duplicate service processes",
+          "result": "PASS"
+        },
+        {
+          "name": "One-action Stop retains every recorded original, signing/encryption key and registry pin",
+          "result": "PASS"
+        },
+        {
+          "name": "Foreign occupied port is refused without stopping it or changing retained application state",
+          "result": "PASS"
+        },
+        {
+          "name": "Real desktop window starts all services from stopped state with no terminals and retains prior data",
+          "result": "PASS"
+        },
+        {
+          "name": "Warm desktop launch shows ready state and preserves service PIDs",
+          "result": "PASS"
+        },
+        {
+          "name": "Readiness checks actual login UI and protected backend after a cold restart",
+          "result": "PASS"
+        }
+      ],
+      "evidence": [
+        {
+          "localArtifact": ".local-data/desktop-tests/results.json",
+          "sha256": "d164f64b187e64a72dbd3e2f4d6586fd69e89a75dcc975f5799985c13dde9243"
+        }
+      ]
+    }
+  ],
+  "benchmark": {
+    "documentsPerPhase": 16,
+    "labelledFictionalDocuments": 14,
+    "goldenFields": 169,
+    "privateDocumentsWithoutGoldenTruth": 2,
+    "record": "ocr-p0-benchmark.json",
+    "sha256": "258af02fefae43edc012f7c4ee9b39e39f23aff58d77d14b86ee756b68efd17c"
+  },
+  "preservation": {
+    "recordedFiles": 102,
+    "changedOrMissing": 0,
+    "mainAndCf": {
+      "main": "c04741ee68563566dc82ab4e71b97c3898714f72",
+      "cf": "b053b324e87d4a90f4d0151d3f7e7077759a89c5"
+    },
+    "remotePushPerformed": false,
+    "originalCheckout": "Evidentia; codex/foliolet-evidence-bridge; existing untracked evolution document and output retained"
+  },
+  "sourceDigests": {
+    "django-service/dashboard/static/wallet/intake.js": "671ad16fdc829d0e48b2312c198e8a73bb7d64784f64a47d0811b4fc79bb27c0",
+    "django-service/dashboard/templates/wallet/_intake_labels.html": "29002905d902d6b4a738b65006d3ffacbe538e533dd95e39ebd2f060754e0d6c",
+    "django-service/dashboard/templates/wallet/detail.html": "c0867817a0a76ee996a74f10b049338c2160b55319810fb2621131cacf1b7502",
+    "django-service/dashboard/test_intake.py": "0ec64610945045d5f576924ded60c1a6ea6b543ad2564a5959cba3dd4f769e7d",
+    "django-service/dashboard/wallet_views.py": "27188755dbfc6dcdbd47bbe0a44848c5d12a16c45c01bc801c20d5b0d0e5d1f9",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/FoliData.java": "636df3dd1e4c30764282bc5d98bf4456b5642d645ac997b8d3feb4659046d9e5",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/FoliExtractionService.java": "d67db73bf43ddb939afe96d6cd79ab357fcb0e50cbf7a2bcdff3f122be077eb6",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/FoliProperties.java": "91cae3d600cc8ddc8859a7291b671caab531ac56736f726bc1fed5e8621837ec",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/FoliReaderMain.java": "ba8256ef3e6598486efd98e86dfc8dd8df8328d0d02ed4dcfb65f6fd383e3bad",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/IntakeIndicators.java": "3c38bb7825af059d1d86c2f4da99906da6e2ca526e63d44ccc48d362b428ab08",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/OcrService.java": "cf5adb6bcd3018758344667272841eeeea9e2c57687c7da847e8bc353bd26bb9",
+    "spring-boot-service/src/main/java/com/sih26190/dms/foli/PositionedTextStripper.java": "68b258af9b334b54151d901df6e8a5005ae6f4c2f8a8e8d9532309f770f65ea0",
+    "spring-boot-service/src/main/java/com/sih26190/dms/intake/FactSuggestions.java": "faaf702261a44e941b98ba2421fd286112bfa0f5e78d0398e40ad1be4dc9226b",
+    "spring-boot-service/src/main/java/com/sih26190/dms/intake/IntakeJobs.java": "5d5020bcc909e8684b1036904d7108434f7f1420331bb82d4e2911c7daa02537",
+    "spring-boot-service/src/main/java/com/sih26190/dms/intake/IntakeMetadata.java": "5759b4681ff73ce2373e2243d3a9deb0886b909496cf4b621327db073c8cf7ea",
+    "spring-boot-service/src/main/java/com/sih26190/dms/intake/LayoutFacts.java": "29d0ef1289d307b9b3babb5ec3a3722435ae6817b20e2ae610f8154449f688de",
+    "spring-boot-service/src/test/java/com/sih26190/dms/foli/FoliReadingTest.java": "42d9f4b821c5b96b97d040644b040cbbe7192a20fc4087af0bd8e71d055c4629",
+    "spring-boot-service/src/test/java/com/sih26190/dms/foli/IntakeIndicatorsTest.java": "8132955705e1223a3dc2ed04dc44d0308765ce73a27820bfa1f259151c9e91b9",
+    "spring-boot-service/src/test/java/com/sih26190/dms/intake/IntakeBenchmarkMain.java": "8cf75a438bbf9dfb00fc63b325daf881e3d018c27f4cfbab7a5dcb9543d81c46",
+    "spring-boot-service/src/test/java/com/sih26190/dms/intake/IntakeWorkflowTest.java": "8bcfa6aefe28632516f5a8a3cf3d28ba70cc0543301e01bef8d497e185bf00fa",
+    "spring-boot-service/src/test/java/com/sih26190/dms/intake/LayoutFactsTest.java": "6b78cb1a30df44bad0bc53ecc98ad45b80e6056d0baae7cfd76274e9f8eaecba",
+    "tools/benchmark-intake.py": "c2139f4aab64aae2b4189b79be2346d37a9e94583b30098c081bbbd8a292c0c4",
+    "tools/make-ocr-benchmark.py": "21f19db94b6879b7ef2329f2fd4c11bad9d78470d701a8806ffb2d127453c70e",
+    "tools/ocr-layout-worker.py": "3080ef0a9a7e24f3b2f667f6f592b0872ccc0df2ffa1004349f2771b8263f8e8",
+    "tools/requirements-ocr.txt": "eb389ad1ec511a0aa6c8cdaa71868ddfb19a65beb66132def129f95272d3d05e",
+    "tools/start-digilocker-demo.ps1": "269b41662b3a5ca97c65dd813d8ceeacd022cb34814d5718cfd6020065c8dbd0",
+    "tools/start-foliolet.ps1": "02bc09e00141f9d0c05111b501b24ac75106c7111cf0118a962f1f72c48d5d08",
+    "tools/summarize-ocr-benchmark.py": "0c878eef758ae500c3204010b2940d2e35e76b167b070c04fde2649b51d6a5d5",
+    "tools/test-intake-failures.py": "df7a9a5f65c1b6119f6023d952fed43bc97389c8ddfc44e6f569b80d75a60fa9",
+    "tools/test-intake-ui.cjs": "8dc609a85ae8c5b0685a3bb019a28ac02daa567176aad158e9f6674206f36310",
+    "tools/test-ocr-intake-ui.cjs": "14652f5646df617f6657d152455f2746b17744a05543664ac71b0da47665346a",
+    "tools/test-ocr-layout-worker.py": "66e46acecd0a8f88aae7c1a80cbecf60337232c8b73871b9098593fb5dce4d3e"
+  },
+  "sequencing": "Live intake/failure/existing UI checks preceded final focused layout refinements. Final Java unit build, same-byte benchmark, new full browser walkthrough, CSV/packaged-reader and desktop checks cover final source.",
+  "intermediateFailuresResolved": [
+    "overprinted values required type-independent rejection, including concatenated strings",
+    "layout OCR mock contract updates",
+    "Mockito restub changed to doAnswer",
+    "managed service stop before replacing Windows-locked JAR",
+    "browser detail selector disambiguation and bounded 429 source retry",
+    "initial desktop check overlapped existing startup mutex"
+  ],
+  "remainingLimitations": [
+    "Two wrong review suggestions remain in the labelled corpus; zero wrong automatic suggestions observed.",
+    "Private real-document precision/recall cannot be measured without independent golden labels; 1 and 11 proposals require review. Mathematics total withheld for column collision.",
+    "Sampled peak reader tree RSS is about 1 GiB and excludes resident Ollama; worst measured document took 43.449 seconds.",
+    "Complex layouts/scripts, security backgrounds and OCR character confusion can need manual entry. No OCR guess is issuer verification.",
+    "Authentic DigiLocker login/download, government/issuer cryptography, physical NFC, Docker, remote CI and production deployment not tested.",
+    "Historical 80-question live campaign not rerun; current Java tests passed 60/60 source-page and 40/40 fine-print retrieval assertions."
+  ],
+  "expectedWarnings": [
+    "Java 17 SecurityManager deprecation in live test networking guard",
+    "Ganache native uWS module mismatch; JavaScript fallback passed contract gate"
+  ],
+  "walkthrough": {
+    "fictional": true,
+    "checks": 5,
+    "screenshots": [
+      ".local-data/ocr-p0/walkthrough/01-table-review.png",
+      ".local-data/ocr-p0/walkthrough/02-selective-disclosure.png",
+      ".local-data/ocr-p0/walkthrough/03-scanned-review.png"
+    ],
+    "visuallyInspected": true
+  },
+  "reproductionEnvironment": {
+    "FOLI_PLAYWRIGHT_MODULE": "C:/Users/User/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright",
+    "NODE_PATH": "C:/Users/User/Downloads/Foliolet-testcloudflare/spring-boot-service/node_modules;C:/Users/User/Downloads/Foliolet-testcloudflare/node_modules",
+    "FOLI_OLLAMA_URL": "http://127.0.0.1:11444",
+    "FOLI_TESSERACT": "C:/Users/User/Downloads/Foliolet-testcloudflare/.local-tools/ocr/Library/bin/tesseract.exe",
+    "FOLI_OCR_DATA_DIR": "C:/Users/User/Downloads/Foliolet-testcloudflare/.local-tools/ocr/share/tessdata",
+    "INTAKE_REFERENCE_IMAGE": "Use the supplied local QR/wordmark reference image; do not substitute a private identity document."
+  }
+}

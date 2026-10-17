@@ -133,6 +133,7 @@ def file_lock(name, timeout):
 
 
 def control_key():
+    STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = STATE_DIR / "control.key"
     if not path.exists():
         try:

@@ -1,0 +1,495 @@
+{
+  "generatedAt": "2026-10-16T11:50:12.097656+00:00",
+  "sourceCommit": "250b5fe5afcb5c7b2b5469014125aef9658dd96f",
+  "branch": "feature/digilocker-assisted-intake",
+  "base": "b053b324e87d4a90f4d0151d3f7e7077759a89c5",
+  "mainPreserved": "c04741ee68563566dc82ab4e71b97c3898714f72",
+  "syntheticDocumentsOnly": true,
+  "realDigiLockerAuthentication": "NOT TESTED",
+  "realIssuedDocument": "NOT TESTED",
+  "physicalNfc": "NOT TESTED",
+  "issuerCryptographicVerification": "NOT IMPLEMENTED",
+  "java": {
+    "result": "PASS",
+    "count": 100,
+    "suites": [
+      {
+        "name": "com.sih26190.dms.DmsApplicationTests",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliAuthorizationTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliLocalLiveIT",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliOcrLiveIT",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliQaTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliReaderTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliReadingTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.FoliReviewTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.IntakeIndicatorsTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.foli.IntakeOcrLiveIT",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.intake.FactSuggestionsTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.intake.IntakeLocalLiveIT",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.intake.IntakeWorkflowTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.selective.FieldScanParserTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.selective.MerkleTreeServiceTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.selective.UsernameUniquenessTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sih26190.dms.selective.WalletWorkflowTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "gates": {
+    "django": {
+      "result": "PASS",
+      "count": 72,
+      "log": ".local-data/intake-django-final.log"
+    },
+    "watcher": {
+      "result": "PASS",
+      "count": 11,
+      "log": ".local-data/intake-watcher-tests.log"
+    },
+    "nodeVerifier": {
+      "result": "PASS",
+      "count": 22,
+      "log": ".local-data/intake-node-verifier.log"
+    },
+    "contracts": {
+      "result": "PASS",
+      "merkleShapes": 7,
+      "log": ".local-data/intake-node-contracts.log"
+    },
+    "live": {
+      "result": "PASS",
+      "count": 46,
+      "checks": [
+        {
+          "name": "Existing local Qwen model is ready; no model downloaded",
+          "result": "PASS"
+        },
+        {
+          "name": "Private session API requires holder authentication",
+          "result": "PASS"
+        },
+        {
+          "name": "Capability rejects browser Origin, full-wallet access and cross-owner stop",
+          "result": "PASS"
+        },
+        {
+          "name": "Real recursive companion heartbeat connects to armed session",
+          "result": "PASS"
+        },
+        {
+          "name": "Partial browser download and pre-existing files are ignored",
+          "result": "PASS"
+        },
+        {
+          "name": "Finished recursive rename imports one document automatically",
+          "result": "PASS"
+        },
+        {
+          "name": "Repeated file events do not duplicate enrollment",
+          "result": "PASS"
+        },
+        {
+          "name": "Download, observation-bound upload and decrypted vault bytes match exactly",
+          "result": "PASS"
+        },
+        {
+          "name": "Copied synthetic indicators remain possible and issuer-unverified",
+          "result": "PASS"
+        },
+        {
+          "name": "Live local Ollama proposes Math 90 with deterministic source validation",
+          "result": "PASS"
+        },
+        {
+          "name": "Unavailable CGPA is never fabricated",
+          "result": "PASS"
+        },
+        {
+          "name": "Every accepted field has an owner-authorized exact source quote, page and retained-byte hash",
+          "result": "PASS"
+        },
+        {
+          "name": "Reordered canonical facts confirm as AI suggestions unchanged",
+          "result": "PASS"
+        },
+        {
+          "name": "Changing Math 90 to 95 is recorded server-side",
+          "result": "PASS"
+        },
+        {
+          "name": "Client-supplied unaltered flag and replacement baseline cannot erase edits",
+          "result": "PASS"
+        },
+        {
+          "name": "Adding a holder field changes lineage",
+          "result": "PASS"
+        },
+        {
+          "name": "Removing an AI field changes lineage",
+          "result": "PASS"
+        },
+        {
+          "name": "Explicit analysis retry preserves the immutable initial proposal",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing explicit anchor retains the original first-seen assurance class",
+          "result": "PASS"
+        },
+        {
+          "name": "Passive GET cannot release or consume a proof",
+          "result": "PASS"
+        },
+        {
+          "name": "Selective disclosure releases only the chosen committed fact",
+          "result": "PASS"
+        },
+        {
+          "name": "Independent pinned verifier accepts real chain proof and rejects altered fact value",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing share revocation remains effective",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing one-time grant rejects a second release",
+          "result": "PASS"
+        },
+        {
+          "name": "Existing expired grant rejects release",
+          "result": "PASS"
+        },
+        {
+          "name": "Stop watching revokes the companion capability",
+          "result": "PASS"
+        },
+        {
+          "name": "Manual import works with watcher stopped",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: logo-only.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: qr-only.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: neither.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Absent indicators preserve the existing self-enrolled assurance class",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: unrelated-qr.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: last-page.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: scanned.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Scanned PDF supplies source-aligned Math 90 with OCR provenance",
+          "result": "PASS"
+        },
+        {
+          "name": "Live PDFBox/Tesseract indicator outcome: hybrid.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Hybrid PDF retains native text, OCR text and uncertainty",
+          "result": "PASS"
+        },
+        {
+          "name": "Failure retains exact original and manual fallback: malformed.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Failure retains exact original and manual fallback: protected.pdf",
+          "result": "PASS"
+        },
+        {
+          "name": "Failure retains exact original and manual fallback: unsupported.docx",
+          "result": "PASS"
+        },
+        {
+          "name": "New version gets independent source-bound baseline and unassessed lineage",
+          "result": "PASS"
+        },
+        {
+          "name": "Original Foli write-shaped requests still require the private-client boundary header",
+          "result": "PASS"
+        },
+        {
+          "name": "Original general Foli chat works without fabricated document citations",
+          "result": "PASS"
+        },
+        {
+          "name": "Original document Foli chat retains exact source citations",
+          "result": "PASS"
+        },
+        {
+          "name": "Original complete fine-print review retains fee and exception evidence",
+          "result": "PASS"
+        },
+        {
+          "name": "Foli general chat, document chat and review leave wallet facts, lineage and chain unchanged",
+          "result": "PASS"
+        }
+      ]
+    },
+    "ui": {
+      "result": "PASS",
+      "count": 11,
+      "checks": [
+        {
+          "name": "Official HTTPS action opens a separate tab without an opener; closing it preserves the local form",
+          "result": "PASS"
+        },
+        {
+          "name": "Desktop enrollment shows honest disconnected state and normal file picker",
+          "result": "PASS"
+        },
+        {
+          "name": "390px enrollment fits both actual light and dark palettes",
+          "result": "PASS"
+        },
+        {
+          "name": "CSRF-protected UI pairing downloads scoped configuration; Stop revokes it",
+          "result": "PASS"
+        },
+        {
+          "name": "Real Django intake POST rejects missing CSRF token",
+          "result": "PASS"
+        },
+        {
+          "name": "Real Ollama fields populate review rows with Math 90, source quote and immediate edited preview",
+          "result": "PASS"
+        },
+        {
+          "name": "Owner can open the exact retained original PDF page from a suggested fact",
+          "result": "PASS"
+        },
+        {
+          "name": "390px light and dark review has no horizontal overflow with long title and several fields",
+          "result": "PASS"
+        },
+        {
+          "name": "Review exposes labeled form controls, keyboard focus and live progress to accessibility tree",
+          "result": "PASS"
+        },
+        {
+          "name": "Confirmed edit is recorded by server and shown separately from issuer status",
+          "result": "PASS"
+        },
+        {
+          "name": "Private browser workflow sends no document requests to external services and has no JavaScript errors",
+          "result": "PASS"
+        }
+      ]
+    },
+    "failure": {
+      "result": "PASS",
+      "count": 12,
+      "checks": [
+        {
+          "name": "Real refused local model connection produces bounded offline state",
+          "result": "PASS"
+        },
+        {
+          "name": "Model outage preserves exact encrypted original",
+          "result": "PASS"
+        },
+        {
+          "name": "Manual confirmation remains available during model outage",
+          "result": "PASS"
+        },
+        {
+          "name": "Missing OCR is explicit; independent QR can remain possible without invented facts",
+          "result": "PASS"
+        },
+        {
+          "name": "Local model preflight rejects missing without inference",
+          "result": "PASS"
+        },
+        {
+          "name": "Local model preflight rejects oversized without inference",
+          "result": "PASS"
+        },
+        {
+          "name": "Local model preflight rejects cloud without inference",
+          "result": "PASS"
+        },
+        {
+          "name": "Wrong model value 95 against source Math 90 is deterministically discarded",
+          "result": "PASS"
+        },
+        {
+          "name": "Delayed local inference times out without a baseline or lost upload",
+          "result": "PASS"
+        },
+        {
+          "name": "Real backend restart marks an interrupted job and retains its original",
+          "result": "PASS"
+        },
+        {
+          "name": "Owner retry after restart can create the first valid source-bound proposal",
+          "result": "PASS"
+        },
+        {
+          "name": "Oversized upload is refused before enrollment",
+          "result": "PASS"
+        }
+      ]
+    },
+    "launcher": {
+      "result": "PASS",
+      "count": 3,
+      "checks": []
+    },
+    "format": {
+      "result": "PASS",
+      "count": 3,
+      "checks": [
+        {
+          "name": "CSV physical source is read completely with explicit coverage",
+          "result": "PASS"
+        },
+        {
+          "name": "Ambiguous CSV layout yields no guessed facts and retains exact original",
+          "result": "PASS"
+        },
+        {
+          "name": "CSV fallback permits holder-confirmed manual facts without AI or issuer assurance",
+          "result": "PASS"
+        }
+      ]
+    }
+  },
+  "pythonEnvironment": [
+    "asgiref==3.12.1",
+    "certifi==2026.7.22",
+    "charset-normalizer==3.5.1",
+    "Django==6.1",
+    "idna==3.19",
+    "pillow==12.1.1",
+    "psycopg==3.3.6",
+    "psycopg-binary==3.3.6",
+    "pycryptodome==3.23.0",
+    "PyMuPDF==1.27.2",
+    "requests==2.34.2",
+    "sqlparse==0.6.0",
+    "typing_extensions==4.16.0",
+    "tzdata==2026.3",
+    "urllib3==2.7.0",
+    "waitress==3.0.2",
+    "watchdog==6.0.0"
+  ]
+}

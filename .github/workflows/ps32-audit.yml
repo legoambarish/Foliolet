@@ -1,0 +1,98 @@
+name: PS32 isolated audit
+
+on:
+  push:
+    branches: [feature/ps32-final-winning-audit-20261016-1645]
+    paths-ignore:
+      - 'docs/**'
+      - 'RESEARCH_PROGRESS.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ps32-isolated-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONUNBUFFERED: '1'
+      MAVEN_OPTS: '-Xmx1536m'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated dependencies
+        run: |
+          mkdir -p audit-evidence
+          { git rev-parse HEAD; java -version; python --version; node --version; } > audit-evidence/environment.txt 2>&1
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+          python -m pip install -r django-service/requirements.txt -r tools/requirements-dev.txt
+          npm ci
+          npm --prefix spring-boot-service ci
+      - name: Java regression
+        id: java
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cd spring-boot-service
+          bash mvnw -B test 2>&1 | tee ../audit-evidence/java.txt
+      - name: Django regression
+        id: django
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cd django-service
+          python manage.py test --noinput 2>&1 | tee ../audit-evidence/django.txt
+          python manage.py check 2>&1 | tee ../audit-evidence/django-check.txt
+      - name: Contract regression
+        id: contracts
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:contracts 2>&1 | tee audit-evidence/contracts.txt
+      - name: Verifier regression
+        id: verifier
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:verifier 2>&1 | tee audit-evidence/verifier.txt
+      - name: Dependency audit evidence
+        continue-on-error: true
+        run: |
+          npm --prefix spring-boot-service audit --json > audit-evidence/npm-audit.json || true
+          python -m pip check > audit-evidence/pip-check.txt 2>&1
+      - name: Retain exact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps32-audit-${{ github.sha }}
+          path: |
+            audit-evidence/
+            spring-boot-service/target/surefire-reports/
+          retention-days: 14
+      - name: Enforce regression outcomes
+        if: always()
+        env:
+          JAVA: ${{ steps.java.outcome }}
+          DJANGO: ${{ steps.django.outcome }}
+          CONTRACTS: ${{ steps.contracts.outcome }}
+          VERIFIER: ${{ steps.verifier.outcome }}
+        run: |
+          printf 'java=%s django=%s contracts=%s verifier=%s\n' "$JAVA" "$DJANGO" "$CONTRACTS" "$VERIFIER"
+          test "$JAVA" = success && test "$DJANGO" = success && test "$CONTRACTS" = success && test "$VERIFIER" = success

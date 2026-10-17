@@ -509,3 +509,33 @@ html.theme-changing,html.theme-changing *,html.theme-changing *::before,html.the
 @media (max-width:399px){
   .form-foot .btn,.auth-form .btn{width:100%}
 }
+/* Private intake uses the existing neutral status palette. */
+.tracked-folder{border:1px solid var(--rule);border-top:3px solid var(--seal);border-radius:var(--r-control);padding:var(--s4);min-width:0}
+.tracked-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.tracked-heading h3{margin:0;font-size:var(--t-sub)}
+.tracked-count{flex-shrink:0;padding:3px 9px;background:var(--seal-wash);color:var(--seal-ink);border-radius:var(--r-mark);font-size:var(--t-small);font-weight:600}
+.tracked-feedback{font-size:var(--t-small);color:var(--ink-2);margin-block:var(--s3)}
+.tracked-feedback[data-state="connected"]{color:var(--pass)}
+.tracked-feedback[data-state="busy"]{color:var(--seal-ink)}
+.tracked-feedback[data-state="error"]{color:var(--fail)}
+.tracked-files{list-style:none;padding:0;margin:var(--s3) 0 0;max-height:30rem;overflow:auto;scrollbar-gutter:stable}
+.tracked-file+.tracked-file{border-top:1px solid var(--rule)}
+.tracked-file-button{display:flex;align-items:center;gap:var(--s3);width:100%;min-height:76px;padding:var(--s3);border:0;background:var(--sheet);color:var(--ink);font:inherit;text-align:left;cursor:pointer;border-radius:var(--r-control)}
+.tracked-file-button:hover,.tracked-file-button:focus-visible{background:var(--seal-wash)}
+.tracked-file-button:focus-visible{outline:2px solid var(--seal);outline-offset:-2px}
+.tracked-file-button:disabled{cursor:progress;opacity:.65}
+.tracked-file-kind{width:42px;flex-shrink:0;padding:8px 3px;background:var(--quiet-wash);color:var(--ink-2);border-radius:var(--r-mark);text-align:center;font:500 .7rem var(--mono)}
+.tracked-file-newest .tracked-file-kind{background:var(--seal-wash);color:var(--seal-ink)}
+.tracked-file-text{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.tracked-file-name{font-size:var(--t-body);overflow-wrap:anywhere;font-weight:600;line-height:1.45}
+.tracked-file-meta{color:var(--ink-3);font-size:var(--t-small);overflow-wrap:anywhere}
+.tracked-file-action{color:var(--seal-ink);font-size:var(--t-small);font-weight:600;flex-shrink:0}
+@media(max-width:600px){.tracked-folder{padding:var(--s3)}.tracked-file-button{flex-wrap:wrap;gap:var(--s2)}.tracked-file-text{flex-basis:calc(100% - 54px)}.tracked-file-action{margin-left:50px}.tracked-heading{align-items:flex-start}}
+.intake-labels { display:flex; flex-wrap:wrap; gap:.5rem; max-width:100%; }
+.intake-labels .mark { white-space:normal; overflow-wrap:anywhere; }
+.register-name .intake-labels { margin-top:.5rem; font-size:.75rem; }
+#intake-analysis .help, #digilocker-intake .help { overflow-wrap:anywhere; }
+.edit-row details.field { min-width:0; }
+.edit-row .scan-note { grid-column:1 / -1; overflow-wrap:anywhere; }
+#intake-warnings { max-height:16rem; overflow:auto; }
+#intake-warnings p { margin-block:.35rem; }

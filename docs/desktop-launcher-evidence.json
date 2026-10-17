@@ -1,0 +1,85 @@
+{
+  "generatedAt": "2026-10-16T12:56:04.502182+00:00",
+  "branch": "feature/digilocker-assisted-intake",
+  "baseCommit": "8e6671003c090dc958ce718afa12484c5e47299b",
+  "startup": {
+    "generatedAt": "2026-10-16T12:48:00.885882+00:00",
+    "platform": "Windows",
+    "engine": "Windows PowerShell 5.1",
+    "result": "PASS",
+    "count": 8,
+    "checks": [
+      {
+        "name": "Built-in Windows PowerShell recognizes actual owned services, Python child and PostgreSQL slash paths",
+        "result": "PASS"
+      },
+      {
+        "name": "Repeated start reuses healthy services without changing their PIDs",
+        "result": "PASS"
+      },
+      {
+        "name": "Concurrent startup is refused without creating duplicate service processes",
+        "result": "PASS"
+      },
+      {
+        "name": "One-action Stop retains every recorded original, signing/encryption key and registry pin",
+        "result": "PASS"
+      },
+      {
+        "name": "Foreign occupied port is refused without stopping it or changing retained application state",
+        "result": "PASS"
+      },
+      {
+        "name": "Real desktop window starts all services from stopped state with no terminals and retains prior data",
+        "result": "PASS"
+      },
+      {
+        "name": "Warm desktop launch shows ready state and preserves service PIDs",
+        "result": "PASS"
+      },
+      {
+        "name": "Readiness checks actual login UI and protected backend after a cold restart",
+        "result": "PASS"
+      }
+    ]
+  },
+  "concurrentStatus": {
+    "result": "PASS",
+    "count": 1,
+    "updates": 101,
+    "engine": "Windows PowerShell 5.1",
+    "check": "Concurrent status reading and atomic replacement completes without a sharing error"
+  },
+  "browser": {
+    "result": "PASS",
+    "application": "Chrome",
+    "url": "http://127.0.0.1:8008/login/",
+    "observedPage": "Sign in - Foliolet",
+    "automaticOpen": true,
+    "verification": "Actual target launched, visible browser page inspected"
+  },
+  "shortcut": {
+    "file": "Foliolet.lnk",
+    "created": true,
+    "targetAndArgumentsInspected": true,
+    "automatedShellActivation": "NOT TESTED: combined activation/document check blocked by approval policy; exact target tested directly"
+  },
+  "normalDesktopEnvironment": {
+    "result": "PASS",
+    "check": "Normal Windows desktop PATH locates Java, Node, Python and Git without Codex runtime additions"
+  },
+  "django": {
+    "result": "PASS",
+    "count": 72
+  },
+  "node": {
+    "result": "PASS",
+    "count": 22
+  },
+  "java": "Not rerun: production Java unchanged; earlier 100-test result belongs to the intake implementation",
+  "scope": "Only this feature checkout and its new desktop shortcut; no main/cf changes or push",
+  "limitations": [
+    "Fresh system prerequisite installation on a second PC not tested",
+    "Combined retained-document credential check not performed after policy rejection"
+  ]
+}

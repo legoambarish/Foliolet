@@ -46,7 +46,7 @@ public class FoliLocalModel {
         .restClientBuilder(RestClient.builder().requestFactory(factory)).build();
     model = OllamaChatModel.builder().ollamaApi(api)
         .retryTemplate(new RetryTemplate(RetryPolicy.withMaxRetries(0)))
-        .options(options(false)).build();
+        .options(options(null)).build();
   }
 
   static URI localOrigin(String value) {

@@ -2,8 +2,17 @@ from django.urls import path, include
 from django.conf import settings
 from . import wallet_views as views
 from . import foli_views as foli
+from . import intake_views as intake
+from . import signature_views as signatures
 app_name = 'dashboard'
 urlpatterns = [
+ path('intake/pair/', intake.pair, name='intake-pair'),
+ path('intake/sessions/', intake.sessions, name='intake-sessions'),
+ path('intake/files/', intake.files, name='intake-files'),
+ path('intake/files/import/', intake.import_file, name='intake-file-import'),
+ path('intake/sessions/<uuid:session_id>/stop/', intake.stop, name='intake-stop'),
+ path('intake/documents/<str:credential_id>/', intake.analysis, name='intake-analysis'),
+ path('intake/documents/<str:credential_id>/retry/', intake.retry, name='intake-retry'),
  path('', views.home, name='index'),
  path('login/', views.login, name='login'),
  path('register/', views.register, name='register'),
@@ -20,6 +29,7 @@ urlpatterns = [
  path('wallet/<str:credential_id>/', views.detail, name='detail'),
  path('wallet/<str:credential_id>/share/', views.compose, name='compose'),
  path('wallet/<str:credential_id>/file/', views.original, name='original'),
+ path('wallet/<str:credential_id>/signature/', signatures.inspect, name='signature-inspect'),
  path('wallet/<str:credential_id>/scan/', views.scan_fields, name='scan_fields'),
  path('wallet/<str:credential_id>/<str:action>/', views.document_action, name='document_action'),
  path('versions/<str:previous_id>/', views.enroll, name='version'),

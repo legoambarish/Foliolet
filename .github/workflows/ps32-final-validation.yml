@@ -1,0 +1,106 @@
+name: PS32 final portability and dependency evidence
+on:
+  push:
+    branches: [feature/ps32-final-winning-audit-20261016-1645]
+    paths: ['.github/workflows/ps32-final-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Install application dependencies
+        run: |
+          New-Item -ItemType Directory -Path audit-evidence | Out-Null
+          python -m pip install -r django-service/requirements.txt
+          git rev-parse HEAD | Out-File audit-evidence/HEAD.txt
+          python -m pip freeze | Out-File audit-evidence/python-freeze.txt
+      - name: Parse real Windows launchers without starting or killing user services
+        run: |
+          $results=@()
+          foreach($path in @('tools/start-digilocker-demo.ps1','tools/stop-digilocker-demo.ps1','tools/start-foliolet.ps1','tools/launch-foliolet.ps1','tools/start-digilocker-model.ps1','tools/foliolet-desktop-common.ps1')) {
+            $tokens=$null; $errors=$null
+            $ast=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count -ne 0) { throw ($errors | Out-String) }
+            $results += @{path=$path;parse='PASS'}
+          }
+          $source=Get-Content tools/start-digilocker-demo.ps1 -Raw
+          & ./tools/test-foliolet-branch.ps1
+          if(-not $source.Contains('MaxHeapMb')) {throw 'Heap bound missing'}
+          $results | ConvertTo-Json | Out-File audit-evidence/windows-launcher-parse.json
+      - name: Actual Windows Django regression
+        id: django
+        continue-on-error: true
+        run: |
+          Set-Location django-service
+          python manage.py test --noinput *> ../audit-evidence/windows-django.txt
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ps32-windows-${{ github.sha }}
+          path: audit-evidence/
+          retention-days: 14
+      - name: Require actual regression pass
+        if: always()
+        env:
+          RESULT: ${{ steps.django.outcome }}
+        run: if($env:RESULT -ne 'success') {throw 'Windows regression did not pass'}
+  dependency-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Resolve and query public dependency metadata only
+        run: |
+          set -euo pipefail
+          mkdir -p audit-evidence
+          python -m pip install -r django-service/requirements.txt pip-audit
+          python -m pip freeze > audit-evidence/python-freeze.txt
+          python -m pip_audit --format=json --output audit-evidence/python-audit.json > audit-evidence/python-audit.txt 2>&1 || true
+          (cd spring-boot-service && bash mvnw -B -ntp dependency:list -DoutputFile=target/dependencies-final.txt -DincludeScope=runtime) > audit-evidence/dependency-build.txt 2>&1
+          cp spring-boot-service/target/dependencies-final.txt audit-evidence/java-dependencies.txt
+          python - <<'PY'
+          import json,pathlib,re,requests
+          queries=[]
+          for line in pathlib.Path('audit-evidence/java-dependencies.txt').read_text().splitlines():
+              m=re.match(r'\s+([\w.\-]+):([\w.\-]+):jar:([^: ]+):(compile|runtime)',line)
+              if m:
+                  g,a,v,_=m.groups();queries.append({'package':{'ecosystem':'Maven','name':g+':'+a},'version':v})
+          assert queries
+          response=requests.post('https://api.osv.dev/v1/querybatch',json={'queries':queries},timeout=90);response.raise_for_status()
+          records=[{'dependency':q,**r} for q,r in zip(queries,response.json()['results'])]
+          pathlib.Path('audit-evidence/java-osv.json').write_text(json.dumps(records,indent=2))
+          print('Queried',len(records),'resolved dependencies;',sum(bool(r.get('vulns')) for r in records),'with advisory matches')
+          PY
+          git rev-parse HEAD > audit-evidence/HEAD.txt
+          git log --format='%H %s' db55c2c6c1209e567713fa9ab08c5441bd55bc86..HEAD > audit-evidence/implementation-commits.txt
+          git diff --check db55c2c6c1209e567713fa9ab08c5441bd55bc86..HEAD
+          git diff --stat db55c2c6c1209e567713fa9ab08c5441bd55bc86..HEAD > audit-evidence/change-stat.txt
+          git archive --format=zip HEAD -o audit-evidence/source.zip
+          git bundle create audit-evidence/source.bundle HEAD
+          sha256sum audit-evidence/source.zip audit-evidence/source.bundle > audit-evidence/SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ps32-final-dependencies-${{ github.sha }}
+          path: audit-evidence/
+          retention-days: 14

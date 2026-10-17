@@ -1,5 +1,7 @@
 import json
 import re
+import unicodedata
+from pathlib import Path
 from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse, Http404
@@ -12,6 +14,19 @@ from .verification import validate_bundle, validate_success
 from .decorators import spring_login_required
 
 CATEGORIES = ("Education", "Employment", "Finance", "Identity", "Purchase", "Other")
+
+
+def _fact_path(label):
+    slug = re.sub(r'[^a-z0-9]+', '_', unicodedata.normalize('NFD', label).encode('ascii', 'ignore').decode().lower()).strip('_')
+    known = {'math': 'education.math', 'mathematics': 'education.math', 'cgpa': 'education.cgpa',
+             'name': 'person.name', 'full_name': 'person.name', 'institution': 'education.institution',
+             'course': 'education.course', 'date_of_birth': 'person.birth_date',
+             'purchase_date': 'purchase.date', 'product_identifier': 'purchase.product_id'}
+    if slug in known:
+        return known[slug]
+    if not slug or not slug[0].isalpha():
+        raise api.WalletAPIError('Give each fact a clear name beginning with a letter.', 400)
+    return 'extracted.' + slug[:60]
 
 
 def page(request, template, **context):
@@ -86,14 +101,22 @@ def enroll(request, previous_id=None):
             file = request.FILES.get("file")
             if not file:
                 raise api.WalletAPIError("Choose a document to enroll.", 400)
+            # Check both metadata and a bounded read: a custom upload handler can lie about size.
+            limit = 20 * 1024 * 1024
+            if file.size > limit:
+                raise api.WalletAPIError("Documents must be 20 MiB or smaller.", 413)
+            original = file.read(limit + 1)
+            if len(original) > limit:
+                raise api.WalletAPIError("Documents must be 20 MiB or smaller.", 413)
             endpoint = f"/api/wallet/documents/{previous_id}/versions" if previous_id else "/api/wallet/documents"
             result = api.call("POST", endpoint, request.session["sb_auth"],
-                              files={"file": (file.name, file.read(), file.content_type)},
+                              files={"file": (file.name, original, file.content_type)},
                               data={"displayName": request.POST.get("display_name", ""), "category": request.POST.get("category", "Other"), "observationId": request.POST.get("observation_id", "")})
             return redirect("dashboard:detail", credential_id=result["id"])
     except api.WalletAPIError as exc:
         error = str(exc)
-    return page(request, "enroll", categories=CATEGORIES, observations=observations, previous_id=previous_id, error=error)
+    return page(request, "enroll", categories=CATEGORIES, observations=observations, previous_id=previous_id, error=error,
+                intake_folder=settings.INTAKE_FOLDER, managed_intake=settings.MANAGED_INTAKE)
 
 
 @spring_login_required
@@ -109,7 +132,7 @@ def detail(request, credential_id):
                 raise api.WalletAPIError("Fact rows were incomplete.", 400)
             for path, label, type_, value in zip(paths, labels, types, values):
                 if path.strip() or value.strip():
-                    claims.append({"path": path, "label": label, "type": type_, "value": value})
+                    claims.append({"path": path.strip() or _fact_path(label), "label": label, "type": type_, "value": value})
             if request.POST.get("confirm") != "yes":
                 raise api.WalletAPIError("Confirm that you have reviewed these facts.", 400)
             api.call("PUT", f"/api/wallet/documents/{credential_id}/claims", request.session["sb_auth"], payload={"claims": claims})
@@ -129,7 +152,8 @@ def detail(request, credential_id):
         rows = [{"path": p, "label": l, "type": t, "value": v} for p, l, t, v in zip(
             request.POST.getlist("claim_path"), request.POST.getlist("claim_label"), request.POST.getlist("claim_type"), request.POST.getlist("claim_value"))]
     elif not rows and doc and doc.get("status") == "DRAFT":
-        rows = doc.get("suggestions", [])
+        rows = doc.get("intake", {}).get("fields") or doc.get("suggestions", [])
+        rows = [r for r in rows if (r.get("support") or {}).get("quality") != "REVIEW_REQUIRED"]
     rows = [r for r in rows if not r.get("derived")]
     if not rows:
         rows = [{"path": "", "label": "", "type": "string", "value": ""}]

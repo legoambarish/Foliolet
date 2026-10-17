@@ -1,0 +1,25 @@
+diff --git a/tools/start-digilocker-demo.ps1 b/tools/start-digilocker-demo.ps1
+--- a/tools/start-digilocker-demo.ps1
++++ b/tools/start-digilocker-demo.ps1
+@@ -1,9 +1,10 @@
+-param([string]$RuntimeRoot, [switch]$SkipBuild, [string]$OllamaUrl='http://127.0.0.1:11434')
++param([string]$RuntimeRoot, [switch]$SkipBuild, [string]$OllamaUrl='http://127.0.0.1:11434', [ValidateRange(512,4096)][int]$MaxHeapMb=768)
+ $ErrorActionPreference = 'Stop'
+ $intakeModelOrigin=[uri]$OllamaUrl
+ if ($intakeModelOrigin.Scheme -ne 'http' -or $intakeModelOrigin.Host -notin @('127.0.0.1','::1','[::1]') -or $intakeModelOrigin.Port -lt 1 -or $intakeModelOrigin.UserInfo -or $intakeModelOrigin.Query -or $intakeModelOrigin.Fragment -or $intakeModelOrigin.AbsolutePath -ne '/') { throw 'Use a numeric loopback HTTP Ollama origin with an explicit port.' }
+ $intakeRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
+-if ((git -C $intakeRoot branch --show-current).Trim() -notlike 'feature/digilocker-assisted-intake*') { throw 'Run this launcher only in the dedicated DigiLocker feature worktree.' }
++$intakeBranch = (git -C $intakeRoot branch --show-current).Trim()
++if ($intakeBranch -notlike 'feature/digilocker-assisted-intake*' -and $intakeBranch -ne 'feature/ps32-final-winning-audit-20261016-1645') { throw 'Run this launcher only in the dedicated DigiLocker or isolated PS32 audit worktree.' }
+ if (-not $RuntimeRoot) { $RuntimeRoot = $intakeRoot }
+ $RuntimeRoot = (Resolve-Path -LiteralPath $RuntimeRoot).Path
+ $intakePython = Join-Path $intakeRoot '.venv\Scripts\python.exe'
+@@ -78,7 +79,7 @@
+ $env:LOGGING_LEVEL_ORG_APACHE_PDFBOX='OFF'; $env:LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI='OFF'
+ $env:SERVER_TOMCAT_ACCESSLOG_ENABLED='false'
+ @{root=$intakeRoot;runtimeRoot=$RuntimeRoot;modelUrl=$OllamaUrl} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeData 'intake-runtime.json') -Encoding utf8
+-Intake-Launch 'intake-spring' (Get-Command java).Source @('-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
++Intake-Launch 'intake-spring' (Get-Command java).Source @("-Xmx${MaxHeapMb}m", '-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
+ Intake-Wait 8088 90
+ & node (Join-Path $intakeRoot 'tools\provision-digilocker-trust.cjs')
+ if ($LASTEXITCODE -ne 0) { throw 'Isolated registry trust provisioning failed' }

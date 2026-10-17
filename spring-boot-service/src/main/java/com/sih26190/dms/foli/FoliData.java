@@ -10,10 +10,21 @@ public final class FoliData {
                          String status, String version, boolean supported) {}
   public record Source(Document document, String hash, byte[] bytes) {}
   public record Word(String text, int start, int end, int left, int top,
-                     int width, int height, double confidence) {}
+                     int width, int height, double confidence, boolean visible) {
+    public Word(String text,int start,int end,int left,int top,int width,int height,double confidence) {
+      this(text,start,end,left,top,width,height,confidence,true);
+    }
+  }
+  /** Coordinates belong to this layer's upright reading frame, never to an inferred text order. */
+  public record Layer(String id,String kind,int rotation,int width,int height,List<Word> words,List<String> warnings,String method) {
+    public Layer(String id,String kind,int rotation,int width,int height,List<Word> words,List<String> warnings){this(id,kind,rotation,width,height,words,warnings,kind);}
+  }
   public record Page(int number, String text, String status, Double confidence,
                      int firstLine, int lastLine, int rotation,
-                     List<Word> words, List<String> warnings) {
+                     List<Word> words, List<String> warnings,List<Layer> layers) {
+    public Page(int number,String text,String status,Double confidence,int firstLine,int lastLine,int rotation,List<Word> words,List<String> warnings) {
+      this(number,text,status,confidence,firstLine,lastLine,rotation,words,warnings,List.of());
+    }
     public boolean readable() { return !text.isBlank(); }
     public boolean ocr() { return status.contains("OCR"); }
   }

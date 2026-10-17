@@ -33,6 +33,7 @@ public class WalletService {
   private final TextExtractionService extraction;
   private final AuditService audit;
   private final TransactionTemplate tx;
+  private final com.sih26190.dms.intake.IntakeMetadata intake;
 
   public WalletService(
       CredentialDocumentRepository documents,
@@ -45,6 +46,7 @@ public class WalletService {
       SelectiveDisclosureBlockchainService chain,
       TextExtractionService extraction,
       AuditService audit,
+      com.sih26190.dms.intake.IntakeMetadata intake,
       org.springframework.transaction.PlatformTransactionManager manager) {
     this.documents = documents;
     this.claims = claims;
@@ -56,6 +58,7 @@ public class WalletService {
     this.chain = chain;
     this.extraction = extraction;
     this.audit = audit;
+    this.intake = intake;
     tx = new TransactionTemplate(manager);
   }
 
@@ -151,6 +154,9 @@ public class WalletService {
 
   private List<ClaimInput> suggest(byte[] bytes, String filename) {
     // Deterministic convenience suggestions, never an authenticity source. No external AI calls.
+    // PDF parsing belongs exclusively to the bounded asynchronous child reader.
+    // Do not run the older in-process stripper while acknowledging a saved upload.
+    if(filename!=null && filename.toLowerCase(Locale.ROOT).endsWith(".pdf")) return List.of();
     var result = new ArrayList<ClaimInput>();
     try {
       String text = extraction.extractBytes(bytes, filename);
@@ -202,6 +208,7 @@ public class WalletService {
     m.put("claimCount", claims.findByCredentialIdOrderByLeafIndexAsc(d.id).size());
     m.put("supersededBy", d.supersededBy);
     m.put("previousId", d.previousId);
+    m.put("intake", intake.summary(d.id));
     return m;
   }
 
@@ -216,6 +223,7 @@ public class WalletService {
     m.put("anchorTx", d.anchorTx);
     m.put("contract", d.contractAddress);
     m.put("chainId", d.chainId);
+    m.put("intake", intake.detail(d));
     m.put(
         "claims",
         claims.findByCredentialIdOrderByLeafIndexAsc(d.id).stream()
@@ -279,6 +287,15 @@ public class WalletService {
             if (entries.put(path, normalized) != null)
               throw new IllegalArgumentException("Duplicate fact path");
           }
+          // Compare the holder's actual canonical submission, before platform-derived leaves.
+          var metadata=intake.record(d);
+          if(metadata.encryptedBaseline!=null) {
+            try {
+              String currentHash=PrivateVault.sha256(vault.read(d.filePath,d.id));
+              if(!currentHash.equals(metadata.sourceHash)) throw new IllegalStateException();
+            } catch(Exception e) { throw new ResponseStatusException(HttpStatus.CONFLICT,"The source changed or is unavailable. Read the current original before confirming."); }
+          }
+          intake.confirmed(d,List.copyOf(entries.values()));
           ClaimInput cgpa = entries.get("education.cgpa");
           if (cgpa != null) {
             if (!cgpa.type().equals("decimal"))

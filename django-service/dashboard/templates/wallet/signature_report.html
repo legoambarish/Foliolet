@@ -1,0 +1,26 @@
+{% extends 'wallet/base.html' %}
+{% block title %}PDF signature inspection · {{ product_label }}{% endblock %}
+{% block content %}
+<a class="crumb" href="{% url 'dashboard:detail' document.id %}">Back to document</a>
+<div class="page-head"><div><span class="kicker">Private local inspection · version {{ document.version }}</span><h1>Is there a valid signature?</h1><p class="lede wrap-any">{{ document.displayName }}</p></div></div>
+<section class="sheet stack">
+  <div class="notice warning"><strong>Issuer authenticity is not established</strong>A mathematically valid signature can be made with a self-created certificate. This inspection never upgrades your credential to issuer-verified. It does not prove the document's claims are true.</div>
+  <h2>Inspection result</h2><p class="wrap-any"><code>{{ inspection.status }}</code></p>
+  <p class="help">The exact original was read locally in a bounded subprocess. No source bytes, certificates or identifiers were sent to an online verifier. This report is not added to your public Merkle proof.</p>
+  <dl class="stack"><div><dt>Source SHA-256</dt><dd class="wrap-any"><code>{{ inspection.sourceSha256|default:'Not available' }}</code></dd></div><div><dt>Checked at</dt><dd>{{ inspection.checkedAt|default:'Inspection could not complete' }}</dd></div><div><dt>Issuer authority</dt><dd>Not established</dd></div><div><dt>Certificate trust and revocation</dt><dd>No issuer trust policy or fresh revocation evidence is provisioned. Embedded certificates are not automatically trusted.</dd></div></dl>
+</section>
+{% for item in inspection.signatures %}
+<section class="sheet stack section">
+  <h2>Signature {{ item.index }}</h2><p class="wrap-any"><code>{{ item.status }}</code></p>
+  <div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th></tr></thead><tbody>
+    <tr><td>Signed byte digest matches</td><td>{{ item.digestIntact|yesno:'Passed,Failed,Not established' }}</td></tr>
+    <tr><td>Signature mathematics</td><td>{{ item.signatureMathValid|yesno:'Passed,Failed,Not established' }}</td></tr>
+    <tr><td>Covers the entire current file</td><td>{{ item.entireCurrentFile|yesno:'Passed,Failed,Not established' }}</td></tr>
+    <tr><td>Certificate path trusted</td><td>{{ item.certificatePathTrusted|yesno:'Passed,Not established,Not established' }}</td></tr>
+    <tr><td>Issuer authenticated</td><td>Not established</td></tr>
+  </tbody></table></div>
+  <p class="help wrap-any">Signer certificate SHA-256: <code>{{ item.signerCertificateSha256|default:'Not available' }}</code></p>
+</section>
+{% empty %}<p class="help section">No supported, completed signature check is available. An unsigned file is not automatically a forged file; it simply supplies no supported digital-signature evidence.</p>{% endfor %}
+<section class="sheet stack section"><h2>What would establish issuer trust?</h2><p>Independently provisioned issuer authority, a validated certificate path and applicable revocation or trusted historical-validation evidence are required. A logo, QR code, PDF signature field or green viewer tick is insufficient.</p><p class="help">Supported here: detached PKCS#7/CAdES PDF signatures, up to eight signatures and a 20 MiB original. Unsupported or incomplete checks fail closed. Older signed revisions do not satisfy the stricter “entire current file” check.</p><a class="btn line" href="{% url 'dashboard:detail' document.id %}">Return to source review</a></section>
+{% endblock %}

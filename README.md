@@ -97,7 +97,22 @@ persistent local Ganache EVM, not a public network.
 
 ## Run locally
 
-### macOS setup (Homebrew, Docker Compose, manual service terminals)
+For **macOS (Apple Silicon or Intel)**, start Docker Desktop and run the full stack
+from this checkout with one command:
+
+```sh
+docker compose up --build -d --wait --wait-timeout 1800
+```
+
+Open [Foliolet](http://127.0.0.1:8008/). Dependencies, local EVM, PostgreSQL, Spring,
+Django, OCR, Ollama/Qwen and the watcher supervisor are set up automatically.
+Enable folder intake once after signing in; its saved pairing resumes on startup.
+The default Mac folder is `~/Downloads/Foliolet Intake`. Downloads, keys and models
+persist across starts. See the [macOS container guide](docs/CONTAINERS_MACOS.md) for
+configuration, shutdown and verification limits. Container execution still needs
+verification on a working Docker engine; this host's Docker Desktop cannot start.
+
+### Alternative macOS setup (Homebrew and manual service terminals)
 
 These steps use the repository's cross-platform Maven/Node/Python entry points; the checked-in PowerShell launchers are Windows-only. Run development services on loopback and use harmless documents. Do not fund the local EVM key or expose these development servers to a network.
 
@@ -152,11 +167,11 @@ cp .env.example .env
 Edit `.env` and replace `POSTGRES_PASSWORD` with a fresh local development password, then run:
 
 ```sh
-docker compose up -d postgres
-docker compose ps
+docker compose -f compose.postgres.yaml up -d postgres
+docker compose -f compose.postgres.yaml ps
 ```
 
-Keep that password private. In the Spring terminal below, set `SPRING_DATASOURCE_PASSWORD` to the same value. Do not start a second PostgreSQL instance on port 55432. To stop the container without deleting its database, use `docker compose stop postgres`; do not use `docker compose down -v` for routine shutdown.
+Keep that password private. In the Spring terminal below, set `SPRING_DATASOURCE_PASSWORD` to the same value. Do not start a second PostgreSQL instance on port 55432. To stop the container without deleting its database, use `docker compose -f compose.postgres.yaml stop postgres`; do not use `docker compose down -v` for routine shutdown.
 
 #### 4. Start the persistent local Ethereum network
 
@@ -253,7 +268,7 @@ The watcher is an optional local process, not a document-import or OCR service. 
 
 #### Stop and preserve local state
 
-Press Ctrl+C in the Ollama, Ganache, Spring, Django and watcher terminals. Stop PostgreSQL with `docker compose stop postgres`. Preserve `.local-data/`, `.env`, and the Docker volume; they hold keys, chain/database state, encrypted files and local model weights. Never reset these as a normal restart.
+Press Ctrl+C in the Ollama, Ganache, Spring, Django and watcher terminals. Stop PostgreSQL with `docker compose -f compose.postgres.yaml stop postgres`. Preserve `.local-data/`, `.env`, and the Docker volume; they hold keys, chain/database state, encrypted files and local model weights. Never reset these as a normal restart.
 
 #### Optional macOS checks
 
@@ -270,6 +285,12 @@ npm run test:verifier
 The live wallet workflow/security tests additionally need the running services, a disposable local database and separately provisioned trust pins; see [RUN_GUIDE.md](docs/RUN_GUIDE.md).
 
 ### Windows setup (PowerShell)
+
+For this PS32 branch on Windows, use the [branch-specific setup guide](docs/ps32-final/DEMO_RUNBOOK.md).
+After prerequisites are installed, double-click **`Foliolet.vbs`** in this checkout.
+Its desktop window starts the local services and opens **http://127.0.0.1:8008/**.
+Choose **Stop Foliolet** in that window to stop its services while keeping saved data.
+The older manual commands below use different ports.
 
 The tested path is Windows PowerShell with Java 17+, Python 3.12+, Node/npm and
 PostgreSQL. Maven is included through its wrapper. Use harmless documents for

@@ -1,0 +1,8 @@
+# Keep portable source files LF on macOS, Linux and Windows.
+* text=auto eol=lf
+
+# Windows launchers retain their native line endings on checkout.
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf

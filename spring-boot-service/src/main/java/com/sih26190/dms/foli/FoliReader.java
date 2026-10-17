@@ -17,12 +17,15 @@ public class FoliReader {
   static final String PROGRESS="FOLI_PROGRESS\t", RESULT="FOLI_RESULT\t";
   static final int MAX_OUTPUT=64*1024*1024;
   record Request(Source source, FoliProperties config, String mode, int page) {}
-  record Response(Snapshot snapshot, byte[] png, String code, String message, int status) {}
+  public record Response(Snapshot snapshot, byte[] png, String code, String message, int status, IntakeIndicators.Report indicators) {
+    Response(Snapshot snapshot,byte[] png,String code,String message,int status) { this(snapshot,png,code,message,status,null); }
+  }
   private final FoliProperties config;
   private final ObjectMapper json=new ObjectMapper();
   public FoliReader(FoliProperties config) { this.config=config; }
   public Snapshot extract(Source source, Consumer<String> progress) { return run(source,"extract",0,progress).snapshot(); }
   public byte[] renderPage(Source source,int page) { return run(source,"render",page,ignored -> {}).png(); }
+  public Response inspect(Source source,Consumer<String> progress) { return run(source,"intake",0,progress); }
 
   private Response run(Source source,String mode,int page,Consumer<String> progress) {
     Path scratch=null; Process child=null; Set<ProcessHandle> descendants=new HashSet<>();
@@ -72,7 +75,8 @@ public class FoliReader {
       Response response=reader.get(3,TimeUnit.SECONDS);
       if(process.exitValue()!=0 || response==null) throw failed();
       if(response.code()!=null) throw new FoliException(HttpStatus.valueOf(response.status()),response.code(),response.message());
-      if(mode.equals("extract")?response.snapshot()==null:response.png()==null) throw failed();
+      if(mode.equals("render")?response.png()==null:response.snapshot()==null) throw failed();
+      if(mode.equals("intake") && response.indicators()==null) throw failed();
       return response;
     } catch(InterruptedException e) {
       Thread.currentThread().interrupt(); throw new CancellationException("Reading cancelled");
