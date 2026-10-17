@@ -10,6 +10,8 @@
     else root.removeAttribute('data-theme');
   }
   apply(read());
+  // Sidebar width preference, applied before first paint so pages never jump between widths.
+  try { if (localStorage.getItem('foliolet-sidebar') === 'collapsed') root.setAttribute('data-sidebar', 'collapsed'); } catch (e) {}
   document.addEventListener('DOMContentLoaded', function () {
     var buttons = document.querySelectorAll('[data-theme-choice]');
     function sync() {

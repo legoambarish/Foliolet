@@ -244,7 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (body.method === 'WATCHER_ASSISTED') names.push('Imported with Foliolet');
     names.push(body.lineage === 'SUGGESTIONS_UNMODIFIED' ? 'Suggested facts unchanged'
       : body.lineage === 'SUGGESTIONS_MODIFIED' ? 'Facts edited since extraction' : 'Manual facts / not compared', 'Issuer not verified');
-    for (const text of names) { const tag = document.createElement('span'); tag.className = 'mark quiet'; tag.textContent = text; labels.appendChild(tag); }
+    // Same tones as _intake_labels.html, so a label never changes colour when the page refreshes it.
+    const caution = new Set(['Possible DigiLocker document (unverified)', 'Facts edited since extraction']);
+    for (const text of names) { const tag = document.createElement('span'); tag.className = 'mark ' + (caution.has(text) ? 'caution' : 'quiet'); tag.textContent = text; labels.appendChild(tag); }
   }
   async function poll() {
     try {
