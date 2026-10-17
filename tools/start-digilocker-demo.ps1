@@ -86,13 +86,19 @@ Intake-Wait $ApiPort 90
 if ($LASTEXITCODE -ne 0) { throw 'Isolated registry trust provisioning failed' }
 $env:SPRING_BOOT_API_BASE_URL="http://127.0.0.1:$ApiPort"; $env:PUBLIC_EVM_RPC_URL="http://127.0.0.1:$EvmPort"
 # Keep the private UI local; publish selected disclosure links through the receiver.
-# An operator can still explicitly select local/named mode before starting.
-if (-not $env:FOLIOLET_SHARE_MODE) { $env:FOLIOLET_SHARE_MODE='quick' }
+$env:FOLIOLET_SHARE_MODE='quick'
+if (-not $env:CLOUDFLARED_PATH) {
+    $intakeCloudflared=Join-Path $RuntimeRoot '.local-tools\cloudflared\cloudflared.exe'
+    if (Test-Path -LiteralPath $intakeCloudflared) { $env:CLOUDFLARED_PATH=$intakeCloudflared }
+}
 $env:DJANGO_ALLOWED_HOSTS='localhost,127.0.0.1,testserver'
 & $intakePython (Join-Path $intakeRoot 'django-service\manage.py') migrate --noinput
 if ($LASTEXITCODE -ne 0) { throw 'Private Django migration failed' }
 Intake-Launch 'intake-django' $intakePython @((Join-Path $intakeRoot 'django-service\manage.py'), 'runserver', "127.0.0.1:$UiPort", '--noreload') $intakeRoot
 Intake-Wait $UiPort
+Intake-Status 'Starting Cloudflare receiver sharing'
+& $intakePython (Join-Path $intakeRoot 'tools\share-tunnel.py') start
+if ($LASTEXITCODE -ne 0) { throw 'Cloudflare receiver sharing could not start; inspect the tunnel startup message.' }
 & (Join-Path $PSScriptRoot 'start-digilocker-watcher.ps1') -Resume
 Intake-Status ("Ready: http://127.0.0.1:$UiPort/; sharing mode: " + $env:FOLIOLET_SHARE_MODE)
 if (-not (Test-Path -LiteralPath $intakeOcr)) { Intake-Status 'OCR is unavailable; originals and manual facts still work.' }
