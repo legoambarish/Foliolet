@@ -103,8 +103,11 @@ class FoliAuthorizationTest extends WalletTestContext {
     String jobId=job.get("id").toString(); long until=System.currentTimeMillis()+3000;
     while(!jobs.get(jobId,officer).get("state").equals("COMPLETE") && System.currentTimeMillis()<until) Thread.sleep(5);
     assertEquals("COMPLETE",jobs.get(jobId,officer).get("state"));
+    assertEquals(jobId,jobs.create(new FoliJobs.Request(id,null,"index",List.of(),old.hash()),officer).get("id"));
+    assertThrows(FoliException.class,() -> jobs.get(jobId,other));
     Path path=Path.of(record.getFilePath()); Files.writeString(path,"Replacement text: fee INR 777.");
     var changed=index.read(id,officer,s -> {}); assertNotEquals(old.hash(),changed.hash()); assertTrue(changed.pages().get(0).text().contains("777"));
+    assertThrows(FoliException.class,() -> jobs.create(new FoliJobs.Request(id,null,"index",List.of(),old.hash()),officer));
     assertEquals("SOURCE_CHANGED",assertThrows(FoliException.class,() -> jobs.get(jobId,officer)).code());
     mvc.perform(get("/api/foli/source").param("documentId",id).param("hash",old.hash()).param("page","1").with(httpBasic(officer.getUsername(),password))).andExpect(status().isConflict());
     record.setUploadedBy(other); legacy.saveAndFlush(record);
@@ -121,5 +124,14 @@ class FoliAuthorizationTest extends WalletTestContext {
     mvc.perform(post("/api/foli/jobs").with(httpBasic(owner.getUsername(),password)).header("X-Foli-Client","private")
         .contentType("application/json").content("x".repeat(32769))).andExpect(status().isPayloadTooLarge());
     verifyNoInteractions(model); assertEquals(audits,audit.count());
+  }
+  @Test void credentialStatusChangeInvalidatesCompletedResponseReuse() throws Exception {
+    String id=document(owner);var request=new FoliJobs.Request(id,null,"index",List.of(),null);
+    String job=jobs.create(request,owner).get("id").toString();long until=System.currentTimeMillis()+5000;
+    while(!jobs.get(job,owner).get("state").equals("COMPLETE") && System.currentTimeMillis()<until)Thread.sleep(10);
+    assertEquals("COMPLETE",jobs.get(job,owner).get("state"));
+    var record=credentials.findById(id.substring(7)).orElseThrow();record.status="REVOKED";credentials.saveAndFlush(record);
+    assertEquals("SOURCE_CHANGED",assertThrows(FoliException.class,()->jobs.get(job,owner)).code());
+    assertNotEquals(job,jobs.create(request,owner).get("id"));
   }
 }

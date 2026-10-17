@@ -78,6 +78,12 @@ def main():
     native('logo-only.pdf', True)
     native('qr-only.pdf', code=official)
     native('neither.pdf')
+    with fitz.open() as table:
+        page=table.new_page();page.insert_text((50,60),'SYNTHETIC TABLE - NOT ISSUED',fontsize=14)
+        for row,(label,score) in enumerate([('Subject','Marks'),('Math','90'),('Science','80'),('English','85')]):
+            y=120+row*35;page.insert_text((60,y),label,fontsize=14);page.insert_text((300,y),score,fontsize=14)
+            page.draw_line((50,y+8),(400,y+8))
+        table.save(OUT/'table.pdf')
     native('unrelated-qr.pdf', code='https://example.com/synthetic')
     native('scanned.pdf', True, official, scanned=True)
     native('hybrid.pdf', True, official, hybrid=True)

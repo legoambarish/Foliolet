@@ -28,6 +28,24 @@ PROFILE.update(DEBUG=False, PUBLIC_RECEIVER_ORIGIN=ORIGIN, PUBLIC_RECEIVER_INSTA
 
 @override_settings(**PROFILE)
 class ReceiverTests(TestCase):
+    @patch("dashboard.wallet_views.api.call")
+    def test_signed_selected_status_renders_only_after_full_verification(self, api):
+        proof = bundle()
+        proof['intakeStatus'] = {'schema': 'intake-status-v1', 'qr': 'PASSED', 'branding': 'PASSED',
+            'imported': 'NOT_CHECKED', 'pdfSignature': 'NOT_APPLICABLE', 'issuer': 'UNVERIFIED',
+            'facts': [{'index': 0, 'lineage': 'EDITED', 'support': 'REVIEW_REQUIRED'}]}
+        api.return_value = {'bundle': proof, 'verification': passed()}
+        response = self.client.post(PATH, secure=True, HTTP_HOST=HOST)
+        self.assertContains(response, 'Holder edited this suggestion')
+        self.assertContains(response, 'Original suggestion required source review')
+        self.assertContains(response, 'DigiLocker-associated QR detected')
+        self.assertContains(response, 'Issuer not verified')
+        self.assertNotContains(response, 'Imported with Foliolet')
+        api.return_value = {'bundle': proof, 'verification': passed() | {'verified': False}}
+        response = self.client.post(PATH, secure=True, HTTP_HOST=HOST)
+        self.assertNotContains(response, 'DigiLocker-associated QR detected')
+        self.assertNotContains(response, 'Holder edited this suggestion')
+
     def get(self, path, **kwargs):
         return self.client.get(path, secure=True, HTTP_HOST=HOST, **kwargs)
 

@@ -191,12 +191,15 @@ public class FoliExtractionService {
   }
 
   public byte[] renderPage(Source source, int number) {
+    return renderPage(source,number,130);
+  }
+  byte[] renderPage(Source source,int number,int desiredDpi) {
     if (!source.document().format().equals("pdf")) throw new FoliException(HttpStatus.BAD_REQUEST, "NO_RENDER", "Original page preview is available for PDF only.");
     try (var document = Loader.loadPDF(source.bytes())) {
       if (number < 1 || number > document.getNumberOfPages()) throw AuthorizedDocumentResolver.missing();
       hasImage(document.getPage(number-1).getResources(),0,Collections.newSetFromMap(new IdentityHashMap<>()),new long[2]);
       var renderer = new PDFRenderer(document); renderer.setSubsamplingAllowed(true);
-      var image = render(renderer, document.getPage(number-1), number-1, 130);
+      var image = render(renderer, document.getPage(number-1), number-1, Math.min(200,desiredDpi));
       var output = new ByteArrayOutputStream(); javax.imageio.ImageIO.write(image, "png", output); image.flush(); return output.toByteArray();
     } catch (IOException e) { throw AuthorizedDocumentResolver.failure("SOURCE_UNAVAILABLE", "Original page preview unavailable."); }
   }

@@ -35,6 +35,20 @@ test('genuine cryptography and separately supplied deployment pins pass',async()
   const b=await fixture(),c=chain(b);
   assert.equal((await c.verifier.verifyChain(b,c.provider,{...b.anchor})).current,true);
 });
+test('versioned intake extension is signed, scoped and cannot be stripped or upgraded',async()=>{
+  const b=await fixture(x=>{x.intakeStatus={schema:'intake-status-v1',qr:'PASSED',branding:'NOT_DISCLOSED',
+    imported:'NOT_APPLICABLE',pdfSignature:'NOT_CHECKED',issuer:'UNVERIFIED',facts:[{index:0,lineage:'EDITED',support:'REVIEW_REQUIRED'}]};});
+  assert.equal(tools.verifyCryptography(b).signatureValid,true);
+  for(const mutate of [x=>x.intakeStatus.qr='NOT_CHECKED',x=>x.intakeStatus.issuer='VERIFIED',
+      x=>x.intakeStatus.facts[0].lineage='UNCHANGED',x=>x.intakeStatus.facts[0].index=1,
+      x=>x.intakeStatus.facts.push({index:1,lineage:'UNCHANGED',support:'SUPPORTED'}),
+      x=>delete x.intakeStatus,x=>x.intakeStatus=null,x=>x.credentialVersion++]) {
+    const changed=structuredClone(b);mutate(changed);assert.throws(()=>tools.verifyCryptography(changed));
+  }
+  // Old signed presentations remain valid, but cannot acquire unsigned new statuses.
+  const old=await fixture();assert.equal(tools.verifyCryptography(old).signatureValid,true);
+  old.intakeStatus=b.intakeStatus;assert.throws(()=>tools.verifyCryptography(old));
+});
 test('all deployment pins are mandatory before any RPC',async()=>{
   const b=await fixture();
   for(const pins of [undefined,{}, {contract:b.anchor.contract}, {contract:b.anchor.contract,chainId:1337},

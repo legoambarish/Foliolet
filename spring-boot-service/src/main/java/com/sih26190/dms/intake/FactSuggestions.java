@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 /** Positioned source evidence binds each fact; local models may only select existing cell IDs. */
 @Service
 public class FactSuggestions {
-  public static final String VERSION="intake-facts-2-layout";
+  public static final String VERSION="intake-facts-3-labels-tables";
   public record Fragment(String layer,int start,int end,String quote,double left,double top,double width,double height,double confidence,
                          String channel,String method,int rotation) {}
   public record Support(String id,String quality,String relationship,List<Fragment> labels,List<Fragment> values,List<Fragment> headers,

@@ -16,7 +16,13 @@
     <div class="slip">
       <div class="slip-to"><span>For</span><strong>{{ p.verifierLabel }}</strong><span id="slip-purpose">{{ p.purpose }}</span></div>
       <ul class="lines">
-        {% for claim in b.claims %}{% with c=claim.leaf verifier=True %}<li class="line">{% include 'wallet/_fact_line.html' %}</li>{% endwith %}{% endfor %}
+        {% for claim in b.claims %}{% with c=claim.leaf verifier=True %}<li class="line">{% include 'wallet/_fact_line.html' %}
+          {% if v.verified and b.intakeStatus %}{% for fact in b.intakeStatus.facts %}{% if fact.index == c.index %}
+          <div class="tags" data-fact-lineage="{{ fact.lineage }}">
+            <span class="mark {% if fact.lineage == 'EDITED' or fact.lineage == 'ADDED' %}caution{% else %}quiet{% endif %}">{% if fact.lineage == 'UNCHANGED' %}Accepted unchanged from suggestion{% elif fact.lineage == 'EDITED' %}Holder edited this suggestion{% elif fact.lineage == 'ADDED' %}Added by holder{% elif fact.lineage == 'STALE_SOURCE' %}Source comparison stale{% elif fact.lineage == 'DERIVED' %}Derived fact{% else %}No extraction comparison{% endif %}</span>
+            {% if fact.support == 'REVIEW_REQUIRED' %}<span class="mark caution">Original suggestion required source review</span>{% elif fact.support == 'SUPPORTED' %}<span class="mark quiet">Original suggestion matched source evidence</span>{% endif %}
+          </div>{% endif %}{% endfor %}{% else %}<p class="help">No verified extraction lineage in this proof.</p>{% endif %}
+        </li>{% endwith %}{% endfor %}
       </ul>
       {% with withheld=b|withheld %}
       <div class="tray">
@@ -41,6 +47,16 @@
     </section>
     <section class="stack" aria-labelledby="source-title">
       <h2 id="source-title">Source assurance</h2>
+      {% if v.verified and b.intakeStatus %}
+      <div class="tags" id="recipient-intake-status">
+        {% if b.intakeStatus.qr != 'NOT_DISCLOSED' %}<span class="mark {% if b.intakeStatus.qr == 'PASSED' %}pass{% else %}quiet{% endif %}" data-check="qr">{% if b.intakeStatus.qr == 'PASSED' %}✓ DigiLocker-associated QR detected{% else %}QR check: {{ b.intakeStatus.qr|lower }}{% endif %}</span>{% endif %}
+        {% if b.intakeStatus.branding != 'NOT_DISCLOSED' %}<span class="mark {% if b.intakeStatus.branding == 'PASSED' %}pass{% else %}quiet{% endif %}" data-check="branding">{% if b.intakeStatus.branding == 'PASSED' %}✓ DigiLocker branding detected{% else %}Branding check: {{ b.intakeStatus.branding|lower }}{% endif %}</span>{% endif %}
+        {% if b.intakeStatus.imported == 'PASSED' %}<span class="mark pass" data-check="imported">✓ Imported with Foliolet</span>{% endif %}
+        <span class="mark quiet">Issuer not verified</span>
+        {% if b.intakeStatus.pdfSignature != 'NOT_DISCLOSED' %}<span class="mark {% if b.intakeStatus.pdfSignature == 'PASSED' %}pass{% elif b.intakeStatus.pdfSignature == 'FAILED' %}fail{% else %}quiet{% endif %}" data-check="pdfSignature">{% if b.intakeStatus.pdfSignature == 'PASSED' %}✓ PDF signature integrity passed{% else %}PDF signature: {{ b.intakeStatus.pdfSignature|lower }}{% endif %}</span>{% endif %}
+      </div>
+      <p class="help">These recorded states are bound to this signed presentation and document version. A matching format, copied graphic or observed import does not authenticate an issuer. Source support describes the saved suggestion, not correctness of a later edit.</p>
+      {% endif %}
       {% with level=b.provenance.level %}{% include 'wallet/_ladder.html' with vertical=True %}{% endwith %}
       <p class="help">{{ b.provenance.explanation }}</p>
       {% if b.provenance.firstReceivedAt %}<p class="help">First observed by the service {{ b.provenance.firstReceivedAt|wallet_time }}, across {{ b.provenance.observations }} observation{{ b.provenance.observations|pluralize }}.</p>{% endif %}

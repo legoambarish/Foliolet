@@ -43,6 +43,12 @@ public class FoliReviewService {
   }
 
   public FoliChatService.Answer review(Snapshot snapshot,Consumer<String> progress) {
+    return review(snapshot,progress,true);
+  }
+  public FoliChatService.Answer checklist(Snapshot snapshot,Consumer<String> progress) {
+    return review(snapshot,progress,false);
+  }
+  private FoliChatService.Answer review(Snapshot snapshot,Consumer<String> progress,boolean semantic) {
     progress.accept("Checking every readable page for fine print");
     var spans=retrieval.all(snapshot); var flags=new LinkedHashMap<Span,LinkedHashSet<String>>();
     for(var span:spans) {
@@ -54,7 +60,7 @@ public class FoliReviewService {
     int processed=0,batches=0,failed=0; long modelMillis=0,outputTokens=0;
     long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(100);
     // Every chunk is visited in source order, including pages with no keywords.
-    for(int offset=0;offset<spans.size();) {
+    for(int offset=0;semantic && offset<spans.size();) {
       if(System.nanoTime()>deadline) { warnings.add("Semantic review reached its time budget. Remaining chunks received the checklist scan only."); break; }
       var batch=new ArrayList<Span>(); String prompt="";
       while(offset<spans.size() && batch.size()<12) {

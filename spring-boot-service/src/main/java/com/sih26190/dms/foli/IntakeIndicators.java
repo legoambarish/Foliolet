@@ -15,7 +15,7 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 /** Offline pixel/QR heuristics, deliberately without any authenticity or network API. */
 public final class IntakeIndicators {
-  public static final String VERSION="intake-indicators-2-coverage";
+  public static final String VERSION="intake-indicators-3-structured-pixels";
   public record Bounds(float left,float top,float right,float bottom) {}
   public record Qr(String kind,String payloadHash,int payloadLength,Bounds bounds) {}
   public record PageResult(int page,boolean inspected,boolean logo,double logoScore,String logoEvidence,
@@ -23,7 +23,8 @@ public final class IntakeIndicators {
     public PageResult(int page,boolean inspected,boolean logo,double logoScore,String logoEvidence,List<Qr> qr,List<String> warnings){this(page,inspected,logo,logoScore,logoEvidence,qr,warnings,inspected,inspected);}
   }
   public record Report(String version,String sourceHash,String status,int totalPages,int inspectedPages,
-                       List<PageResult> pages,List<String> warnings,int qrInspectedPages,int logoInspectedPages) {
+                       List<PageResult> pages,List<String> warnings,int qrInspectedPages,int logoInspectedPages,String pdfSignature) {
+    public Report(String version,String sourceHash,String status,int totalPages,int inspectedPages,List<PageResult> pages,List<String> warnings,int qrInspectedPages,int logoInspectedPages){this(version,sourceHash,status,totalPages,inspectedPages,pages,warnings,qrInspectedPages,logoInspectedPages,"NOT_CHECKED");}
     public Report(String version,String sourceHash,String status,int totalPages,int inspectedPages,List<PageResult> pages,List<String> warnings){this(version,sourceHash,status,totalPages,inspectedPages,pages,warnings,inspectedPages,inspectedPages);}
   }
   private final FoliProperties config;
@@ -41,14 +42,17 @@ public final class IntakeIndicators {
     var pages=new ArrayList<PageResult>(); int inspected=0,logoInspected=0; boolean possible=false,weak=false;
     for(var page:snapshot.pages()) {
       FoliExtractionService.checkCancel();
-      if(page.number()>config.getMaxPages() || System.nanoTime()+TimeUnit.SECONDS.toNanos(2)>deadline || page.status().equals("SKIPPED_LIMIT") || page.status().equals("FAILED")) {
+      if(page.number()>config.getMaxPages() || System.nanoTime()+TimeUnit.SECONDS.toNanos(2)>deadline) {
         pages.add(new PageResult(page.number(),false,false,0,"Not inspected",List.of(),List.of("Page omitted by the safety budget or parser failure."))); continue;
       }
       try {
-        byte[] png=extraction.renderPage(source,page.number());
+        // Preview rendering at 130 DPI destroys one-pixel dense QR modules after
+        // PDFBox interpolation. Independent inspection uses 200 DPI within the
+        // same 8 MP ceiling and killable reader deadline.
+        byte[] png=extraction.renderPage(source,page.number(),200);
         var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
         try {
-          var cached=cachedReading(page,image);var qr=decode(image);
+          var cached=cachedReading(page,image);var qr=decode(image,config,deadline);
           int previous=config.getOcrTimeoutSeconds();config.setOcrTimeoutSeconds((int)Math.max(1,Math.min(previous,TimeUnit.NANOSECONDS.toSeconds(deadline-System.nanoTime())-1)));
           LogoReading graphic;
           try {graphic=recognizeLogo(image,ocr,cached);}finally{config.setOcrTimeoutSeconds(previous);}
@@ -61,14 +65,15 @@ public final class IntakeIndicators {
           if(logo.score()>0 && !logo.found()) warnings.add("Weak DigiLocker text/graphic resemblance; inspect the original.");
           pages.add(new PageResult(page.number(),true,logo.found(),logo.score(),logo.evidence(),qr,List.copyOf(warnings),true,readable));
           inspected++;if(readable)logoInspected++;
-          possible|=logo.found() || qr.stream().anyMatch(q -> q.kind().equals("DIGILOCKER_VERIFICATION_ORIGIN"));
+          possible|=logo.found() || qr.stream().anyMatch(q -> associated(q.kind()));
         } finally { image.flush(); }
       } catch(java.util.concurrent.CancellationException e) { throw e;
       } catch(Exception e) { pages.add(new PageResult(page.number(),false,false,0,"Rendering failed",List.of(),List.of("Indicator inspection failed; review the original."))); }
     }
     boolean partial=inspected<snapshot.pages().size() || logoInspected<snapshot.pages().size() || weak;
     return new Report(VERSION,source.hash(),possible?"POSSIBLE_DIGILOCKER_FORMAT":partial?"INCONCLUSIVE":"NO_DIGILOCKER_INDICATOR",
-        snapshot.pages().size(),inspected,List.copyOf(pages),partial?List.of("QR and logo coverage are reported separately. Weak or uninspected indicators establish no source origin."):List.of(),inspected,logoInspected);
+        snapshot.pages().size(),inspected,List.copyOf(pages),partial?List.of("QR and logo coverage are reported separately. Weak or uninspected indicators establish no source origin."):List.of(),inspected,logoInspected,
+        System.nanoTime()<deadline?PdfSignatureIntegrity.inspect(source.bytes()):"NOT_CHECKED");
   }
   private static OcrService.Result cachedReading(Page page,BufferedImage image) {
     if(page.layers()==null)return null;
@@ -83,6 +88,22 @@ public final class IntakeIndicators {
   }
   public static String qrKind(String payload) {
     if(payload==null || payload.length()>4096) return "UNKNOWN_QR";
+    if(payload.stripLeading().startsWith("[")) {
+      try {
+        var a=new com.fasterxml.jackson.databind.ObjectMapper().enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(payload);
+        // Empirical envelope profile, NOT a public cryptographic specification.
+        // Other headers remain unknown until separately documented and tested.
+        if(a.isArray() && a.size()==4 && a.get(0).isTextual() && a.get(1).isTextual()
+            && a.get(2).isTextual() && a.get(3).isTextual()
+            && a.get(0).asText().equals("5005") && a.get(1).asText().equals("1")
+            && a.get(2).asText().equals("Y")) {
+          String encoded=a.get(3).asText();byte[] bytes=Base64.getDecoder().decode(encoded);
+          if(bytes.length>=64 && bytes.length<=2048 && Base64.getEncoder().encodeToString(bytes).equals(encoded))
+            return "DIGILOCKER_ASSOCIATED_STRUCTURED";
+        }
+      } catch(Exception ignored) {}
+      return "UNRECOGNIZED_STRUCTURED_QR";
+    }
     try {
       var u=URI.create(payload);
       if("https".equals(u.getScheme()) && "verify.digilocker.gov.in".equalsIgnoreCase(u.getHost())
@@ -91,10 +112,44 @@ public final class IntakeIndicators {
     } catch(IllegalArgumentException ignored) {}
     return "GENERIC_QR_FOUND";
   }
+  public static boolean associated(String kind) {
+    return Set.of("DIGILOCKER_VERIFICATION_ORIGIN","DIGILOCKER_ASSOCIATED_STRUCTURED").contains(kind);
+  }
+  public static List<Qr> decode(BufferedImage image,FoliProperties config,long deadline) {
+    var found=new LinkedHashMap<String,Qr>();
+    for(var qr:decode(image)) found.put(qr.payloadHash(),qr);
+    // A readable generic code must not mask a dense associated code on the same page.
+    for(var qr:ComplementaryQr.decode(image,config,deadline))
+      if(found.size()<16) found.putIfAbsent(qr.payloadHash(),qr);
+    return List.copyOf(found.values());
+  }
   public static List<Qr> decode(BufferedImage image) {
     int width=image.getWidth(),height=image.getHeight();
     if((long)width*height>8_000_000) throw new IllegalArgumentException("Pixel budget exceeded");
     var found=new LinkedHashMap<String,Qr>();
+    decodeFrame(image,found,1,0,0,0);
+    // Dense one-pixel modules need a quiet zone and nearest-neighbour scaling.
+    // Bounded overlapping tiles isolate small codes from unrelated page graphics.
+    if(found.isEmpty()) {
+      long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(2);int tiles=0;
+      int side=Math.max(width,height)<=1000?Math.max(width,height):900;
+      for(int y=0;y<height && found.size()<16;y+=Math.max(1,side*3/4))
+        for(int x=0;x<width && found.size()<16;x+=Math.max(1,side*3/4)) {
+          if(++tiles>16 || System.nanoTime()>deadline)return List.copyOf(found.values());
+          FoliExtractionService.checkCancel();
+          int w=Math.min(side,width-x),h=Math.min(side,height-y);
+          double scale=Math.min(4,1500d/Math.max(w,h));int pad=32;
+          var frame=new BufferedImage((int)(w*scale)+2*pad,(int)(h*scale)+2*pad,BufferedImage.TYPE_INT_RGB);
+          var g=frame.createGraphics();g.setColor(Color.WHITE);g.fillRect(0,0,frame.getWidth(),frame.getHeight());
+          g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+          g.drawImage(image,pad,pad,pad+(int)(w*scale),pad+(int)(h*scale),x,y,x+w,y+h,null);g.dispose();
+          try {decodeFrame(frame,found,scale,x,y,pad);}finally{frame.flush();}
+        }
+    }
+    return List.copyOf(found.values());
+  }
+  private static void decodeFrame(BufferedImage image,Map<String,Qr> found,double scale,int offsetX,int offsetY,int pad) {
+    int width=image.getWidth(),height=image.getHeight();
     // ZXing handles quarter turns and multiple codes; inverted pass supports dark graphics.
     var luminance=new RGBLuminanceSource(width,height,image.getRGB(0,0,width,height,null,0,width));
     for(var source:List.of(luminance,luminance.invert())) {
@@ -102,16 +157,17 @@ public final class IntakeIndicators {
         var hints=new EnumMap<DecodeHintType,Object>(DecodeHintType.class);
         hints.put(DecodeHintType.TRY_HARDER,true); hints.put(DecodeHintType.POSSIBLE_FORMATS,List.of(BarcodeFormat.QR_CODE));
         for(var result:new QRCodeMultiReader().decodeMultiple(new BinaryBitmap(new HybridBinarizer(source)),hints)) {
-          String text=result.getText(); byte[] raw=result.getRawBytes();
-          byte[] hashBytes=raw==null?(text==null?new byte[0]:text.getBytes(StandardCharsets.UTF_8)):raw;
+          String text=result.getText();
+          byte[] hashBytes=text==null?new byte[0]:text.getBytes(StandardCharsets.UTF_8);
           String hash=PrivateVault.sha256(hashBytes);
           float left=width,top=height,right=0,bottom=0;
           for(var p:result.getResultPoints()) { left=Math.min(left,p.getX()); top=Math.min(top,p.getY()); right=Math.max(right,p.getX()); bottom=Math.max(bottom,p.getY()); }
-          if(found.size()<16) found.putIfAbsent(hash,new Qr(qrKind(text),hash,Math.min(hashBytes.length,4096),new Bounds(left,top,right,bottom)));
+          if(found.size()<16) found.putIfAbsent(hash,new Qr(qrKind(text),hash,Math.min(hashBytes.length,4096),new Bounds(
+              (float)((left-pad)/scale+offsetX),(float)((top-pad)/scale+offsetY),
+              (float)((right-pad)/scale+offsetX),(float)((bottom-pad)/scale+offsetY))));
         }
       } catch(NotFoundException ignored) {}
     }
-    return List.copyOf(found.values());
   }
   public record Logo(boolean found,double score,String evidence) {}
   public record LogoReading(Logo logo,boolean readable) {}
@@ -119,6 +175,8 @@ public final class IntakeIndicators {
     return recognizeLogo(image,ocr,null);
   }
   private static LogoReading recognizeLogo(BufferedImage image,OcrService ocr,OcrService.Result cached) {
+    var pixels=BrandingTemplate.match(image);
+    if(pixels.found())return new LogoReading(pixels,true);
     var recognized=cached==null?ocr.recognize(image):cached; var first=logo(image,recognized);
     if(!first.found()) {
       var template=graphicTemplate(image,ocr);
@@ -192,6 +250,7 @@ public final class IntakeIndicators {
   public static Logo logo(BufferedImage image,OcrService.Result recognized) {
     // A geometric text template: complete short Powered-by block next to a large
     // DigiLocker wordmark. A mention embedded in prose does not fit this layout.
+    if(recognized==null)return new Logo(false,0,"Logo reading unavailable");
     var words=recognized.words();
     for(int i=0;i<words.size();i++) {
       var word=words.get(i);

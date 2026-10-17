@@ -23,7 +23,13 @@ public final class WalletDtos {
       @NotBlank @Size(max = 150) String verifierLabel,
       @NotBlank @Size(max = 250) String purpose,
       @Min(1) @Max(10080) int expiresInMinutes,
-      boolean oneTime) {}
+      boolean oneTime,
+      Boolean includeDocumentStatus) {
+    public ShareRequest {if(includeDocumentStatus==null)includeDocumentStatus=false;}
+    public ShareRequest(String credentialId,List<String> claimIds,String verifierLabel,String purpose,int expiresInMinutes,boolean oneTime) {
+      this(credentialId,claimIds,verifierLabel,purpose,expiresInMinutes,oneTime,false);
+    }
+  }
 
   public record ObservationInput(
       @NotBlank String agentId,
@@ -75,7 +81,17 @@ public final class WalletDtos {
       Presentation presentation,
       List<RevealedClaim> claims,
       String envelopeHash,
-      String platformSignature) {}
+      String platformSignature,
+      @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) IntakeStatus intakeStatus) {
+    public Bundle(String format,String credentialId,int credentialVersion,String merkleRoot,int leafCount,Anchor anchor,
+        Provenance provenance,Presentation presentation,List<RevealedClaim> claims,String envelopeHash,String platformSignature) {
+      this(format,credentialId,credentialVersion,merkleRoot,leafCount,anchor,provenance,presentation,claims,envelopeHash,platformSignature,null);
+    }
+  }
+
+  /** Versioned signed extension. No hidden values, raw source hashes, QR data or edit counts. */
+  public record FactStatus(int index,String lineage,String support) {}
+  public record IntakeStatus(String schema,String qr,String branding,String imported,String pdfSignature,String issuer,List<FactStatus> facts) {}
 
   public record CheckResult(
       boolean proofValid,

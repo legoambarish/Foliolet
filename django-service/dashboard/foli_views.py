@@ -66,7 +66,9 @@ def jobs(request):
     if len(raw) > 32768:
         return JsonResponse({'code': 'REQUEST_LIMIT', 'message': 'The question is too large.'}, status=413)
     payload = json.loads(raw)
-    if not isinstance(payload, dict) or set(payload) - {'documentId', 'question', 'mode', 'history', 'sourceHash'}:
+    if not isinstance(payload, dict) or set(payload) - {'documentId', 'question', 'mode', 'history', 'sourceHash', 'cloudConsent'}:
+        raise ValueError()
+    if 'cloudConsent' in payload and not isinstance(payload['cloudConsent'], bool):
         raise ValueError()
     return proxy(request, 'jobs', payload=payload)
 

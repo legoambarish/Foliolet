@@ -345,7 +345,13 @@ legend{padding:0;margin-bottom:6px}
 .mark.quiet{--tone:var(--ink-3)}
 .mark.wrap{white-space:normal}
 .lede .mark{font-size:var(--t-small);padding:4px 10px 4px 7px}
-.intake-labels{display:flex;flex-wrap:wrap;gap:6px;max-width:100%}
+.intake-labels,.tags{display:flex;flex-wrap:wrap;gap:6px;max-width:100%}
+.tags{margin-top:var(--s2)}
+.line>.tags,.line>.help{grid-column:1/-1}
+.tags .mark{white-space:normal;overflow-wrap:anywhere}
+/* Recorded checks that already print their own tick: keep the text, drop the duplicate glyph. */
+.mark[data-state="PASSED"]::before,.mark.pass[data-check]::before{display:none}
+.mark[data-state="PASSED"],.mark.pass[data-check]{padding-left:9px}
 .intake-labels .mark{white-space:normal;overflow-wrap:anywhere}
 
 /* ---------- Register (document list) ---------- */

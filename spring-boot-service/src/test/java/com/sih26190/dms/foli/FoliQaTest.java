@@ -16,6 +16,24 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class FoliQaTest {
+  @Test void cloudOutageFallsBackLocallyAndCloudCitationsStayUntrusted() throws Exception {
+    var local=mock(FoliLocalModel.class);var cloud=mock(FoliGeminiModel.class);
+    when(local.promptFits(anyString(),anyString())).thenReturn(true);
+    when(cloud.available()).thenReturn(true);
+    var service=new FoliChatService(local,retrieval,verifier,cloud);
+    when(cloud.ask(eq(true),anyString(),anyString(),any())).thenThrow(
+        new FoliException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"GEMINI_UNAVAILABLE","Unavailable"));
+    when(local.ask(anyString(),anyString(),eq(FoliChatService.GENERAL_FORMAT))).thenReturn(
+        new FoliLocalModel.Reply("{\"answer\":\"Local fallback answer.\"}",1,5));
+    var result=service.chat("Explain selective disclosure",List.of(),null,s->{},true);
+    assertEquals("Local fallback answer.",result.answer());assertTrue(result.warnings().get(0).contains("local Ollama"));
+    when(cloud.ask(eq(true),anyString(),anyString(),any())).thenReturn(
+        new FoliLocalModel.Reply("{\"answer\":\"Invented fee [E9999]\",\"evidence\":[\"E9999\"]}",1,5));
+    var forged=service.chat("Explain the fee",List.of(),corpus(),s->{},true);
+    assertEquals("NO_SOURCE_SUPPORT",forged.answerKind());assertTrue(forged.citations().isEmpty());
+    when(cloud.ask(eq(true),anyString(),anyString(),any())).thenReturn(new FoliLocalModel.Reply("not JSON",1,3));
+    assertTrue(service.chat("Explain the fee",List.of(),corpus(),s->{},true).citations().isEmpty());
+  }
   final ObjectMapper json=new ObjectMapper();
   final FoliRetrievalService retrieval=new FoliRetrievalService();
   final CitationVerifier verifier=new CitationVerifier();

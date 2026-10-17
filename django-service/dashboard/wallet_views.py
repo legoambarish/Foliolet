@@ -238,7 +238,8 @@ def compose(request, credential_id):
                 created = api.call("POST", "/api/wallet/disclosures", request.session["sb_auth"], payload={
                     "credentialId": credential_id, "claimIds": request.POST.getlist("claims"),
                     "verifierLabel": request.POST.get("verifier_label", ""), "purpose": request.POST.get("purpose", ""),
-                    "expiresInMinutes": minutes, "oneTime": request.POST.get("one_time") == "yes"})
+                    "expiresInMinutes": minutes, "oneTime": request.POST.get("one_time") == "yes",
+                    "includeDocumentStatus": request.POST.get("include_document_status") == "yes"})
             except api.WalletAPIError as exc:
                 if exc.status >= 500:
                     raise api.WalletAPIError("Share creation could not be confirmed. Check Shared for a new grant and revoke it before retrying.", exc.status) from None

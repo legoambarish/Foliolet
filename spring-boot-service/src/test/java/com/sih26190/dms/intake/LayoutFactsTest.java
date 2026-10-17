@@ -156,4 +156,67 @@ class LayoutFactsTest {
     assertEquals(2,r.fields().size());assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Mathematics total marks") && f.value().equals("91")));
     assertTrue(r.fields().stream().allMatch(f -> f.support().headers().stream().anyMatch(h -> h.quote().contains("Max."))));
   }
+  Snapshot positioned(String[][] rows) {
+    var text=new StringBuilder();var words=new ArrayList<Word>();
+    for(var row:rows) {
+      int start=text.length();text.append(row[2]).append('\n');
+      words.add(new Word(row[2],start,start+row[2].length(),Integer.parseInt(row[0]),Integer.parseInt(row[1]),Math.max(8,row[2].length()*5),10,100));
+    }
+    var layer=new Layer("native","NATIVE",0,1000,1000,words,List.of());
+    return new Snapshot(unusualCells().document(),"e".repeat(64),List.of(new Page(1,text.toString(),"TEXT",null,0,0,0,List.of(),List.of(),List.of(layer))),null);
+  }
+  @Test void separateColonIsSkippedAndBilingualEnglishAnchorRetainsExactEvidence() {
+    var r=suggest(positioned(new String[][]{{"30","20","Name"},{"160","20",":"},{"220","20","MIRA EXAMPLE"},
+        {"30","60","ifj.kke RESULT: PASS"},{"30","100","noise Mother's Name"},{"220","100","LEELA EXAMPLE"}}));
+    assertEquals(3,r.fields().size());
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Name") && f.value().equals("MIRA EXAMPLE")));
+    var result=r.fields().stream().filter(f -> f.label().equals("RESULT")).findFirst().orElseThrow();
+    assertEquals("PASS",result.value());assertEquals("RESULT",result.support().labels().get(0).quote());
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Mother's Name") && f.value().equals("LEELA EXAMPLE")));
+    verifyNoInteractions(model);
+  }
+  @Test void headersSubjectListsAndProseDoNotBecomeHolderFacts() {
+    var r=suggest(positioned(new String[][]{{"30","20","TOTAL"},{"220","20","TOTAL (IN WORDS)"},
+        {"30","60","RESULT: EDUCATION COMPUTER CHEMISTRY MATHEMATICS"},
+        {"30","100","NAME EDUCATIONAL Father's/Guardian's This"},{"30","140","Result: PASS"}}));
+    assertEquals(1,r.fields().size());assertEquals("PASS",r.fields().get(0).value());
+    assertTrue(((Map<?,?>)r.diagnostics().get("rejections")).containsKey("LABEL_VALUE_SEMANTIC_MISMATCH"));
+    verifyNoInteractions(model);
+  }
+  @Test void resultDateDoesNotLoseItsDateLabelToTheResultAnchor() {
+    var r=suggest(positioned(new String[][]{{"30","20","Date of declaration of result: 19/06/2024"}}));
+    assertEquals(1,r.fields().size());assertEquals("Date of declaration of result",r.fields().get(0).label());
+    assertEquals("2024-06-19",r.fields().get(0).value());assertEquals("date",r.fields().get(0).type());
+  }
+  @Test void multiLineTableCaptionsKeepTotalSeparateFromWordsAndGrade() {
+    var r=suggest(positioned(new String[][]{{"20","20","SUBJECT"},{"170","20","SUBJECT NAME"},{"360","20","THEORY"},
+        {"480","20","PRACTICAL"},{"610","20","TOTAL"},{"720","20","TOTAL (IN WORDS)"},{"900","20","POSITIONAL"},
+        {"20","35","CODE"},{"900","35","GRADE"},
+        {"20","65","041"},{"170","65","MATHEMATICS"},{"360","65","051"},{"480","65","026"},
+        {"610","65","077"},{"720","65","SEVENTY SEVEN"},{"900","65","B1"},
+        {"20","90","502"},{"170","90","HEALTH & PHYSICAL"},{"610","90","---"},{"900","90","A2"},
+        {"170","105","EDUCATION"},
+        {"20","130","503"},{"170","130","GENERAL STUDIES"},{"610","130","---"},{"900","130","A2"}}));
+    assertEquals(6,r.fields().size());
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("MATHEMATICS total marks") && f.value().equals("77")));
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("MATHEMATICS grade") && f.value().equals("B1")));
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("HEALTH & PHYSICAL EDUCATION grade")));
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("GENERAL STUDIES grade")));
+    assertTrue(r.fields().stream().allMatch(f -> f.support().relationship().equals("TABLE_HEADER_AND_ROW")));
+    verifyNoInteractions(model);
+  }
+  @Test void percentageMarksColumnKeepsOnlyItsPrintedNumericToken() {
+    var r=suggest(positioned(new String[][]{{"30","20","Subjects"},{"400","20","Percentage Marks"},{"800","20","Grade"},
+        {"30","60","MATHEMATICS"},{"400","60","87 EIGHT SEVEN"},{"800","60","2 TWO"}}));
+    var f=r.fields().stream().filter(c -> c.path().equals("education.math")).findFirst().orElseThrow();
+    assertEquals("87",f.value());assertEquals("87",f.support().values().get(0).quote());
+    assertEquals(2,r.fields().size());verifyNoInteractions(model);
+  }
+  @Test void assessmentSectionIsNotAppendedToThePreviousSubject() {
+    var r=suggest(positioned(new String[][]{{"30","20","Subjects"},{"400","20","Percentage Marks"},{"800","20","Grade"},
+        {"30","60","COMPUTER SCIENCE"},{"400","60","87 EIGHT SEVEN"},{"800","60","2 TWO"},
+        {"30","85","INTERNAL ASSESSMENT"},{"30","110","COMMUNITY SERVICE"},{"800","110","A"}}));
+    assertEquals(2,r.fields().size());assertTrue(r.fields().stream().allMatch(f -> f.label().startsWith("COMPUTER SCIENCE ")));
+    assertTrue(r.fields().stream().noneMatch(f -> f.label().contains("ASSESSMENT")));
+  }
 }

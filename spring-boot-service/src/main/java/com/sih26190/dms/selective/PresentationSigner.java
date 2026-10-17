@@ -39,7 +39,7 @@ public class PresentationSigner {
   public String hash(Bundle b) {
     try {
       var out = new ByteArrayOutputStream();
-      out.write(3);
+      out.write(b.intakeStatus()==null?3:4);
       Presentation p = b.presentation();
       Anchor a = b.anchor();
       out.write(
@@ -65,6 +65,21 @@ public class PresentationSigner {
               Boolean.toString(p.oneTime())));
       for (var claim : b.claims())
         out.write(MerkleTreeService.hex32(merkle.leafHash(claim.leaf())));
+      if(b.intakeStatus()!=null) {
+        var s=b.intakeStatus();
+        if(!"intake-status-v1".equals(s.schema()) || !"UNVERIFIED".equals(s.issuer())
+            || s.facts()==null || s.facts().size()!=b.claims().size())throw new IllegalArgumentException("Invalid intake status");
+        var states=Set.of("PASSED","FAILED","INCONCLUSIVE","NOT_CHECKED","NOT_APPLICABLE","NOT_DISCLOSED");
+        if(!states.contains(s.qr()) || !states.contains(s.branding()) || !states.contains(s.imported()) || !states.contains(s.pdfSignature()))throw new IllegalArgumentException("Invalid status state");
+        out.write(MerkleTreeService.encode(s.schema(),s.qr(),s.branding(),s.imported(),s.pdfSignature(),s.issuer()));
+        for(int i=0;i<s.facts().size();i++) {
+          var f=s.facts().get(i);
+          if(f.index()!=b.claims().get(i).leaf().index()
+              || !Set.of("UNCHANGED","EDITED","ADDED","NOT_ASSESSED","STALE_SOURCE","DERIVED").contains(f.lineage())
+              || !Set.of("SUPPORTED","REVIEW_REQUIRED","NOT_ASSESSED","DERIVED").contains(f.support()))throw new IllegalArgumentException("Invalid fact status");
+          out.write(MerkleTreeService.encode(Integer.toString(f.index()),f.lineage(),f.support()));
+        }
+      }
       return Numeric.toHexString(Hash.sha3(out.toByteArray()));
     } catch (IOException impossible) {
       throw new IllegalStateException(impossible);
@@ -90,7 +105,7 @@ public class PresentationSigner {
         b.presentation(),
         b.claims(),
         hash,
-        Numeric.toHexString(bytes));
+        Numeric.toHexString(bytes),b.intakeStatus());
   }
 
   public boolean verify(Bundle b) {

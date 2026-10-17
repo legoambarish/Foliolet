@@ -1,3 +1,4 @@
 # Optional compact CPU fallback, bundled model hashes enforced by ocr-layout-worker.py.
 rapidocr==3.10.0
 onnxruntime==1.31.0
+zxing-cpp==2.3.0

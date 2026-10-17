@@ -113,6 +113,11 @@ class WalletWorkflowTest extends WalletTestContext {
     assertTrue(signer.verify(result.bundle()));
     String encoded = json.write(result.bundle());
     assertEquals(result.bundle(), json.readBundle(encoded));
+    var b=result.bundle();
+    var legacy=signer.sign(new Bundle(b.format(),b.credentialId(),b.credentialVersion(),b.merkleRoot(),b.leafCount(),
+        b.anchor(),b.provenance(),b.presentation(),b.claims(),null,null));
+    assertTrue(signer.verify(json.readBundle(json.write(legacy))),"Legacy envelopes survive strict JSON parsing");
+    assertThrows(IllegalArgumentException.class,()->json.readBundle(json.write(legacy).replaceFirst("\\}$",",\"intakeStatus\":null}")));
     assertThrows(IllegalArgumentException.class,
         () -> json.readBundle(encoded.substring(0, encoded.length()-1) + ",\"unsignedExtra\":true}"));
     assertThrows(IllegalArgumentException.class,

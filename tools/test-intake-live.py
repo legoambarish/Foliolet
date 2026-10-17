@@ -23,6 +23,7 @@ FIXTURES = OUT / 'fixtures'
 API = os.environ.get('INTAKE_TEST_API', 'http://127.0.0.1:8088')
 UI = os.environ.get('INTAKE_TEST_UI', 'http://127.0.0.1:8008')
 DSN = os.environ.get('INTAKE_TEST_DSN', 'host=127.0.0.1 port=55438 dbname=wallet_intake_demo user=wallet')
+RPC = os.environ.get('INTAKE_TEST_RPC', 'http://127.0.0.1:8548')
 HTTP = requests.Session(); HTTP.trust_env = False
 checks = []
 for origin in (API, UI):
@@ -37,6 +38,12 @@ def check(condition, name):
 
 def request(method, path, auth=None, expected=200, **kwargs):
     response = HTTP.request(method, API + path, auth=auth, timeout=(5, 60), **kwargs)
+    # Real source rendering has its own bounded reader gate; wait without relaxing it.
+    if method == 'GET' and path.startswith('/api/foli/'):
+        for _ in range(30):
+            if response.status_code != 429: break
+            time.sleep(1)
+            response = HTTP.request(method, API + path, auth=auth, timeout=(5, 60), **kwargs)
     assert response.status_code == expected, f'{method} private route returned {response.status_code}; expected {expected}'
     return response.json() if 'application/json' in response.headers.get('Content-Type', '') else response
 
@@ -81,7 +88,7 @@ def independent(bundle, expected=True):
     network = json.loads((ROOT / '.local-data/trusted-deployment.json').read_text(encoding='utf-8-sig'))
     result = subprocess.run(['node', str(ROOT / 'spring-boot-service/scripts/verify-proof.cjs'), str(artifact),
                              '--contract', network['contract'], '--operator', network['operator'], '--chain-id', str(network['chainId']),
-                             '--rpc', 'http://127.0.0.1:8548'], capture_output=True, text=True)
+                             '--rpc', RPC], capture_output=True, text=True)
     assert (result.returncode == 0) == expected, 'Independent pinned verifier result'
 
 
@@ -148,7 +155,7 @@ def main():
     request('POST', '/api/wallet/intake/sessions/' + config['sessionId'] + '/stop', other, expected=404)
     check(True, 'Capability rejects browser Origin, full-wallet access and cross-owner stop')
     log = (OUT / 'watcher-live.log').open('w', encoding='utf-8')
-    child = subprocess.Popen([sys.executable, str(ROOT / 'tools/local-watcher/intake.py'), '--config', str(pair)],
+    child = subprocess.Popen([sys.executable, str(ROOT / 'tools/local-watcher/intake.py'), '--config', str(pair), '--app-pid', str(os.getpid())],
         cwd=ROOT, stdout=log, stderr=log, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     try:
         deadline = time.monotonic() + 20
@@ -267,7 +274,7 @@ def main():
     review_credential = upload(owner, 'neither.pdf')
     analysis(owner, review_credential)
     before = request('GET', '/api/wallet/documents/' + credential, owner)
-    chain_before = HTTP.post('http://127.0.0.1:8548', json={'jsonrpc': '2.0', 'id': 1, 'method': 'eth_blockNumber', 'params': []}, timeout=5).json()['result']
+    chain_before = HTTP.post(RPC, json={'jsonrpc': '2.0', 'id': 1, 'method': 'eth_blockNumber', 'params': []}, timeout=5).json()['result']
     refused = HTTP.post(API + '/api/foli/jobs', auth=owner, json={'mode': 'chat', 'question': 'Synthetic boundary control'}, timeout=10)
     check(refused.status_code == 403, 'Original Foli write-shaped requests still require the private-client boundary header')
     general = foli(owner, question='Explain briefly what a cryptographic hash is.', mode='chat')
@@ -277,7 +284,7 @@ def main():
     review = foli(owner, documentId='wallet:' + review_credential, mode='review')
     check(review['answerKind'] == 'DOCUMENT_REVIEW' and review['manifest']['complete'] and review['findings']
           and any('unless' in c['quote'] or '9300' in c['quote'] for c in review['citations']), 'Original complete fine-print review retains fee and exception evidence')
-    chain_after = HTTP.post('http://127.0.0.1:8548', json={'jsonrpc': '2.0', 'id': 2, 'method': 'eth_blockNumber', 'params': []}, timeout=5).json()['result']
+    chain_after = HTTP.post(RPC, json={'jsonrpc': '2.0', 'id': 2, 'method': 'eth_blockNumber', 'params': []}, timeout=5).json()['result']
     check(before == request('GET', '/api/wallet/documents/' + credential, owner) and chain_before == chain_after,
           'Foli general chat, document chat and review leave wallet facts, lineage and chain unchanged')
     # Credentials are intentionally excluded from the durable evidence report.

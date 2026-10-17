@@ -11,6 +11,8 @@ if (!fs.existsSync(keyFile)) {
 const key = fs.readFileSync(keyFile, 'utf8').trim();
 const server = ganache.server({chain:{chainId:1337, networkId:1337, hardfork:'shanghai'},
   wallet:{accounts:[{secretKey:key, balance:'0x3635c9adc5dea00000'}]}, database:{dbPath:dir}, logging:{quiet:true}});
-server.listen(8548, '127.0.0.1').then(() => console.log('Isolated Foliolet demo EVM ready on loopback 8548.'));
+const port = Number(process.env.FOLIOLET_EVM_PORT || 8548);
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error('Invalid loopback EVM port');
+server.listen(port, '127.0.0.1').then(() => console.log(`Isolated Foliolet demo EVM ready on loopback ${port}.`));
 process.on('SIGINT', async () => {await server.close(); process.exit(0);});
 process.on('SIGTERM', async () => {await server.close(); process.exit(0);});

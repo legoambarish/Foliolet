@@ -36,6 +36,7 @@ public class FoliChatService {
   private final FoliRetrievalService retrieval;
   private final CitationVerifier verifier;
   private final ObjectMapper json=new ObjectMapper();
+  private final FoliGeminiModel gemini;
   public record Turn(@jakarta.validation.constraints.Pattern(regexp="user|assistant") String role,
                      @jakarta.validation.constraints.Size(max=1500) String text) {}
   public record Answer(String answer, String answerKind, List<Citation> citations,
@@ -43,7 +44,20 @@ public class FoliChatService {
                        Map<String,Object> reviewCoverage, Map<String,Object> performance) {}
 
   public FoliChatService(FoliLocalModel model, FoliRetrievalService retrieval, CitationVerifier verifier) {
-    this.model=model; this.retrieval=retrieval; this.verifier=verifier;
+    this(model,retrieval,verifier,null);
+  }
+  @org.springframework.beans.factory.annotation.Autowired
+  public FoliChatService(FoliLocalModel model,FoliRetrievalService retrieval,CitationVerifier verifier,FoliGeminiModel gemini) {
+    this.model=model;this.retrieval=retrieval;this.verifier=verifier;this.gemini=gemini;
+  }
+  public boolean cloudAvailable(){return gemini!=null && gemini.available();}
+  private FoliLocalModel.Reply ask(String system,String prompt,Object format,boolean consent,List<String> warnings) {
+    if(consent) {
+      if(!cloudAvailable())throw new FoliException(org.springframework.http.HttpStatus.FORBIDDEN,"CLOUD_DISABLED","Gemini is disabled until paid-service handling is reviewed. Use local mode.");
+      try {var reply=gemini.ask(true,system,prompt,format);warnings.add("Gemini received this question, conversation context and any supplied text excerpts with your consent. Interpretations remain unverified.");return reply;}
+      catch(FoliException e){warnings.add("Gemini could not complete this request; local Ollama was used instead.");}
+    }
+    return "json".equals(format)?model.ask(system,prompt,true):model.ask(system,prompt,format);
   }
 
   static boolean action(String question) {
@@ -51,6 +65,9 @@ public class FoliChatService {
   }
 
   public Answer chat(String question, List<Turn> history, Snapshot snapshot, Consumer<String> progress) {
+    return chat(question,history,snapshot,progress,false);
+  }
+  public Answer chat(String question,List<Turn> history,Snapshot snapshot,Consumer<String> progress,boolean cloudConsent) {
     var warnings=new ArrayList<String>();
     if (snapshot!=null) warnings.addAll(snapshot.manifest().warnings());
     if (action(question)) return new Answer(
@@ -60,11 +77,11 @@ public class FoliChatService {
       if (DOCUMENT_QUESTION.matcher(question).find()) return new Answer(
           "Please select a wallet/document from the sidebar first, then ask me about it.","GENERAL",List.of(),null,List.of(),List.of(),Map.of(),Map.of());
       progress.accept("Writing answer");
-      var reply=model.ask(GENERAL_SYSTEM,"Current question: "+question+"\nConversation history (context only): "+history(history),GENERAL_FORMAT);
+      var reply=ask(GENERAL_SYSTEM,"Current question: "+question+"\nConversation history (context only): "+history(history),GENERAL_FORMAT,cloudConsent,warnings);
       try {
         String answer=json.readTree(reply.text()).path("answer").asText("").trim();
         if (answer.isBlank() || answer.length()>16000) throw new IllegalArgumentException();
-        return new Answer(answer,"GENERAL",List.of(),null,List.of(),List.of(),Map.of(),performance(reply));
+        return new Answer(answer,"GENERAL",List.of(),null,List.copyOf(warnings),List.of(),Map.of(),performance(reply));
       } catch (Exception e) {
         return new Answer("I couldn't produce a clean answer this time. Please try again.","GENERAL",List.of(),null,
             List.of("The local model response was not in the expected format, so it was not shown."),List.of(),Map.of(),performance(reply));
@@ -87,7 +104,7 @@ public class FoliChatService {
     }
     if (supplied.size()<spans.size()) warnings.add("Only the best-fitting source excerpts were supplied to the model; this answer is not a whole-document review.");
     progress.accept("Writing answer");
-    var reply=model.ask(SYSTEM,prompt,true);
+    var reply=ask(SYSTEM,prompt,"json",cloudConsent,warnings);
     progress.accept("Checking citations");
     String answer; var citations=new ArrayList<Citation>();
     try {
