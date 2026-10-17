@@ -25,9 +25,9 @@ public class FoliJobs {
   }
   private static class Job {
     final String id=UUID.randomUUID().toString(); final long owner,created=System.currentTimeMillis();
-    final String documentId,hash,version; volatile String state="QUEUED",stage="Queued",code="",message="";
+    final String documentId,hash,version,documentStatus; volatile String state="QUEUED",stage="Queued",code="",message="";
     volatile Object result,preview; volatile Future<?> future;
-    Job(long owner,String documentId,String hash,String version) { this.owner=owner; this.documentId=documentId; this.hash=hash; this.version=version; }
+    Job(long owner,String documentId,String hash,String version,String documentStatus) { this.owner=owner; this.documentId=documentId; this.hash=hash; this.version=version;this.documentStatus=documentStatus; }
     boolean active() { return state.equals("QUEUED") || state.equals("RUNNING"); }
   }
   private final Map<String,Job> jobs=new ConcurrentHashMap<>();
@@ -66,11 +66,11 @@ public class FoliJobs {
     Source source=id==null?null:resolver.open(id,user);
     if (source!=null && request.sourceHash()!=null) FoliController.requireHash(request.sourceHash(),source.hash());
     if(request.cloudConsent() && (!mode.equals("chat") || !chat.cloudAvailable()))throw new FoliException(HttpStatus.FORBIDDEN,"CLOUD_DISABLED","This request requires local mode or configured, reviewed Gemini access.");
-    String requestKey=user.getId()+":"+Objects.toString(id,"")+":"+(source==null?"":source.hash()+":"+source.document().version())+":"+mode+":"+request.toString();
+    String requestKey=user.getId()+":"+Objects.toString(id,"")+":"+(source==null?"":source.hash()+":"+source.document().version()+":"+source.document().status())+":"+mode+":"+request.toString();
     // Memory-only, same owner/source/version/request. Every release reauthorizes current access.
     var previous=jobs.get(completedRequests.getOrDefault(requestKey,""));
     if(previous!=null && previous.state.equals("COMPLETE")){current(previous,user);return view(previous);}
-    var job=new Job(user.getId(),id,source==null?"":source.hash(),source==null?"":source.document().version());
+    var job=new Job(user.getId(),id,source==null?"":source.hash(),source==null?"":source.document().version(),source==null?"":source.document().status());
     jobs.put(job.id,job);
     try { job.future=executor.submit(() -> execute(job,request,mode));completedRequests.put(requestKey,job.id); }
     catch(RejectedExecutionException e) { jobs.remove(job.id); throw new FoliException(HttpStatus.TOO_MANY_REQUESTS,"BUSY","Foli's local queue is full. Retry shortly."); }
@@ -114,7 +114,7 @@ public class FoliJobs {
     user=users.findById(job.owner).orElseThrow(AuthorizedDocumentResolver::missing);
     Source current=resolver.open(job.documentId,user);
     FoliController.requireHash(job.hash,current.hash());
-    if (!job.version.equals(current.document().version())) throw AuthorizedDocumentResolver.failure("SOURCE_CHANGED","Document version changed. Read it again.");
+    if (!job.version.equals(current.document().version()) || !job.documentStatus.equals(current.document().status())) throw AuthorizedDocumentResolver.failure("SOURCE_CHANGED","Document version or status changed. Read it again.");
   }
   public Map<String,Object> get(String id,User user) {
     var job=owned(id,user);

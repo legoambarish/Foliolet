@@ -125,4 +125,13 @@ class FoliAuthorizationTest extends WalletTestContext {
         .contentType("application/json").content("x".repeat(32769))).andExpect(status().isPayloadTooLarge());
     verifyNoInteractions(model); assertEquals(audits,audit.count());
   }
+  @Test void credentialStatusChangeInvalidatesCompletedResponseReuse() throws Exception {
+    String id=document(owner);var request=new FoliJobs.Request(id,null,"index",List.of(),null);
+    String job=jobs.create(request,owner).get("id").toString();long until=System.currentTimeMillis()+5000;
+    while(!jobs.get(job,owner).get("state").equals("COMPLETE") && System.currentTimeMillis()<until)Thread.sleep(10);
+    assertEquals("COMPLETE",jobs.get(job,owner).get("state"));
+    var record=credentials.findById(id.substring(7)).orElseThrow();record.status="REVOKED";credentials.saveAndFlush(record);
+    assertEquals("SOURCE_CHANGED",assertThrows(FoliException.class,()->jobs.get(job,owner)).code());
+    assertNotEquals(job,jobs.create(request,owner).get("id"));
+  }
 }

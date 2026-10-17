@@ -71,6 +71,9 @@ async function main() {
   const title='Synthetic document '+('long filename '.repeat(6));await page.locator('#name').fill(title);
   await Promise.all([page.waitForURL(/\/wallet\/0x[0-9a-f]{64}\//),page.getByRole('button',{name:'Upload and review facts',exact:true}).click()]);
   await page.waitForFunction(()=>[...document.querySelectorAll('[name=claim_label]')].some(e=>e.value==='Math'),null,{timeout:300000});
+  // Synthetic fixture values are known; explicitly accept every review-required suggestion.
+  // This preserves the production guard against silently elevating OCR uncertainty.
+  while(await page.locator('.use-reviewed-fact:not(:disabled)').count()) await page.locator('.use-reviewed-fact:not(:disabled)').first().click();
   const math=page.locator('.edit-row').filter({has:page.locator('[name=claim_label][value="Math"]')});
   // Values set by JS do not necessarily update their HTML value attribute.
   const rows=page.locator('.edit-row');let mathIndex=-1;
@@ -101,7 +104,7 @@ async function main() {
   await page.locator('[name=confirm]').check();
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Confirm facts',exact:true}).click()]);
   await page.locator('[data-check="modified"][data-state="MODIFIED"]').first().waitFor();
-  assert(await page.getByText('Issuer not verified',{exact:true}).count()>0);
+  assert(await page.locator('[data-check="issuer"][data-state="UNVERIFIED"].quiet').count()>0);
   pass('Confirmed edit is recorded by server and shown separately from issuer status');
   assert.equal(errors.length,0,JSON.stringify(errors));
   // The only intentionally intercepted external URL is the official button.

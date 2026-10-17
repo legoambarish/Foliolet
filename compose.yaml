@@ -57,6 +57,10 @@ services:
       FOLIOLET_RPC_PORT: ${FOLIOLET_RPC_PORT:-8548}
       FOLIOLET_SHARE_MODE: ${FOLIOLET_SHARE_MODE:-quick}
       FOLI_MODEL: qwen3:4b-instruct
+      FOLI_GEMINI_ENABLED: ${FOLI_GEMINI_ENABLED:-false}
+      FOLI_GEMINI_DATA_POLICY: ${FOLI_GEMINI_DATA_POLICY:-unverified}
+      FOLI_GEMINI_MODEL: ${FOLI_GEMINI_MODEL:-gemini-3.5-flash-lite}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       PYTHONUNBUFFERED: "1"
     volumes:
       - app:/app/.local-data

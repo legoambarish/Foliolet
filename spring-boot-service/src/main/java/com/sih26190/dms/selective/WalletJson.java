@@ -31,7 +31,14 @@ public class WalletJson {
 
   public WalletDtos.Bundle readBundle(String value) {
     try {
-      return proofMapper.readValue(value, WalletDtos.Bundle.class);
+      var tree=proofMapper.readTree(value);
+      if(!(tree instanceof com.fasterxml.jackson.databind.node.ObjectNode object))throw new IllegalArgumentException();
+      // Explicit optional-extension migration. Keep strict required-field,
+      // duplicate-key and scalar rules for every legacy and nested field.
+      if(object.has("intakeStatus")) {
+        if(object.get("intakeStatus").isNull())throw new IllegalArgumentException();
+      } else object.putNull("intakeStatus");
+      return proofMapper.treeToValue(object, WalletDtos.Bundle.class);
     } catch (Exception e) {
       throw new IllegalArgumentException("Malformed v1 proof bundle");
     }

@@ -46,7 +46,10 @@ public final class IntakeIndicators {
         pages.add(new PageResult(page.number(),false,false,0,"Not inspected",List.of(),List.of("Page omitted by the safety budget or parser failure."))); continue;
       }
       try {
-        byte[] png=extraction.renderPage(source,page.number());
+        // Preview rendering at 130 DPI destroys one-pixel dense QR modules after
+        // PDFBox interpolation. Independent inspection uses 200 DPI within the
+        // same 8 MP ceiling and killable reader deadline.
+        byte[] png=extraction.renderPage(source,page.number(),200);
         var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
         try {
           var cached=cachedReading(page,image);var qr=decode(image,config,deadline);
