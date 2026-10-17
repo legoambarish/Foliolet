@@ -18,7 +18,7 @@
     </aside>
     <section class="foli-chat" aria-label="Conversation with Foli">
       <div class="foli-context"><div class="foli-context-label"><span class="foli-context-icon" aria-hidden="true">F</span><div><h2 id="foli-document-title">General conversation</h2><p id="foli-document-subtitle">General explanations · no source selected</p></div></div>
-        <div class="foli-context-actions"><button id="foli-source-open" type="button" class="foli-small-btn" disabled>View source</button><button id="foli-clear" type="button" class="foli-small-btn" title="Clear conversation and cached readings">Clear</button></div></div>
+        <div class="foli-context-actions"><button id="foli-source-open" type="button" class="foli-small-btn" disabled>View source</button><button id="foli-clear" type="button" class="foli-small-btn" title="Clear only this conversation">Clear conversation</button></div></div>
       <details id="foli-coverage" class="foli-coverage" hidden><summary id="foli-coverage-summary">Source coverage</summary><div id="foli-coverage-content"></div></details>
       <div id="foli-log" class="foli-log" role="log" aria-label="Messages" aria-live="polite" aria-relevant="additions">
         <div id="foli-welcome" class="foli-welcome"><span class="foli-welcome-mark" aria-hidden="true">F</span><h2>A little clarity,<br>one question at a time.</h2><p>Choose a document to explore its details,<br>or start a conversation here.</p>
@@ -26,7 +26,7 @@
         </div>
       </div>
       <div class="foli-compose-area"><div id="foli-progress" class="foli-progress" role="status" hidden><span class="foli-spinner" aria-hidden="true"></span><span id="foli-progress-label">Reading source</span><button id="foli-stop" type="button" class="text-btn">Stop</button></div>
-        <div class="foli-reading-tools"><button id="foli-review" type="button" class="foli-review-btn" disabled><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg> Review fine print</button><span>Conversation stays in this tab · server readings expire after 10 min</span></div>
+        <div class="foli-reading-tools"><button id="foli-review" type="button" class="foli-review-btn" disabled><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg> Review fine print</button><span>Each chat stays until you clear it or reload this page · server readings expire after 10 min</span></div>
         <form id="foli-form" class="foli-composer">{% csrf_token %}<label class="sr-only" for="foli-question">Ask Foli a question</label><textarea id="foli-question" rows="1" maxlength="4000" placeholder="Ask anything about your document…" aria-describedby="foli-compose-note"></textarea><button id="foli-send" type="submit" aria-label="Send question" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form>
         <label id="foli-cloud-option" class="check" hidden><input id="foli-cloud-consent" type="checkbox"><span>Use Gemini for this question. Send the question, recent conversation and selected source text excerpts to Google under the operator's reviewed paid-service configuration. Source files and images stay local. If Gemini fails, use local Ollama.</span></label>
         <p id="foli-compose-note" class="foli-compose-note">Enter to send · Shift + Enter for a new line. Foli can make mistakes; inspect the source.</p>

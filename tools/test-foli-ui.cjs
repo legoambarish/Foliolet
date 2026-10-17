@@ -107,7 +107,8 @@ async function main() {
   await page.locator('#foli-health').click(); await page.locator('#foli-health-label').filter({hasText: 'Model not installed'}).waitFor();
   await page.unroute('**/ask-foli/api/health/'); pass('Synthetic missing-model state is clear');
   await page.locator('#foli-clear').click(); await waitIdle();
-  await page.locator('#foli-log').filter({hasText: 'Conversation and cached readings cleared'}).waitFor(); pass('Explicit forgetting clears server reading state and visible conversation');
+  await page.locator('#foli-alert').filter({hasText: 'This conversation was cleared'}).waitFor();
+  assert.equal(await page.locator('#foli-log').textContent(), ''); pass('Explicit clear removes the current visible conversation');
   await page.setViewportSize({width: 390, height: 844}); await page.reload();
   await page.locator('#foli-documents .foli-doc').first().waitFor();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));

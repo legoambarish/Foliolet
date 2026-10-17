@@ -4,8 +4,15 @@
   const root = document.getElementById('foli-app');
   if (!root) return;
   const $ = id => document.getElementById('foli-' + id);
-  const state = {documents: [], selected: null, manifest: null, history: [], activeJob: null,
-    busy: false, generation: 0, retry: null, source: null, sourceGeneration: 0, health: null};
+  const state = {documents: [], selected: null, manifest: null, conversations: new Map(), activeJob: null,
+    busy: false, generation: 0, retry: null, source: null, sourceGeneration: 0, health: null, signedOut: false,
+    stopping: Promise.resolve()};
+  const conversationKey = document => document ? JSON.stringify([document.id, document.version]) : 'general';
+  function conversation() {
+    const key = conversationKey(state.selected);
+    if (!state.conversations.has(key)) state.conversations.set(key, {messages: [], history: [], draft: ''});
+    return state.conversations.get(key);
+  }
   const csrf = root.querySelector('[name=csrfmiddlewaretoken]').value;
   const node = (tag, text, className) => {
     const element = document.createElement(tag);
@@ -32,7 +39,8 @@
     catch (_) { throw {code: 'INVALID_RESPONSE', message: 'The private application returned an unreadable response. Refresh the page.'}; }
     if (!response.ok) {
       if (response.status === 401) {
-        state.history = []; state.documents = []; state.manifest = null; state.selected = null; state.source = null;
+        state.signedOut = true; state.conversations.clear(); state.activeJob = null;
+        state.documents = []; state.manifest = null; state.selected = null; state.source = null;
         $('log').replaceChildren(); $('documents').replaceChildren(); $('coverage').hidden = true;
         $('question').value = ''; $('document-title').textContent = 'Signed out'; $('document-subtitle').textContent = 'Sign in to continue';
         $('source-dialog').close(); state.generation++; setBusy(false);
@@ -67,7 +75,8 @@
   }
   function setBusy(value) {
     state.busy = value; $('progress').hidden = !value;
-    $('send').disabled = value || !$('question').value.trim();
+    $('send').disabled = state.signedOut || value || !$('question').value.trim();
+    $('clear').disabled = state.signedOut;
     $('review').disabled = value || !state.selected || !state.selected.supported;
     $('source-open').disabled = !state.manifest;
     $('log').setAttribute('aria-busy', String(value));
@@ -75,15 +84,17 @@
   function resizeComposer() {
     // CSS alone keeps this control bounded; no inline style or HTML injection.
     $('question').rows = Math.min(5, Math.max(1, $('question').value.split('\n').length));
-    $('send').disabled = state.busy || !$('question').value.trim();
+    $('send').disabled = state.signedOut || state.busy || !$('question').value.trim();
   }
   function dismissWelcome() { const welcome = $('welcome'); if (welcome) welcome.remove(); }
   function scrollLog() { $('log').scrollTop = $('log').scrollHeight; }
-  function userMessage(text) {
+  function userMessage(text, remember = true) {
+    if (remember) conversation().messages.push({role: 'user', text});
     dismissWelcome(); $('log').append(node('div', text, 'foli-message foli-message-user')); scrollLog();
   }
   function citationButton(citation) {
-    const label = state.manifest && state.manifest.format !== 'pdf' ? 'Segment' : 'Page';
+    const format = state.manifest ? state.manifest.format : state.selected?.format;
+    const label = format && format !== 'pdf' ? 'Segment' : 'Page';
     const button = node('button', `${label} ${citation.page} · source matched`, 'foli-citation');
     button.type = 'button'; button.append(node('small', citation.provenance));
     button.addEventListener('click', () => showSource(citation)); return button;
@@ -157,7 +168,8 @@
     }
     select.addEventListener('change', () => cards.forEach(({card, finding}) => { card.hidden = !!select.value && !finding.categories.includes(select.value); }));
   }
-  function assistantMessage(answer) {
+  function assistantMessage(answer, remember = true) {
+    if (remember) conversation().messages.push({role: 'assistant', answer});
     dismissWelcome(); const message = node('article', null, 'foli-message foli-message-assistant');
     const header = node('div', null, 'foli-message-header'); header.append(node('strong', 'Foli'));
     const labels = {GENERAL: 'General explanation', INTERPRETATION: 'AI interpretation · inspect the evidence',
@@ -190,17 +202,21 @@
     }); content.append(list); $('source-open').disabled = false;
   }
   async function run(mode, question = '') {
-    if (state.busy) return;
+    if (state.busy || state.signedOut) return;
     if ((mode === 'index' || mode === 'review') && !state.selected) { alert('Select a document from Your sources first.'); return; }
     if (state.selected && !state.selected.supported) { alert('This file type is not supported yet. Choose PDF, UTF-8 TXT or CSV.'); return; }
     const generation = ++state.generation; setBusy(true); $('alert').hidden = true; state.retry = () => run(mode, question);
     $('progress-label').textContent = mode === 'review' ? 'Starting a whole-document reading review' : mode === 'index' ? 'Opening your source' : 'Preparing your question';
-    const payload = {mode, question, history: mode === 'chat' ? state.history.slice(-6) : []};
+    const chat = conversation();
+    const payload = {mode, question, history: mode === 'chat' ? chat.history.slice(-6) : []};
     if(mode === 'chat' && $('cloud-consent')?.checked) payload.cloudConsent = true;
     if($('cloud-consent')) $('cloud-consent').checked = false;
     if (state.selected) payload.documentId = state.selected.id;
     if (state.manifest) payload.sourceHash = state.manifest.sourceHash;
     try {
+      // Restore the UI immediately, but finish prior cancellations before asking the server for more work.
+      await state.stopping;
+      if (generation !== state.generation) return;
       const job = await api('jobs', {method: 'POST', payload});
       if (generation !== state.generation) { await api('jobs/' + job.id, {method: 'DELETE'}); return; }
       state.activeJob = job.id; let result = job, previewShown = false; const start = Date.now();
@@ -211,6 +227,7 @@
           previewShown = true;
         }
         $('progress-label').textContent = result.stage; await pause(600);
+        if (generation !== state.generation) return;
         if (Date.now() - start > 320000) throw {code: 'TIMEOUT', message: 'The local request took too long. Stop it and retry.'};
         result = await api('jobs/' + job.id);
       }
@@ -222,8 +239,8 @@
         if (result.result.manifest) renderManifest(result.result.manifest);
         assistantMessage(result.result);
         if (mode === 'chat') {
-          state.history.push({role: 'user', text: question.slice(0, 1500)}, {role: 'assistant', text: result.result.answer.slice(0, 1500)});
-          state.history = state.history.slice(-6);
+          chat.history.push({role: 'user', text: question.slice(0, 1500)}, {role: 'assistant', text: result.result.answer.slice(0, 1500)});
+          chat.history = chat.history.slice(-6);
         }
       }
     } catch (error) { if (generation === state.generation) failure(error, state.retry); }
@@ -231,20 +248,36 @@
   }
   async function stop() {
     const id = state.activeJob; state.generation++; state.activeJob = null; setBusy(false);
-    if (id) { try { await api('jobs/' + id, {method: 'DELETE'}); } catch (error) { failure(error); } }
+    const generation = state.generation;
+    const cancellation = id ? api('jobs/' + id, {method: 'DELETE'}).catch(error => {
+      if (generation === state.generation) failure(error);
+    }) : Promise.resolve();
+    state.stopping = Promise.all([state.stopping, cancellation]).then(() => undefined);
+    await state.stopping;
   }
   async function selectDocument(document) {
-    await stop(); state.selected = document; state.manifest = null; state.history = []; state.retry = null;
+    if (state.signedOut) return;
+    conversation().draft = $('question').value;
+    // Invalidate the old request immediately; a slow cancellation must not reorder selections.
+    void stop(); state.selected = document; state.manifest = null; state.retry = null;
     $('log').replaceChildren(); $('coverage').hidden = true; $('alert').hidden = true; $('source-dialog').close();
+    state.sourceGeneration++;
     $('document-title').textContent = document ? document.name : 'General conversation';
     $('document-subtitle').textContent = document ? `${document.format.toUpperCase()} · version ${document.version} · ${document.status.toLowerCase()}` : 'General explanations · no source selected';
     $('question').placeholder = document ? 'Ask anything about this document…' : 'Ask Foli a question…';
+    const chat = conversation();
+    $('question').value = chat.draft; resizeComposer();
+    if ($('cloud-consent')) $('cloud-consent').checked = false;
+    for (const message of chat.messages) {
+      if (message.role === 'user') userMessage(message.text, false);
+      else assistantMessage(message.answer, false);
+    }
     $('general').setAttribute('aria-pressed', String(!document)); renderDocuments(); setBusy(false);
+    $('question').focus();
     if (document) {
       if (!document.supported) alert('This file type is not supported yet. Foli currently reads PDF, UTF-8 TXT and CSV.');
       else await run('index');
-    } else assistantMessage({answer: 'Hello. Ask general questions here. To summarize or ask about a document, select it from Your sources in the sidebar first.', answerKind: 'GENERAL', citations: [], warnings: []});
-    $('question').focus();
+    } else if (!chat.messages.length) assistantMessage({answer: 'Hello. Ask general questions here. To summarize or ask about a document, select it from Your sources in the sidebar first.', answerKind: 'GENERAL', citations: [], warnings: []});
   }
   function renderDocuments() {
     const list = $('documents'); list.replaceChildren(); const query = $('search').value.toLocaleLowerCase();
@@ -310,21 +343,26 @@
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); $('form').requestSubmit(); }
   });
   $('form').addEventListener('submit', event => {
-    event.preventDefault(); const question = $('question').value.trim(); if (!question || state.busy) return;
+    event.preventDefault(); const question = $('question').value.trim(); if (!question || state.busy || state.signedOut) return;
     userMessage(question); $('question').value = ''; resizeComposer(); run('chat', question);
   });
   $('review').addEventListener('click', () => { if (!state.busy) { userMessage('Review the whole document for fine print, exceptions and possible conflicts.'); run('review'); } });
   root.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => { $('question').value = button.dataset.question; resizeComposer(); $('question').focus(); }));
   root.querySelectorAll('[data-review]').forEach(button => button.addEventListener('click', () => { if (state.selected) $('review').click(); else alert('Select a document from Your sources to review its fine print.'); }));
-  $('stop').addEventListener('click', async () => { await stop(); alert('Request stopped. Your source was not changed.'); });
-  $('clear').addEventListener('click', async () => {
-    await stop(); state.history = []; state.manifest = null; $('log').replaceChildren(); $('coverage').hidden = true; $('source-dialog').close(); $('question').value = ''; resizeComposer();
-    try { await api('memory', {method: 'DELETE'}); assistantMessage({answer: 'Conversation and cached readings cleared. Your documents are unchanged. Ask a new question whenever you are ready.', answerKind: 'GENERAL', citations: [], warnings: []}); $('alert').hidden = true; }
-    catch (error) { failure(error); } setBusy(false); $('question').focus();
+  $('stop').addEventListener('click', () => { void stop(); alert('Request stopped. Your source was not changed.'); });
+  $('clear').addEventListener('click', () => {
+    if (state.signedOut) return;
+    void stop(); state.conversations.delete(conversationKey(state.selected)); state.retry = null;
+    $('log').replaceChildren(); $('source-dialog').close(); state.sourceGeneration++;
+    $('question').value = ''; resizeComposer();
+    // The server memory endpoint clears ALL readings, so it is not a per-conversation operation.
+    alert('This conversation was cleared. Other conversations and your documents are unchanged.');
+    $('question').focus();
   });
   // No localStorage/sessionStorage, IndexedDB, service worker or durable history.
   window.addEventListener('pagehide', () => {
-    state.history = []; state.documents = []; state.selected = null; state.manifest = null; state.source = null;
+    state.generation++; state.sourceGeneration++; state.conversations.clear(); state.activeJob = null;
+    state.documents = []; state.selected = null; state.manifest = null; state.source = null;
     $('log').replaceChildren(); $('documents').replaceChildren(); $('source-text').replaceChildren(); $('question').value = '';
   });
   window.addEventListener('pageshow', event => { if (event.persisted) window.location.reload(); });
