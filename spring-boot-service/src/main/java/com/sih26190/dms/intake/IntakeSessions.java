@@ -52,12 +52,12 @@ public class IntakeSessions {
       byte[] random=new byte[32]; new SecureRandom().nextBytes(random); String token=HexFormat.of().formatHex(random);
       var session=new IntakeSession(); session.id=UUID.randomUUID().toString(); session.ownerId=owner.getId();
       session.agentId=agent.get("agentId").toString(); session.tokenHash=fingerprint(token); session.folderHash=fingerprint(folder);
-      session.encryptedFolder=metadata.seal(folder,session.id,"folder"); session.createdAt=Instant.now(); session.expiresAt=session.createdAt.plusSeconds(600);
+      session.encryptedFolder=metadata.seal(folder,session.id,"folder"); session.createdAt=Instant.now(); session.expiresAt=null;
       sessions.save(session);
       var config=new LinkedHashMap<String,Object>(agent); config.put("sessionId",session.id); config.put("token",token);
       config.put("folder",folder); config.put("folderHash",session.folderHash); config.put("expiresAt",session.expiresAt);
       config.put("createdAt",session.createdAt);
-      config.put("maxBytes",20*1024*1024); config.put("maxFiles",10); config.put("extensions",List.of(".pdf",".txt",".csv"));
+      config.put("lifetime","app"); config.put("maxBytes",20*1024*1024); config.put("maxFiles",0); config.put("extensions",List.of(".pdf",".txt",".csv"));
       return config;
     });
   }
@@ -76,13 +76,13 @@ public class IntakeSessions {
     return users.findById(s.ownerId).orElseThrow(IntakeSessions::unauthorized);
   }
   private void active(IntakeSession s) {
-    if(s.revoked || !s.expiresAt.isAfter(Instant.now())) throw unauthorized();
+    if(s.revoked || (s.expiresAt!=null && !s.expiresAt.isAfter(Instant.now()))) throw unauthorized();
   }
   public List<Map<String,Object>> list(User owner) {
     return sessions.findByOwnerIdOrderByCreatedAtDesc(owner.getId()).stream().limit(10).map(this::view).toList();
   }
   public Map<String,Object> view(IntakeSession s) {
-    boolean active=!s.revoked && s.expiresAt.isAfter(Instant.now());
+    boolean active=!s.revoked && (s.expiresAt==null || s.expiresAt.isAfter(Instant.now()));
     var result=new LinkedHashMap<String,Object>(); result.put("id",s.id); result.put("active",active); result.put("expiresAt",s.expiresAt);
     result.put("connected",active && s.lastSeen!=null && s.lastSeen.isAfter(Instant.now().minusSeconds(20)));
     result.put("folder",metadata.open(s.encryptedFolder,s.id,"folder",String.class)); result.put("imported",s.imported);
@@ -106,10 +106,20 @@ public class IntakeSessions {
       var s=sessions.locked(sessionId).orElseThrow(IntakeSessions::unauthorized); active(s);
       if(!s.folderHash.equals(folderHash)) throw unauthorized();
       s.lastSeen=Instant.now(); sessions.save(s);
-      return Map.of("active",true,"expiresAt",s.expiresAt,"remaining",Math.max(0,10-s.imported));
+      var result=new LinkedHashMap<String,Object>(); result.put("active",true); result.put("expiresAt",s.expiresAt);
+      result.put("remaining",s.expiresAt==null ? null : Math.max(0,10-s.imported)); return result;
     });
   }
   public Map<String,Object> upload(String sessionId,String folderHash,String relative,String hash,String observationId,MultipartFile file) {
+    return receive(sessionId,folderHash,relative,hash,observationId,file,null);
+  }
+  public Map<String,Object> importSelected(String sessionId,String folderHash,String relative,MultipartFile file,User owner) {
+    if(file.isEmpty() || file.getSize()>20*1024*1024) throw new IllegalArgumentException("Invalid intake file");
+    String hash;
+    try { hash=PrivateVault.sha256(file.getBytes()); } catch(Exception e) { throw new IllegalArgumentException("Cannot read intake bytes"); }
+    return receive(sessionId,folderHash,relative,hash,null,file,owner);
+  }
+  private Map<String,Object> receive(String sessionId,String folderHash,String relative,String hash,String observationId,MultipartFile file,User selectingOwner) {
     if(relative==null || relative.length()>500 || relative.startsWith("/") || relative.contains("\\")
         || Arrays.stream(relative.split("/",-1)).anyMatch(p -> p.isEmpty() || p.startsWith(".") || !p.matches("[^<>:\"|?*\\p{Cntrl}]+")))
       throw new IllegalArgumentException("Invalid intake relative path");
@@ -127,18 +137,24 @@ public class IntakeSessions {
       if(!header.startsWith("%PDF-") || !tail.contains("%%EOF")) throw new IllegalArgumentException("The download is not a complete PDF");
     }
     return tx.execute(status -> {
-      var s=sessions.locked(sessionId).orElseThrow(IntakeSessions::unauthorized); active(s);
+      var s=sessions.locked(sessionId).orElseThrow(IntakeSessions::missing);
+      if(selectingOwner!=null && !s.ownerId.equals(selectingOwner.getId())) throw missing();
+      active(s);
       if(!s.folderHash.equals(folderHash)) throw unauthorized();
       var a=agents.findById(s.agentId).orElseThrow(IntakeSessions::unauthorized); if(!a.active) throw unauthorized();
       String key=s.id+":"+hash;
       var prior=receipts.findById(key).orElse(null);
       if(prior!=null) return Map.of("id",prior.credentialId,"sha256",hash,"duplicate",true);
-      if(s.imported>=10) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"This session reached its ten-file limit");
-      var observation=observations.findById(observationId).orElseThrow(IntakeSessions::missing);
-      if(!observation.ownerId.equals(s.ownerId) || !observation.agentId.equals(s.agentId)
+      if(s.expiresAt!=null && s.imported>=10) throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"This session reached its ten-file limit");
+      // Selection is authenticated by the holder. A file without a current-agent
+      // observation is self-enrolled; it must never inherit a historical record.
+      var observation=selectingOwner==null
+          ? observations.findById(observationId).orElseThrow(IntakeSessions::missing)
+          : observations.findFirstByAgentIdAndSha256AndFilenameOrderByReceivedAtDesc(s.agentId,hash,filename).orElse(null);
+      if(observation!=null && (!observation.ownerId.equals(s.ownerId) || !observation.agentId.equals(s.agentId)
           || !observation.sha256.equals(hash) || !observation.filename.equals(filename)
           || observation.receivedAt.isBefore(s.createdAt.truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
-          || observation.observedAt.isBefore(s.createdAt.truncatedTo(java.time.temporal.ChronoUnit.SECONDS)))
+          || observation.observedAt.isBefore(s.createdAt.truncatedTo(java.time.temporal.ChronoUnit.SECONDS))))
         throw new ResponseStatusException(HttpStatus.CONFLICT,"Observation does not belong to these exact bytes and this session");
       User owner=users.findById(s.ownerId).orElseThrow(IntakeSessions::unauthorized);
       var immutable=new MultipartFile() {
@@ -151,11 +167,12 @@ public class IntakeSessions {
         public java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(bytes); }
         public void transferTo(java.io.File dest) throws java.io.IOException { Files.write(dest.toPath(),bytes); }
       };
-      var enrolled=wallet.enroll(immutable,filename,"Other",observationId,null,owner);
+      String currentObservation=observation==null ? null : observation.id;
+      var enrolled=wallet.enroll(immutable,filename,"Other",currentObservation,null,owner);
       String id=enrolled.get("id").toString(); var r=metadata.record(wallet.owned(id,owner));
-      r.method="WATCHER_ASSISTED"; r.sessionId=s.id; r.observationId=observationId; metadata.save(r);
+      r.method=observation==null ? "MANUAL_UPLOAD" : "WATCHER_ASSISTED"; r.sessionId=s.id; r.observationId=currentObservation; metadata.save(r);
       var receipt=new IntakeReceipt(); receipt.id=key; receipt.sessionId=s.id; receipt.sha256=hash; receipt.credentialId=id; receipt.importedAt=Instant.now(); receipts.save(receipt);
-      s.imported++; s.lastSeen=Instant.now(); sessions.save(s);
+      s.imported++; if(selectingOwner==null) s.lastSeen=Instant.now(); sessions.save(s);
       return Map.of("id",id,"sha256",hash,"duplicate",false);
     });
   }

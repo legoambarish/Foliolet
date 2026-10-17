@@ -116,7 +116,7 @@ def enroll(request, previous_id=None):
     except api.WalletAPIError as exc:
         error = str(exc)
     return page(request, "enroll", categories=CATEGORIES, observations=observations, previous_id=previous_id, error=error,
-                intake_folder=str(Path.home() / 'Downloads' / 'Foliolet Intake'))
+                intake_folder=settings.INTAKE_FOLDER, managed_intake=settings.MANAGED_INTAKE)
 
 
 @spring_login_required

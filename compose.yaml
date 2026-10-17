@@ -1,18 +1,117 @@
+name: foliolet
+
+x-app: &app
+  image: foliolet-local:ps32
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+
 services:
-  postgres:
-    image: postgres:17
-    environment:
-      POSTGRES_DB: wallet_dev
-      POSTGRES_USER: wallet
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    ports:
-      - "127.0.0.1:55432:5432"
+  init:
+    <<: *app
+    command: ["python", "/app/docker/bootstrap.py"]
     volumes:
-      - wallet_postgres:/var/lib/postgresql/data
+      - secrets:/run/foliolet
+    restart: "no"
+
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: foliolet
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD_FILE: /run/foliolet/postgres-password
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - secrets:/run/foliolet:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet_dev"]
+      test: ["CMD-SHELL", "pg_isready -U wallet -d foliolet"]
       interval: 5s
       timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  network:
+    <<: *app
+    init: true
+    command: ["python", "/app/docker/network.py"]
+    # A stable network namespace lets app/Ollama restart independently while
+    # retaining the existing private numeric-loopback transport restrictions.
+    ports:
+      - "127.0.0.1:${FOLIOLET_HTTP_PORT:-8008}:8000"
+      - "127.0.0.1:${FOLIOLET_RPC_PORT:-8548}:8549"
+    restart: unless-stopped
+
+  app:
+    <<: *app
+    init: true
+    network_mode: service:network
+    command: ["python", "/app/docker/runtime.py"]
+    environment:
+      FOLIOLET_CONTAINER: "1"
+      SPRING_BOOT_API_BASE_URL: http://127.0.0.1:8088
+      FOLIOLET_INTAKE_FOLDER: /app/imports/foliolet
+      FOLIOLET_HTTP_PORT: ${FOLIOLET_HTTP_PORT:-8008}
+      FOLIOLET_RPC_PORT: ${FOLIOLET_RPC_PORT:-8548}
+      FOLIOLET_SHARE_MODE: ${FOLIOLET_SHARE_MODE:-quick}
+      FOLI_MODEL: qwen3:4b-instruct
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - app:/app/.local-data
+      - secrets:/run/foliolet:ro
+      - type: bind
+        source: ${FOLIOLET_INTAKE_DIR:-${HOME:-.}/Downloads/Foliolet Intake}
+        target: /app/imports/foliolet
+        read_only: true
+        bind:
+          create_host_path: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      network:
+        condition: service_started
+        restart: true
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "/app/docker/healthcheck.py"]
+      interval: 15s
+      timeout: 10s
+      start_period: 30m
+      retries: 4
+    stop_grace_period: 45s
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.40.5
+    # Preserve Foli's numeric loopback transport; no host model port.
+    network_mode: service:network
+    environment:
+      OLLAMA_HOST: 127.0.0.1:11434
+      OLLAMA_MODELS: /models
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_CONTEXT_LENGTH: "8192"
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_VULKAN: "0"
+    volumes:
+      - models:/models
+    depends_on:
+      network:
+        condition: service_started
+        restart: true
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 5s
       retries: 10
+    restart: unless-stopped
+
 volumes:
-  wallet_postgres:
+  app:
+  postgres:
+  secrets:
+  models:

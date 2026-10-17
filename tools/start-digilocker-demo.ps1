@@ -3,8 +3,8 @@ $ErrorActionPreference = 'Stop'
 $intakeModelOrigin=[uri]$OllamaUrl
 if ($intakeModelOrigin.Scheme -ne 'http' -or $intakeModelOrigin.Host -notin @('127.0.0.1','::1','[::1]') -or $intakeModelOrigin.Port -lt 1 -or $intakeModelOrigin.UserInfo -or $intakeModelOrigin.Query -or $intakeModelOrigin.Fragment -or $intakeModelOrigin.AbsolutePath -ne '/') { throw 'Use a numeric loopback HTTP Ollama origin with an explicit port.' }
 $intakeRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
-$intakeBranch = (git -C $intakeRoot branch --show-current).Trim()
-if ($intakeBranch -notlike 'feature/digilocker-assisted-intake*' -and $intakeBranch -ne 'feature/ps32-final-winning-audit-20261016-1645') { throw 'Run this launcher only in the dedicated DigiLocker or isolated PS32 audit worktree.' }
+. (Join-Path $PSScriptRoot 'foliolet-desktop-common.ps1')
+Assert-FolioletBranch
 if (-not $RuntimeRoot) { $RuntimeRoot = $intakeRoot }
 $RuntimeRoot = (Resolve-Path -LiteralPath $RuntimeRoot).Path
 $intakePython = Join-Path $intakeRoot '.venv\Scripts\python.exe'
@@ -83,13 +83,17 @@ Intake-Launch 'intake-spring' (Get-Command java).Source @("-Xmx${MaxHeapMb}m", '
 Intake-Wait 8088 90
 & node (Join-Path $intakeRoot 'tools\provision-digilocker-trust.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Isolated registry trust provisioning failed' }
-$env:SPRING_BOOT_API_BASE_URL='http://127.0.0.1:8088'; $env:FOLIOLET_SHARE_MODE='local'; $env:PUBLIC_EVM_RPC_URL='http://127.0.0.1:8548'
+$env:SPRING_BOOT_API_BASE_URL='http://127.0.0.1:8088'; $env:PUBLIC_EVM_RPC_URL='http://127.0.0.1:8548'
+# Keep the private UI local; publish selected disclosure links through the receiver.
+# An operator can still explicitly select local/named mode before starting.
+if (-not $env:FOLIOLET_SHARE_MODE) { $env:FOLIOLET_SHARE_MODE='quick' }
 $env:DJANGO_ALLOWED_HOSTS='localhost,127.0.0.1,testserver'
 & $intakePython (Join-Path $intakeRoot 'django-service\manage.py') migrate --noinput
 if ($LASTEXITCODE -ne 0) { throw 'Private Django migration failed' }
 Intake-Launch 'intake-django' $intakePython @((Join-Path $intakeRoot 'django-service\manage.py'), 'runserver', '127.0.0.1:8008', '--noreload') $intakeRoot
 Intake-Wait 8008
-Intake-Status 'Ready: http://127.0.0.1:8008/ · isolated local demo, no tunnel'
+& (Join-Path $PSScriptRoot 'start-digilocker-watcher.ps1') -Resume
+Intake-Status ('Ready: http://127.0.0.1:8008/; sharing mode: ' + $env:FOLIOLET_SHARE_MODE)
 if (-not (Test-Path -LiteralPath $intakeOcr)) { Intake-Status 'OCR is unavailable; originals and manual facts still work.' }
 try {
     $intakeModel=Invoke-RestMethod ($OllamaUrl.TrimEnd('/')+'/api/tags') -TimeoutSec 3

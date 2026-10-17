@@ -35,6 +35,35 @@ npm run contracts:build
 
 Java and Node must be on PATH. The launcher expects reusable PostgreSQL binaries under `.local-tools\postgres\bin` and optional Tesseract under `.local-tools\ocr`. The repository's existing installers may supply those dependencies; do not download unverified binaries or replace a working runtime merely to match a path.
 
+For this branch's desktop launcher, double-click `Foliolet.vbs` after setup.
+It opens a status window, starts owned services, and opens `http://127.0.0.1:8008/`
+when ready. Its **Stop Foliolet** button preserves saved data. Repeated launches
+reuse healthy services. Startup details are under `.local-data/desktop-*.log` and
+`.local-data/desktop-status.json`. If portable PostgreSQL is missing, run
+`./tools/setup-local-postgres.ps1`. OCR and Ollama are optional for the core demo;
+without a retained model the desktop launcher starts manual document review.
+It never downloads model weights at startup.
+
+Disclosure links use Cloudflare Quick Tunnel by default. Install the connector
+once with `./tools/install-cloudflared.ps1`. The first share checks and starts
+the restricted public receiver; its HTTPS URL is used for the link and QR.
+The private app remains at port 8008. Explicitly set
+`$env:FOLIOLET_SHARE_MODE='local'` before startup only for local-only sharing.
+Quick Tunnel hostnames change when the tunnel is recreated; create a new share
+after switching from an older localhost link. See [receiver controls](../CLOUDFLARE_RECEIVER.md).
+
+The desktop launcher searches this checkout and a sibling `Foliolet-testcloudflare`
+for reusable PostgreSQL/tool binaries. To select a different runtime explicitly:
+
+```powershell
+.\tools\start-foliolet.ps1 -RuntimeRoot 'C:\path\to\existing\Foliolet'
+```
+
+The VBScript is a wrapper for `tools/launch-foliolet.ps1`, which runs
+`tools/start-foliolet.ps1`. All startup entry points now share the same branch
+guard. Python readiness reads exact versions from the requirement files, so a
+dependency patch update does not trigger installation on every launch.
+
 When those binaries already exist in another Foliolet directory, pass that directory as `RuntimeRoot`. It supplies reusable tool binaries; this launcher creates/uses the **new worktree's** `.local-data` and refuses occupied demo ports. Example:
 
 ```powershell

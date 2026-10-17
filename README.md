@@ -97,6 +97,27 @@ persistent local Ganache EVM, not a public network.
 
 ## Run locally
 
+For **macOS (Apple Silicon or Intel)**, start Docker Desktop and run the full stack
+from this checkout with one command:
+
+```sh
+docker compose up --build -d --wait --wait-timeout 1800
+```
+
+Open [Foliolet](http://127.0.0.1:8008/). Dependencies, local EVM, PostgreSQL, Spring,
+Django, OCR, Ollama/Qwen and the watcher supervisor are set up automatically.
+Enable folder intake once after signing in; its saved pairing resumes on startup.
+The default Mac folder is `~/Downloads/Foliolet Intake`. Downloads, keys and models
+persist across starts. See the [macOS container guide](docs/CONTAINERS_MACOS.md) for
+configuration, shutdown and verification limits. Container execution still needs
+verification on a working Docker engine; this host's Docker Desktop cannot start.
+
+For this PS32 branch on Windows, use the [branch-specific setup guide](docs/ps32-final/DEMO_RUNBOOK.md).
+After prerequisites are installed, double-click **`Foliolet.vbs`** in this checkout.
+Its desktop window starts the local services and opens **http://127.0.0.1:8008/**.
+Choose **Stop Foliolet** in that window to stop its services while keeping saved data.
+The older manual commands below use different ports.
+
 The tested path is Windows PowerShell with Java 17+, Python 3.12+, Node/npm and
 PostgreSQL. Maven is included through its wrapper. Use harmless documents for
 this local development setup. The [complete guide](docs/RUN_GUIDE.md) includes

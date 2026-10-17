@@ -76,9 +76,10 @@ class IntakeWorkflowTest extends WalletTestContext {
     fail("Bounded mock analysis did not finish");return result;
   }
   String observation(Map<String,Object> config,byte[] content,String filename) {
-    var input=new ObservationInput(config.get("agentId").toString(),UUID.randomUUID().toString(),filename,PrivateVault.sha256(content),Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS),1,"0x"+"00".repeat(32),"00".repeat(32));
+    var agent=agents.findById(config.get("agentId").toString()).orElseThrow();
+    var input=new ObservationInput(agent.id,UUID.randomUUID().toString(),filename,PrivateVault.sha256(content),Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS),agent.sequence+1,agent.lastDigest,"00".repeat(32));
     var sig=IntegrityService.hmac(MerkleTreeService.hex32(config.get("secret").toString()),IntegrityService.message(input));
-    return integrity.observe(new ObservationInput(input.agentId(),input.itemId(),input.filename(),input.sha256(),input.observedAt(),1,input.previousDigest(),sig)).get("observationId").toString();
+    return integrity.observe(new ObservationInput(input.agentId(),input.itemId(),input.filename(),input.sha256(),input.observedAt(),input.sequence(),input.previousDigest(),sig)).get("observationId").toString();
   }
   @Test void pdfEnrollmentNeverInvokesTheUnboundedLegacyStripper() throws Exception {
     byte[] bytes="%PDF-1.7\nmalformed synthetic input\n%%EOF".getBytes();
@@ -100,6 +101,21 @@ class IntakeWorkflowTest extends WalletTestContext {
     assertThrows(RuntimeException.class,() -> sessions.authenticate(third.get("token").toString()));
     sessions.expire();assertFalse(agents.findById(third.get("agentId").toString()).orElseThrow().active);
   }
+  @Test void appLifetimeHasNoTimerOrTenFileLimitButStopStillRevokes() {
+    var config=sessions.arm(owner,FOLDER);
+    assertEquals("app",config.get("lifetime")); assertNull(config.get("expiresAt")); assertEquals(0,config.get("maxFiles"));
+    String id=config.get("sessionId").toString(),token=config.get("token").toString();
+    var row=sessionRows.findById(id).orElseThrow(); row.createdAt=Instant.now().minusSeconds(86400); sessionRows.saveAndFlush(row);
+    sessions.expire(); assertEquals(id,sessions.authenticate(token).id);
+    assertNull(sessions.heartbeat(id,config.get("folderHash").toString()).get("expiresAt"));
+    assertEquals(true,sessions.list(owner).get(0).get("connected"));
+    for(int i=0;i<11;i++) {
+      byte[] content=("Synthetic document "+i).getBytes(); String observed=observation(config,content,"marks.txt");
+      sessions.upload(id,config.get("folderHash").toString(),"marks.txt",PrivateVault.sha256(content),observed,file(content));
+    }
+    assertEquals(11,sessionRows.findById(id).orElseThrow().imported);
+    sessions.stop(id,owner); assertThrows(RuntimeException.class,() -> sessions.authenticate(token));
+  }
   @Test void exactHashObservationUploadAndVaultAreBoundAndIdempotent() {
     var config=sessions.arm(owner,FOLDER);String sid=config.get("sessionId").toString(),folder=config.get("folderHash").toString(),hash=PrivateVault.sha256(CONTENT);
     String observed=observation(config,CONTENT,"marks.txt");
@@ -120,6 +136,31 @@ class IntakeWorkflowTest extends WalletTestContext {
     var foreign=sessions.arm(other,FOLDER);String observed=observation(foreign,CONTENT,"marks.txt");
     var own=sessions.arm(owner,FOLDER);
     assertThrows(RuntimeException.class,() -> sessions.upload(own.get("sessionId").toString(),own.get("folderHash").toString(),"marks.txt",PrivateVault.sha256(CONTENT),observed,file(CONTENT)));
+  }
+  @Test void selectedFilesStayOwnerSessionAndByteBoundWithoutHistoricalObservation() {
+    var previous=sessions.arm(owner,FOLDER); observation(previous,CONTENT,"marks.txt");
+    var current=sessions.arm(owner,FOLDER); String sid=current.get("sessionId").toString(),folder=current.get("folderHash").toString();
+    assertThrows(RuntimeException.class,() -> sessions.importSelected(sid,folder,"marks.txt",file(CONTENT),other));
+    assertThrows(RuntimeException.class,() -> sessions.importSelected(previous.get("sessionId").toString(),folder,"marks.txt",file(CONTENT),owner));
+    var first=sessions.importSelected(sid,folder,"marks.txt",file(CONTENT),owner);
+    assertNull(sessionRows.findById(sid).orElseThrow().lastSeen,"Selecting a file does not imply a connected companion");
+    assertEquals("SELF_ENROLLED",wallet.detail(first.get("id").toString(),owner).get("provenanceLevel"));
+    assertArrayEquals(CONTENT,resolver.open("wallet:"+first.get("id"),owner).bytes());
+    var duplicate=sessions.importSelected(sid,folder,"marks.txt",file(CONTENT),owner);
+    assertEquals(first.get("id"),duplicate.get("id")); assertEquals(true,duplicate.get("duplicate"));
+    byte[] changed="A different current document".getBytes();
+    var second=sessions.importSelected(sid,folder,"marks.txt",file(changed),owner);
+    assertNotEquals(first.get("id"),second.get("id")); assertArrayEquals(changed,resolver.open("wallet:"+second.get("id"),owner).bytes());
+    sessions.stop(sid,owner);
+    assertThrows(RuntimeException.class,() -> sessions.importSelected(sid,folder,"marks.txt",file(CONTENT),owner));
+  }
+  @Test void selectedImportReusesTheCurrentWatchersExactReceipt() {
+    var current=sessions.arm(owner,FOLDER); String sid=current.get("sessionId").toString(),folder=current.get("folderHash").toString();
+    String observed=observation(current,CONTENT,"marks.txt");
+    var received=sessions.upload(sid,folder,"marks.txt",PrivateVault.sha256(CONTENT),observed,file(CONTENT));
+    var selected=sessions.importSelected(sid,folder,"marks.txt",file(CONTENT),owner);
+    assertEquals(received.get("id"),selected.get("id")); assertEquals(true,selected.get("duplicate"));
+    assertEquals(1,sessionRows.findById(sid).orElseThrow().imported);
   }
   @Test void automaticReadingNeverRestartsCompletedJobsAndBaselineSurvivesRetry() throws Exception {
     String id=draft();jobs.automatically(id,owner);var result=done(id);assertEquals("READY",result.get("state"));

@@ -1,4 +1,8 @@
-"""Real Windows desktop/startup acceptance; preserves the isolated demo's data."""
+"""Windows startup acceptance for an idle demo with no concurrent users/writes.
+
+This suite deliberately stops and restarts the owned services. Do not run it
+while someone is using the application.
+"""
 import ctypes
 from datetime import datetime, timezone
 import hashlib
@@ -46,7 +50,8 @@ def run(script='start-foliolet.ps1', *args, expected=0, timeout=240):
 def snapshot():
     # Only compare hashes/counts. Never export any retained keys or documents.
     paths = [p for p in (ROOT / '.local-data').rglob('*') if p.is_file() and
-             (p.suffix == '.key' or p.is_relative_to(ROOT / '.local-data/wallet') or p.name == 'selective-registry.json')]
+             (p.suffix in ('.key', '.address') or p.is_relative_to(ROOT / '.local-data/wallet')
+              or p.name in ('selective-registry.json', 'trusted-deployment.json'))]
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 
 
@@ -63,9 +68,10 @@ def main():
     run('start-foliolet.ps1', '-CheckOnly', '-StatusPath', str(OUT / 'health.json'))
     pass_check('Built-in Windows PowerShell recognizes actual owned services, Python child and PostgreSQL slash paths')
     before = processes()
-    run('start-foliolet.ps1', '-StatusPath', str(OUT / 'repeat.json'))
+    repeat = run('start-foliolet.ps1', '-StatusPath', str(OUT / 'repeat.json'))
     assert before == processes()
-    pass_check('Repeated start reuses healthy services without changing their PIDs')
+    assert 'Installing the project Python dependencies' not in repeat.read_text(encoding='utf8')
+    pass_check('Repeated start accepts current requirement pins without reinstalling or changing service PIDs')
 
     # Hold the exact worker mutex from another process/thread, then verify refusal.
     identity = hashlib.sha256(str(ROOT).lower().encode('utf8')).hexdigest().upper()[:20]
@@ -84,6 +90,7 @@ def main():
         kernel.ReleaseMutex(handle); kernel.CloseHandle(handle)
     pass_check('Concurrent startup is refused without creating duplicate service processes')
 
+    assert baseline == snapshot(), 'Runtime data changed during testing; stop before the restart checks and use an idle demo'
     run('start-foliolet.ps1', '-Stop', '-StatusPath', str(OUT / 'stop.json'))
     assert baseline == snapshot()
     pass_check('One-action Stop retains every recorded original, signing/encryption key and registry pin')

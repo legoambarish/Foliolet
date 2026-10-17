@@ -2,7 +2,8 @@ param([Parameter(Mandatory=$true)][string]$RuntimeRoot)
 $ErrorActionPreference='Stop'
 $intakeRoot=(Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 $RuntimeRoot=(Resolve-Path -LiteralPath $RuntimeRoot).Path
-if ((git -C $intakeRoot branch --show-current).Trim() -notlike 'feature/digilocker-assisted-intake*') { throw 'Use the dedicated intake feature worktree.' }
+. (Join-Path $PSScriptRoot 'foliolet-desktop-common.ps1')
+Assert-FolioletBranch
 if (Get-NetTCPConnection -State Listen -LocalPort 11444 -ErrorAction SilentlyContinue) { throw 'Port 11444 is occupied. No process was changed.' }
 function Copy-IntakeRuntimeFile([string]$Source,[string]$Destination,[string]$ExpectedHash) {
     if (-not $ExpectedHash) { $ExpectedHash=(Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash }

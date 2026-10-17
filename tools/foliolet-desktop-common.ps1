@@ -19,6 +19,13 @@ function Get-FolioletPowerShell {
     return Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 }
 
+function Assert-FolioletBranch {
+    $branch = (git -C $folioletRoot branch --show-current).Trim()
+    if ($LASTEXITCODE -ne 0 -or ($branch -notlike 'feature/digilocker-assisted-intake*' -and $branch -ne 'feature/ps32-final-winning-audit-20261016-1645')) {
+        throw 'Use the dedicated DigiLocker feature or PS32 audit checkout. No branch was changed.'
+    }
+}
+
 function Assert-FolioletPath([string]$Path) {
     $full = [IO.Path]::GetFullPath($Path)
     if (-not $full.StartsWith($folioletRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Launcher state must stay inside this feature checkout.' }

@@ -145,6 +145,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.environ.get('STATIC_ROOT', str(BASE_DIR.parent / '.local-data/static'))
+MANAGED_INTAKE = os.environ.get('FOLIOLET_CONTAINER') == '1'
+INTAKE_FOLDER = os.environ.get('FOLIOLET_INTAKE_FOLDER', str(Path.home() / 'Downloads' / 'Foliolet Intake'))
 
 
 # Email

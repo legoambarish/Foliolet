@@ -20,6 +20,11 @@ public class IntakeController {
     return sessions.arm(owner(auth),body.get("folder"));
   }
   @PostMapping("/api/wallet/intake/sessions/{id}/stop") public Object stop(@PathVariable String id,Authentication auth) { sessions.stop(id,owner(auth)); return Map.of("active",false); }
+  @PostMapping("/api/wallet/intake/sessions/{id}/import") public Object importSelected(@PathVariable String id,
+      @RequestParam String folderHash,@RequestParam String relativePath,@RequestParam MultipartFile file,Authentication auth) {
+    var holder=owner(auth); var result=sessions.importSelected(id,folderHash,relativePath,file,holder);
+    jobs.automatically(result.get("id").toString(),holder); return result;
+  }
   @GetMapping("/api/wallet/intake/documents/{id}") public Object status(@PathVariable String id,Authentication auth) { return jobs.get(id,owner(auth)); }
   @PostMapping("/api/wallet/intake/documents/{id}/retry") public Object retry(@PathVariable String id,Authentication auth) { return jobs.start(id,owner(auth),true); }
   @PostMapping("/api/intake-agent/heartbeat") public Object heartbeat(@RequestParam String folderHash,Authentication auth) { return sessions.heartbeat(auth.getName(),folderHash); }

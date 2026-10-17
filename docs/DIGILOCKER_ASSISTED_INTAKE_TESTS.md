@@ -1,5 +1,29 @@
 # Assisted-intake verification record
 
+## Current-folder list regression, 17 October 2026
+
+Verified locally in `C:\Users\User\Downloads\Foliolet` on the PS32 feature branch. These results are separate from the historical rehearsal below.
+
+| Gate | Result | Local evidence |
+| --- | --- | --- |
+| Intake service workflow | 13 tests passed | `.local-data/tracked-files-java-tests.log` |
+| Private inventory/import plus existing intake proxy | 17 tests passed | `.local-data/tracked-files-django-tests.log` |
+| Shared Windows stable-file reader and companion | 13 tests passed | `.local-data/tracked-files-companion-tests.log` |
+
+The regressions cover current-holder/current-pairing isolation, stale file versions, tampered selections, deleted files, exact selected bytes, receipt reuse, absence from the public receiver, CSRF and loopback access. Manually selecting an existing file does not imply a connected watcher or inherit an old agent observation.
+
+Live browser checks used a separate synthetic holder and folder: arrival appeared first without reloading; selecting the middle CSV saved its exact bytes (SHA-256 checked against its encrypted-vault download); the real companion imported a TXT and selecting that row opened the same saved credential. The list fit at 1280px and 390px in light and dark themes, with no browser errors. Captures are retained in `.local-data/tracked-files-test/`. The user's existing Enroll tab was refreshed only after confirming it had no pending file/name input; its live folder status and current-folder list were present after restart.
+
+To repeat the focused tests without overwriting a running backend JAR:
+
+```powershell
+.\spring-boot-service\mvnw.cmd -f spring-boot-service/pom.xml -B '-Dtest=IntakeWorkflowTest' test
+.\.venv\Scripts\python.exe django-service/manage.py test dashboard.test_tracked_files dashboard.test_intake --noinput
+.\.venv\Scripts\python.exe tools/test-intake-watcher.py
+```
+
+## Historical rehearsal, 16 October 2026
+
 Windows local execution, 16 October 2026. All imported documents/accounts in automated tests are synthetic. The supplied Downloads image is a visual calibration reference, not an issued document or issuer trust anchor. No remote push, PR, tunnel or public deployment was performed.
 
 ## Git and environment

@@ -1,5 +1,6 @@
 """Actual Windows PowerShell companion launcher, disposable loopback pairing only."""
 import json
+import argparse
 import os
 from pathlib import Path
 import shutil
@@ -15,6 +16,10 @@ API = 'http://127.0.0.1:8088'
 
 def main():
     assert os.name == 'nt', 'This gate requires real Windows'
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--powershell', default=shutil.which('pwsh') or 'powershell',
+                        help='Exact PowerShell executable; exercise 5.1 as well as 7')
+    args = parser.parse_args()
     http = requests.Session(); http.trust_env = False
     auth = ('launcher-' + uuid.uuid4().hex[:12], 'synthetic-' + uuid.uuid4().hex)
     response = http.post(API + '/api/auth/register', json={'username': auth[0], 'password': auth[1], 'role': 'HOLDER'}, timeout=15)
@@ -23,7 +28,7 @@ def main():
     response = http.post(API + '/api/wallet/intake/sessions', json={'folder': str(folder)}, timeout=15)
     response.raise_for_status(); config = response.json(); config['apiUrl'] = API
     pairing = OUT / 'launcher-pair-private.json'; pairing.write_text(json.dumps(config), encoding='utf8')
-    command = [shutil.which('pwsh') or 'powershell', '-NoProfile', '-NonInteractive', '-File',
+    command = [args.powershell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                str(ROOT / 'tools/start-digilocker-watcher.ps1'), '-PairingFile', str(pairing)]
     log = (OUT / 'launcher-process.log').open('w', encoding='utf8')
     process = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)

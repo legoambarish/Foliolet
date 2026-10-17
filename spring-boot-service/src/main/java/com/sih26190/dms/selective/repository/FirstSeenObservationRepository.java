@@ -12,4 +12,5 @@ public interface FirstSeenObservationRepository
   List<FirstSeenObservation> findByOwnerIdOrderByReceivedAtDesc(Long ownerId);
 
   Optional<FirstSeenObservation> findByAgentIdAndSequence(String agentId, long sequence);
+  Optional<FirstSeenObservation> findFirstByAgentIdAndSha256AndFilenameOrderByReceivedAtDesc(String agentId,String sha256,String filename);
 }

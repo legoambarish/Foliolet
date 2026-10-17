@@ -26,14 +26,14 @@ jobs:
       - name: Parse real Windows launchers without starting or killing user services
         run: |
           $results=@()
-          foreach($path in @('tools/start-digilocker-demo.ps1','tools/stop-digilocker-demo.ps1')) {
+          foreach($path in @('tools/start-digilocker-demo.ps1','tools/stop-digilocker-demo.ps1','tools/start-foliolet.ps1','tools/launch-foliolet.ps1','tools/start-digilocker-model.ps1','tools/foliolet-desktop-common.ps1')) {
             $tokens=$null; $errors=$null
             $ast=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)
             if($errors.Count -ne 0) { throw ($errors | Out-String) }
             $results += @{path=$path;parse='PASS'}
           }
           $source=Get-Content tools/start-digilocker-demo.ps1 -Raw
-          if(-not $source.Contains('feature/ps32-final-winning-audit-20261016-1645')) {throw 'Audit branch cannot launch'}
+          & ./tools/test-foliolet-branch.ps1
           if(-not $source.Contains('MaxHeapMb')) {throw 'Heap bound missing'}
           $results | ConvertTo-Json | Out-File audit-evidence/windows-launcher-parse.json
       - name: Actual Windows Django regression

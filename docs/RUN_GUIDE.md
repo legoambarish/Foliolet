@@ -1,5 +1,9 @@
 # Run Foliolet locally
 
+For the complete one-command macOS container setup, use
+[CONTAINERS_MACOS.md](CONTAINERS_MACOS.md). The manual Windows route below keeps its
+PostgreSQL-only Compose file separate from the new full-stack `compose.yaml`.
+
 Run commands from the repository root unless a directory is shown. Prerequisites: Windows PowerShell, Java 17+, Node/npm, Python 3.12+ and either PostgreSQL or working Docker. Maven is provided by the wrapper. This guide uses loopback-only development services and an ignored local development relay key. Do not fund that key outside the isolated local chain.
 
 ## Install dependencies
@@ -31,7 +35,7 @@ The optional setup downloads checksum-pinned PostgreSQL 17.6 binaries from Maven
 Copy `.env.example` to `.env`, replace its placeholder password, then:
 
 ```powershell
-docker compose up -d postgres
+docker compose -f compose.postgres.yaml up -d postgres
 # In the terminal that will start Spring:
 $env:SPRING_DATASOURCE_PASSWORD = 'the-password-you-put-in-.env'
 ```
@@ -159,6 +163,6 @@ Press Ctrl+C in the EVM, backend and Django terminals. Portable PostgreSQL runs 
 & .\.local-tools\postgres\bin\pg_ctl.exe -D .\.local-data\postgres -w stop
 ```
 
-For Docker use `docker compose stop postgres`. Neither command deletes persisted data. Never use a volume-removal/reset operation as a normal restart. See [security limitations](SECURITY.md) before moving beyond localhost.
+For the manual PostgreSQL-only Docker route use `docker compose -f compose.postgres.yaml stop postgres`. Neither command deletes persisted data. Never use a volume-removal/reset operation as a normal restart. See [security limitations](SECURITY.md) before moving beyond localhost.
 
 The additional live security suite checks registration races, strict bundle parsing, transient extraction, hidden salts, independently configured pins, tampering and custom labels. It retains `.local-data/live-security-results.json` and a fresh `security-demo-session.json`. Both live suites require separately provisioned local pins.

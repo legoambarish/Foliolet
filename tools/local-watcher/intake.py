@@ -1,4 +1,4 @@
-"""Opt-in, ten-minute private document intake companion. No browser credentials.
+"""Opt-in private document intake companion, bound to Foliolet's lifetime.
 
 Download a pairing file from Foliolet's Enroll page, then:
   python tools/local-watcher/intake.py --config PATH_TO_PAIRING_FILE
@@ -12,7 +12,6 @@ import io
 import json
 import os
 import queue
-import stat
 import threading
 import time
 from datetime import datetime, timezone
@@ -23,10 +22,7 @@ import requests
 from Crypto.Cipher import AES
 from watchdog.observers import Observer
 from watch import Agent, IntakeHandler
-
-MAX_BYTES = 20 * 1024 * 1024
-SUFFIXES = {'.pdf', '.txt', '.csv'}
-
+from local_files import MAX_BYTES, SUFFIXES, safe_path, stable_bytes
 
 class LoopbackSession(requests.Session):
     def __init__(self, origin):
@@ -49,81 +45,43 @@ def local_origin(value):
     return value.rstrip('/')
 
 
-def safe_path(root, incoming):
-    root, path = Path(os.path.abspath(root)), Path(os.path.abspath(incoming))
-    relative = path.relative_to(root)
-    if not relative.parts or any(p.startswith('.') or ':' in p for p in relative.parts):
-        raise ValueError('Hidden or external path')
-    for current in (path, *path.parents):
-        info = current.lstat()
-        if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
-            raise ValueError('Symlinks and junctions are not eligible')
-        if current == root:
-            # Root ancestors are also checked, so the allowed root cannot itself escape.
-            for parent in root.parents:
-                pinfo = parent.lstat()
-                if stat.S_ISLNK(pinfo.st_mode) or getattr(pinfo, 'st_file_attributes', 0) & 0x400:
-                    raise ValueError('The folder has a reparse-point ancestor')
-            break
-    if path.suffix.lower() not in SUFFIXES or not path.is_file():
-        raise ValueError('Use a completed supported file')
-    attrs = getattr(path.stat(), 'st_file_attributes', 0)
-    if attrs & (0x2 | 0x4):
-        raise ValueError('Hidden/system file')
-    return path, relative.as_posix()
-
-
-def open_stable_handle(path):
-    if os.name == 'nt':
+class AppLifetime:
+    """Hold Windows process handles so a reused PID cannot extend watching."""
+    def __init__(self, pids):
+        if os.name != 'nt' or not pids:
+            raise ValueError('App-lifetime watching requires Foliolet process IDs on Windows')
         import ctypes
-        import msvcrt
         from ctypes import wintypes
-        create = ctypes.WinDLL('kernel32', use_last_error=True).CreateFileW
-        create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
-                           wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
-        create.restype = wintypes.HANDLE
-        # Permit concurrent readers, deny all writers and deletion/rename while reading.
-        handle = create(str(path), 0x80000000, 1, None, 3, 0x00200000, None)
-        if handle == ctypes.c_void_p(-1).value:
-            raise OSError('File is locked or unavailable')
+        self.kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        self.kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        self.kernel.OpenProcess.restype = wintypes.HANDLE
+        self.kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        self.kernel.WaitForSingleObject.restype = wintypes.DWORD
+        self.kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.handles = []
         try:
-            fd = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+            for pid in pids:
+                handle = self.kernel.OpenProcess(0x00100000, False, pid)
+                if not handle:
+                    raise ValueError('Foliolet is not running; start it before the watcher')
+                self.handles.append(handle)
+            if not self.active():
+                raise ValueError('Foliolet stopped before the watcher connected')
         except Exception:
-            ctypes.windll.kernel32.CloseHandle(handle)
+            self.close()
             raise
-        return os.fdopen(fd, 'rb')
-    return os.fdopen(os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)), 'rb')
 
+    def active(self):
+        return all(self.kernel.WaitForSingleObject(handle, 0) == 258 for handle in self.handles)
 
-def identity(info):
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
-
-
-def stable_bytes(root, incoming, delay=1.0):
-    path, relative = safe_path(root, incoming)
-    before = path.stat()
-    if not 0 < before.st_size <= MAX_BYTES:
-        raise ValueError('Empty or oversized file')
-    time.sleep(delay)
-    if identity(path.stat()) != identity(before):
-        raise OSError('File is still changing')
-    with open_stable_handle(path) as source:
-        held = os.fstat(source.fileno())
-        if identity(held) != identity(before):
-            raise OSError('File changed before opening')
-        content = source.read(MAX_BYTES + 1)
-        time.sleep(delay)
-        after, _ = safe_path(root, path)
-        if (len(content) != held.st_size or identity(os.fstat(source.fileno())) != identity(held)
-                or identity(after.stat()) != identity(held)):
-            raise OSError('File changed while reading')
-    if path.suffix.lower() == '.pdf' and (not content.startswith(b'%PDF-') or b'%%EOF' not in content[-2048:]):
-        raise OSError('PDF download is incomplete')
-    return relative, content
+    def close(self):
+        for handle in self.handles:
+            self.kernel.CloseHandle(handle)
+        self.handles.clear()
 
 
 class Companion:
-    def __init__(self, config, state_dir, transport=None):
+    def __init__(self, config, state_dir, transport=None, app_running=None):
         self.config = config
         self.base = local_origin(config['apiUrl'])
         self.root = Path(config['folder'])
@@ -133,7 +91,11 @@ class Companion:
             raise ValueError('Choose a dedicated intake subfolder')
         if hashlib.sha256(str(self.root).encode()).hexdigest() != config['folderHash']:
             raise ValueError('Folder does not match this pairing; re-arm in Foliolet to change it')
-        self.expiry = datetime.fromisoformat(config['expiresAt'].replace('Z', '+00:00')).timestamp()
+        self.expiry = (datetime.fromisoformat(config['expiresAt'].replace('Z', '+00:00')).timestamp()
+                       if config.get('expiresAt') else None)
+        self.app_running = app_running
+        if self.expiry is None and (config.get('lifetime') != 'app' or app_running is None):
+            raise ValueError('A pairing without expiry must be bound to the running Foliolet app')
         self.state_dir = Path(state_dir).resolve()
         if self.state_dir.is_relative_to(self.root.resolve()):
             raise ValueError('Keep companion state outside the intake folder')
@@ -156,7 +118,8 @@ class Companion:
         self.key = key_file.read_bytes()
 
     def active(self):
-        return time.time() < self.expiry
+        return ((self.expiry is None or time.time() < self.expiry)
+                and (self.app_running is None or self.app_running()))
 
     def save(self):
         temp = self.state_file.with_suffix('.tmp')
@@ -194,7 +157,8 @@ class Companion:
         digest = hashlib.sha256(content).hexdigest()
         if digest in self.state['done'] or digest in self.state['pending']:
             return False
-        if len(self.state['pending']) + len(self.state['done']) >= min(10, self.config['maxFiles']):
+        limit = 0 if self.expiry is None else min(10, self.config['maxFiles'])
+        if limit and len(self.state['pending']) + len(self.state['done']) >= limit:
             return False
         cipher = AES.new(self.key, AES.MODE_GCM)
         cipher.update((self.config['sessionId'] + ':' + digest).encode())
@@ -288,7 +252,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
     parser.add_argument('--state-dir')
+    parser.add_argument('--app-pid', type=int, action='append', help='Owned Foliolet process to stop with')
     parser.add_argument('--once', action='store_true', help='Flush the existing outbox and scan new files once')
+    parser.add_argument('--poll', action='store_true', help='Poll host-mounted folders (Docker Desktop on macOS)')
     args = parser.parse_args()
     config_file = Path(args.config).resolve()
     config = json.loads(config_file.read_text(encoding='utf-8-sig'))
@@ -296,12 +262,24 @@ def main():
     if config_file.is_relative_to(root):
         parser.error('Keep the pairing file outside the intake folder')
     state_dir = args.state_dir or Path(__file__).resolve().parents[2] / '.local-data/intake' / config['sessionId']
-    companion = Companion(config, state_dir)
+    lifetime = None
+    if args.app_pid:
+        if os.name == 'nt':
+            lifetime = AppLifetime(args.app_pid)
+        else:
+            from lifetime import LinuxAppLifetime
+            lifetime = LinuxAppLifetime(args.app_pid)
+    companion = Companion(config, state_dir, app_running=lifetime.active if lifetime else None)
     pending = BoundedEvents()
-    observer = Observer()
+    if args.poll:
+        from watchdog.observers.polling import PollingObserver
+        observer = PollingObserver(timeout=1)
+    else:
+        observer = Observer()
     observer.schedule(IntakeHandler(pending), str(companion.root), recursive=True)
     observer.start()
-    print('Watching the selected folder for new documents until session expiry. Ctrl+C stops locally.', flush=True)
+    print('Watching while Foliolet is running. No timer. Stop watching in Foliolet revokes access.'
+          if companion.expiry is None else 'Watching until session expiry. Ctrl+C stops locally.', flush=True)
     print('This records holder-controlled file continuity, never issuer verification.', flush=True)
     last_scan = last_status = 0
     try:
@@ -343,6 +321,8 @@ def main():
     finally:
         observer.stop()
         observer.join(timeout=5)
+        if lifetime:
+            lifetime.close()
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const token = () => document.querySelector('[name=csrfmiddlewaretoken]')?.value;
   async function call(url, options = {}) {
-    const response = await fetch(url, {credentials: 'same-origin', ...options,
+    const response = await fetch(url, {credentials: 'same-origin', cache: 'no-store', ...options,
       headers: {'Accept': 'application/json', 'X-CSRFToken': token(), ...options.headers}});
     if (response.redirected) throw new Error('Your session ended. Sign in again.');
     const body = await response.json();
@@ -13,10 +13,64 @@ document.addEventListener('DOMContentLoaded', () => {
   if (intake) {
     const status = document.getElementById('intake-connection');
     const stop = document.getElementById('intake-stop');
-    let session = null;
-    document.getElementById('manual-import')?.addEventListener('click', () => document.getElementById('file').focus());
+    const list = document.getElementById('intake-files'), count = document.getElementById('intake-file-count');
+    const empty = document.getElementById('intake-files-empty'), feedback = document.getElementById('intake-file-feedback');
+    let session = null, refreshing = false, generation = 0, importing = false, importError = false;
+    const sizeLabel = size => size < 1024 ? size + ' B' : size < 1048576 ? (size / 1024).toFixed(1) + ' KB' : (size / 1048576).toFixed(1) + ' MB';
+    function renderFiles(files) {
+      count.textContent = files.length + (files.length === 1 ? ' file' : ' files');
+      empty.hidden = files.length > 0;
+      const existing = new Map([...list.children].map(row => [row.dataset.path, row]));
+      files.sort((a, b) => b.modifiedAt - a.modifiedAt || a.relativePath.localeCompare(b.relativePath));
+      files.forEach((file, index) => {
+        let row = existing.get(file.relativePath);
+        if (!row) {
+          row = document.createElement('li'); row.className = 'tracked-file'; row.dataset.path = file.relativePath;
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'tracked-file-button';
+          const kind = document.createElement('span'); kind.className = 'tracked-file-kind'; kind.setAttribute('aria-hidden', 'true');
+          const text = document.createElement('span'); text.className = 'tracked-file-text';
+          const name = document.createElement('strong'); name.className = 'tracked-file-name';
+          const meta = document.createElement('span'); meta.className = 'tracked-file-meta';
+          const action = document.createElement('span'); action.className = 'tracked-file-action'; action.textContent = 'Import & review →';
+          text.append(name, meta); button.append(kind, text, action); row.append(button);
+        }
+        existing.delete(file.relativePath);
+        const button = row.querySelector('button'); button.dataset.selection = file.selection;
+        button.setAttribute('aria-label', 'Import ' + file.relativePath); button.disabled = importing;
+        row.querySelector('.tracked-file-kind').textContent = file.name.split('.').pop().toUpperCase();
+        row.querySelector('.tracked-file-name').textContent = file.name;
+        const time = new Date(file.modifiedAt).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+        row.querySelector('.tracked-file-meta').textContent = sizeLabel(file.size) + ' · ' + time
+          + (file.relativePath !== file.name ? ' · ' + file.relativePath : '');
+        row.classList.toggle('tracked-file-newest', index === 0);
+        if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
+      });
+      for (const row of existing.values()) row.remove();
+    }
+    list.addEventListener('click', async event => {
+      const button = event.target.closest('button[data-selection]');
+      if (!button || importing) return;
+      importError = false;
+      importing = true;
+      for (const control of list.querySelectorAll('button')) control.disabled = true;
+      feedback.dataset.state = 'busy'; feedback.textContent = 'Importing ' + button.closest('li').querySelector('strong').textContent + '…';
+      try {
+        const data = new FormData(); data.set('selection', button.dataset.selection);
+        const result = await call(intake.dataset.import, {method:'POST', body:data});
+        if (!/^\/wallet\/0x[0-9a-f]{64}\/$/.test(result.url)) throw new Error('The document could not be opened.');
+        window.location.assign(result.url);
+      } catch (error) {
+        importError = true; feedback.dataset.state = 'error'; feedback.textContent = error.message;
+        generation++; importing = false; await refresh();
+        for (const control of list.querySelectorAll('button')) control.disabled = false;
+      }
+    });
+    document.getElementById('manual-import')?.addEventListener('click', () => {
+      const picker = document.getElementById('file'); picker.value = ''; picker.focus();
+    });
     document.getElementById('intake-arm').addEventListener('submit', async event => {
       event.preventDefault();
+      generation++; importError = false; renderFiles([]);
       const form = event.currentTarget, button = form.querySelector('button');
       button.disabled = true;
       try {
@@ -25,42 +79,59 @@ document.addEventListener('DOMContentLoaded', () => {
           const body = await response.json();
           throw new Error(body.error || 'Pairing failed. Sign in and check the folder.');
         }
-        const blob = await response.blob();
-        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'foliolet-intake.json';
-        link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-        status.textContent = 'Pairing file downloaded. Start the local companion, then download to your chosen folder. Watching expires after ten minutes.';
+        if (intake.dataset.managed === 'yes') {
+          const result = await response.json();
+          if (!result.managed) throw new Error('The managed watcher could not be paired. Retry.');
+          status.textContent = 'Folder paired. Your watcher connects automatically and continues while Foliolet is running.';
+        } else {
+          const blob = await response.blob();
+          const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'foliolet-intake.json';
+          link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          status.textContent = 'Pairing file downloaded. Start the local companion, then download to your chosen folder. Watching continues while Foliolet is running.';
+        }
         await refresh();
       } catch (e) { status.textContent = e.message + ' Manual upload remains available.'; }
       finally { button.disabled = false; }
     });
     stop.addEventListener('click', async () => {
       if (!session) return;
+      generation++; importError = false;
       try {
         await call('/intake/sessions/' + encodeURIComponent(session.id) + '/stop/', {method: 'POST'});
         status.textContent = 'Watching stopped. New uploads using this pairing are denied.';
-        stop.disabled = true; session = null;
+        stop.disabled = true; session = null; renderFiles([]);
+        empty.textContent = 'Watching stopped. Enable folder intake to see its documents again.';
+        feedback.textContent = '';
       } catch (e) { status.textContent = e.message; }
     });
     async function refresh() {
+      if (refreshing || importing) return;
+      refreshing = true;
+      const currentGeneration = generation;
       try {
-        const body = await call(intake.dataset.sessions);
+        const [body, inventory] = await Promise.all([call(intake.dataset.sessions), call(intake.dataset.files)]);
+        if (generation !== currentGeneration || importing) return;
         session = body.sessions.find(s => s.active) || null;
         stop.disabled = !session;
         if (session) {
           status.textContent = (session.connected ? 'Watcher connected. ' : 'Local watcher not connected. ')
-            + session.folder + ' · ends ' + new Date(session.expiresAt).toLocaleTimeString()
+            + session.folder + (session.expiresAt ? ' · ends ' + new Date(session.expiresAt).toLocaleTimeString() : ' · while Foliolet is running')
             + ' · ' + session.imported + ' files received.';
         } else status.textContent = 'Local watcher not connected. Enable a session to receive new files, or upload normally.';
-        const received = document.getElementById('intake-received'); received.replaceChildren();
-        for (const s of body.sessions) for (const doc of s.documents || []) {
-          if (!/^0x[0-9a-f]{64}$/.test(doc.id)) continue;
-          const item = document.createElement('li'), link = document.createElement('a');
-          link.href = '/wallet/' + doc.id + '/'; link.textContent = 'File received · review suggested facts';
-          item.appendChild(link); received.appendChild(item);
+        renderFiles(session && inventory.sessionId === session.id ? inventory.files : []);
+        empty.textContent = session ? 'No completed PDF, TXT or CSV files yet. Save a document in your watched folder.' : 'Enable a folder watcher to see its documents here.';
+        if (!importError) {
+          feedback.dataset.state = session?.connected ? 'connected' : 'waiting';
+          feedback.textContent = session ? (session.connected ? 'Live folder · updates automatically' : 'Folder paired · watcher reconnecting') : 'No folder paired';
         }
-      } catch (e) { status.textContent = e.message + ' Manual upload remains available.'; }
+      } catch (e) {
+        if (generation !== currentGeneration) return;
+        renderFiles([]); feedback.dataset.state = 'error'; feedback.textContent = e.message + ' Retrying automatically.';
+      } finally { refreshing = false; }
     }
-    refresh(); setInterval(refresh, 5000);
+    refresh(); setInterval(refresh, 2000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   }
 
   const analysis = document.getElementById('intake-analysis');

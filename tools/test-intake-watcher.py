@@ -17,7 +17,7 @@ import requests
 from Crypto.Hash import keccak
 
 sys.path.insert(0, str(Path(__file__).parent / 'local-watcher'))
-from intake import Companion, LoopbackSession, BoundedEvents, local_origin, safe_path, stable_bytes
+from intake import Companion, AppLifetime, LoopbackSession, BoundedEvents, local_origin, safe_path, stable_bytes
 from watch import IntakeHandler, message
 
 
@@ -67,6 +67,34 @@ class Transport:
 
 
 class WatcherTests(unittest.TestCase):
+    def test_app_lifetime_has_no_timer_and_stops_with_app(self):
+        self.config['expiresAt'] = None
+        self.config['lifetime'] = 'app'
+        self.config['maxFiles'] = 0
+        running = [True]
+        companion = Companion(self.config, self.base / 'app-state', self.http, app_running=lambda: running[0])
+        with patch('intake.time.time', return_value=time.time() + 86400):
+            self.assertTrue(companion.active())
+        for n in range(11):
+            self.assertTrue(companion.enqueue(self.write('app-'+str(n)+'.txt', str(n).encode()), 0))
+        running[0] = False
+        self.assertFalse(companion.active())
+        self.assertFalse(companion.flush())
+        with self.assertRaises(ValueError):
+            Companion(self.config, self.base / 'unbound', self.http)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows process handles')
+    def test_process_handle_detects_app_exit(self):
+        process = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'], creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            lifetime = AppLifetime([process.pid])
+            self.assertTrue(lifetime.active())
+            process.terminate(); process.wait(timeout=5)
+            self.assertFalse(lifetime.active())
+            lifetime.close()
+        finally:
+            if process.poll() is None: process.terminate(); process.wait(timeout=5)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
