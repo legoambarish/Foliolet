@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 /** Positioned source evidence binds each fact; local models may only select existing cell IDs. */
 @Service
 public class FactSuggestions {
-  public static final String VERSION="intake-facts-3-labels-tables";
+  public static final String VERSION="intake-facts-4-broad-fields";
   public record Fragment(String layer,int start,int end,String quote,double left,double top,double width,double height,double confidence,
                          String channel,String method,int rotation) {}
   public record Support(String id,String quality,String relationship,List<Fragment> labels,List<Fragment> values,List<Fragment> headers,
@@ -131,8 +131,13 @@ public class FactSuggestions {
       case "date_of_birth" -> "person.birth_date";
       case "purchase_date" -> "purchase.date";
       case "product_identifier" -> "purchase.product_id";
-      default -> { if(slug.isEmpty() || !Character.isLetter(slug.charAt(0))) throw new IllegalArgumentException();
-        yield "extracted."+slug.substring(0,Math.min(60,slug.length())); }
+      default -> {
+        String normalized=Normalizer.normalize(label,Normalizer.Form.NFC).strip();
+        if(!normalized.matches(".*\\p{L}.*"))throw new IllegalArgumentException();
+        String suffix=com.sih26190.dms.selective.PrivateVault.sha256(normalized.getBytes(java.nio.charset.StandardCharsets.UTF_8)).substring(0,12);
+        if(slug.isEmpty() || !Character.isLetter(slug.charAt(0)))yield "extracted.field_"+suffix;
+        yield "extracted."+(slug.length()>60?slug.substring(0,47)+"_"+suffix:slug);
+      }
     };
   }
 }

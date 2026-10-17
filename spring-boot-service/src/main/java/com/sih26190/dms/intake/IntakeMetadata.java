@@ -53,8 +53,12 @@ public class IntakeMetadata {
       var node=json.valueToTree(report).path("indicators");
       signature=node.path("pdfSignature").asText("NOT_CHECKED");
       qr="INCONCLUSIVE";branding="INCONCLUSIVE";
+      int total=node.path("totalPages").asInt(0);
+      if(total>0 && node.path("qrInspectedPages").asInt(0)==total)qr="NOT_DETECTED";
+      if(total>0 && node.path("logoInspectedPages").asInt(0)==total)branding="NOT_DETECTED";
       for(var page:node.path("pages")) {
         if(page.path("logo").asBoolean(false))branding="PASSED";
+        else if(page.path("logoScore").asDouble(0)>0 && !branding.equals("PASSED"))branding="INCONCLUSIVE";
         for(var code:page.path("qr"))if(com.sih26190.dms.foli.IntakeIndicators.associated(code.path("kind").asText()))qr="PASSED";
       }
       if(node.path("warnings").toString().contains("Text/CSV")){qr="NOT_APPLICABLE";branding="NOT_APPLICABLE";}
@@ -100,9 +104,12 @@ public class IntakeMetadata {
       facts.add(new WalletDtos.FactStatus(l.index(),lineage,support));
     }
     var c=checks(current?r:null);String hidden="NOT_DISCLOSED";
-    return new WalletDtos.IntakeStatus("intake-status-v1",includeDocument?c.get("qr"):hidden,
-        includeDocument?c.get("branding"):hidden,includeDocument?c.get("imported"):hidden,includeDocument?c.get("pdfSignature"):hidden,"UNVERIFIED",List.copyOf(facts));
+    // The existing signed v1 format has no NOT_DETECTED state. A local absence
+    // observation must not change that protocol or be encoded as a failed proof.
+    return new WalletDtos.IntakeStatus("intake-status-v1",includeDocument?disclosureCheck(c.get("qr")):hidden,
+        includeDocument?disclosureCheck(c.get("branding")):hidden,includeDocument?c.get("imported"):hidden,includeDocument?c.get("pdfSignature"):hidden,"UNVERIFIED",List.copyOf(facts));
   }
+  private static String disclosureCheck(String state){return state.equals("NOT_DETECTED")?"INCONCLUSIVE":state;}
   public Map<String,Object> detail(CredentialDocument d) {
     var out=new LinkedHashMap<>(summary(d.id));
     String filename=d.originalFilename==null?"":d.originalFilename.toLowerCase(Locale.ROOT);

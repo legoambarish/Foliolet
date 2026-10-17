@@ -20,7 +20,7 @@ import static com.sih26190.dms.foli.FoliData.*;
 
 @Service
 public class FoliExtractionService {
-  public static final String VERSION = "foli-pages-3-layout";
+  public static final String VERSION = "foli-pages-4-field-confidence";
   private final FoliProperties config;
   private final OcrService ocr;
   public FoliExtractionService(FoliProperties config, OcrService ocr) { this.config = config; this.ocr = ocr; }
