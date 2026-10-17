@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const analysis = document.getElementById('intake-analysis');
   if (!analysis) return;
   const rows = document.getElementById('fact-rows'), stage = document.getElementById('intake-stage');
-  let dirty = false, applied = false, baseline = [], timer;
+  let dirty = false, applied = false, baseline = [], timer, appliedAttempt = -1;
   const preview = document.createElement('p'); preview.className = 'help'; preview.setAttribute('role', 'status');
   document.getElementById('claim-form')?.prepend(preview);
   const pathFor = label => {
@@ -195,8 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
     source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = analysis.dataset.pdf === 'yes' ? 'View original page' : 'View original file';
     return source;
   }
-  function showFields(fields) {
-    baseline = fields;
+  function showFields(fields, originalFields = fields) {
+    baseline = originalFields;
     if (!rows || !fields.length || dirty || applied || analysis.dataset.editable !== 'yes') { changed(); return; }
     const template = rows.firstElementChild.cloneNode(true); rows.replaceChildren();
     function append(field) {
@@ -250,14 +250,22 @@ document.addEventListener('DOMContentLoaded', () => {
   async function poll() {
     try {
       const body = await call(analysis.dataset.url); stage.textContent = body.stage || 'Original saved. Enter facts manually or read locally.';
-      showLabels(body); showFields(body.fields || []);
+      showLabels(body);
+      if (!['QUEUED','RUNNING'].includes(body.state)) {
+        // A reread may improve the draft proposal; the immutable original remains
+        // the comparison baseline. Never replace edits made in this browser.
+        if (body.attempts !== appliedAttempt && !dirty) applied = false;
+        const latest = body.report?.currentFields;
+        showFields(Array.isArray(latest) && latest.length ? latest : (body.fields || []), body.fields || []);
+        appliedAttempt = body.attempts;
+      }
       const manifest = body.report?.manifest, indicators = body.report?.indicators;
       const diagnostic = body.report?.diagnostics, diagnosticBox = document.getElementById('intake-diagnostics');
       if (diagnosticBox) {
         diagnosticBox.replaceChildren();
         if (diagnostic) {
           const counts = document.createElement('p'); counts.textContent = diagnostic.candidates + ' associations located · ' + diagnostic.supported + ' supported · ' + diagnostic.reviewRequired + ' need review.'; diagnosticBox.append(counts);
-          const reasonNames = {OVERLAPPING_VALUE_WITHHELD:'An overprinted number could not be read safely',OCR_LABEL_NOT_RECOGNIZED:'An OCR field label could not be identified safely',NO_ALIGNED_GEOMETRY:'Readable text had no aligned field locations',PAGE_UNREADABLE:'A page could not be read',INVISIBLE_SOURCE_TEXT:'Hidden PDF text excluded',WORD_OFFSET_OR_GEOMETRY_MISMATCH:'Text with mismatched locations excluded',OCR_TOO_WEAK_TO_SUGGEST:'Fields too unclear to suggest safely',INVALID_LITERAL_VALUE:'Invalid field values excluded',TABLE_VALUE_MISSING:'Table cells were missing',TABLE_COLUMN_COLLISION:'More than one value occupied a table cell',TABLE_OVERLAPPING_COLUMNS:'Overlapping columns could not be paired safely',CITATION_MISMATCH:'A source quote failed exact validation',FIELD_COUNT_LIMIT:'The field limit was reached',UNSAFE_CGPA_LITERAL:'An unclear CGPA was withheld',INVALID_LABEL_PATH:'A label could not be safely identified',EVIDENCE_SPAN_LIMIT:'Evidence was too spread out to associate safely',CONFLICTING_READINGS:'Conflicting source readings held for review'};
+          const reasonNames = {LABEL_VALUE_SEMANTIC_MISMATCH:'A heading, separator or unrelated text was excluded as a value',TABLE_SCORE_NOT_NUMERIC:'A table score had no readable numeric value',OVERLAPPING_VALUE_WITHHELD:'An overprinted number could not be read safely',OCR_LABEL_NOT_RECOGNIZED:'An OCR field label could not be identified safely',NO_ALIGNED_GEOMETRY:'Readable text had no aligned field locations',PAGE_UNREADABLE:'A page could not be read',INVISIBLE_SOURCE_TEXT:'Hidden PDF text excluded',WORD_OFFSET_OR_GEOMETRY_MISMATCH:'Text with mismatched locations excluded',OCR_TOO_WEAK_TO_SUGGEST:'Fields too unclear to suggest safely',INVALID_LITERAL_VALUE:'Invalid field values excluded',TABLE_VALUE_MISSING:'Table cells were missing',TABLE_COLUMN_COLLISION:'More than one value occupied a table cell',TABLE_OVERLAPPING_COLUMNS:'Overlapping columns could not be paired safely',CITATION_MISMATCH:'A source quote failed exact validation',FIELD_COUNT_LIMIT:'The field limit was reached',UNSAFE_CGPA_LITERAL:'An unclear CGPA was withheld',INVALID_LABEL_PATH:'A label could not be safely identified',EVIDENCE_SPAN_LIMIT:'Evidence was too spread out to associate safely',CONFLICTING_READINGS:'Conflicting source readings held for review'};
           for (const [code, count] of Object.entries(diagnostic.rejections || {})) { const p = document.createElement('p'); p.textContent = (reasonNames[code] || 'Other source checks') + ': ' + count + '.'; diagnosticBox.append(p); }
         }
       }
@@ -274,10 +282,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { stage.textContent = e.message + ' The original is saved; manual fact entry remains available.'; }
   }
   document.getElementById('retry-intake')?.addEventListener('click', async event => {
-    event.currentTarget.disabled = true; clearTimeout(timer);
+    const button = event.currentTarget;
+    button.disabled = true; clearTimeout(timer);
     try { await call(analysis.dataset.retry, {method: 'POST'}); await poll(); }
     catch (e) { stage.textContent = e.message; }
-    finally { event.currentTarget.disabled = false; }
+    finally { button.disabled = false; }
   });
   changed(); poll();
 });

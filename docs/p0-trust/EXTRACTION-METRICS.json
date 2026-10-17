@@ -1,0 +1,379 @@
+{
+  "fictionalOnly": true,
+  "privateDocumentsSent": 0,
+  "budget": {
+    "requests": 18,
+    "tokens": 60000
+  },
+  "eligibleModels": [
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
+    "gemini-omni-1.1-flash",
+    "gemini-omni-flash-preview",
+    "gemini-2.5-pro",
+    "gemini-3.1-pro-preview",
+    "gemini-4-argon",
+    "gemma-4-26b-a4b-it",
+    "gemma-4-31b-it"
+  ],
+  "excluded": [
+    "antigravity-preview-05-2026",
+    "antigravity-preview-09-2026",
+    "antigravity-preview-latest",
+    "deep-research-max-preview-04-2026",
+    "deep-research-preview-04-2026",
+    "deep-research-pro-preview-12-2025",
+    "gemini-2.5-computer-use-preview-10-2025",
+    "gemini-2.5-flash-image",
+    "gemini-2.5-flash-preview-tts",
+    "gemini-2.5-pro-preview-tts",
+    "gemini-3-pro-image",
+    "gemini-3-pro-image-preview",
+    "gemini-3.1-flash-image",
+    "gemini-3.1-flash-image-preview",
+    "gemini-3.1-flash-lite-image",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-flash-tts-preview",
+    "gemini-3.1-pro-preview-customtools",
+    "gemini-3.5-transcribe",
+    "gemini-3.8-flash-lite-tts",
+    "gemini-3.8-flash-tts",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-nano-banana-2.1",
+    "gemini-pro-latest",
+    "gemini-robotics-er-2-preview",
+    "lyria-3-clip-preview",
+    "lyria-3-pro-preview",
+    "lyria-3.5",
+    "nano-banana-pro-preview"
+  ],
+  "exclusionReason": "Moving aliases, duplicate preview/stable Flash-Lite, custom-tools specialization, image/audio/music, research, robotics and computer-use endpoints are outside this extraction screen.",
+  "rows": [
+    {
+      "model": "gemini-3.1-flash-lite",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "STOP",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 492,
+        "totalTokenCount": 1632,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": true,
+        "correct": 11,
+        "expected": 11,
+        "wrongOrDuplicate": 0,
+        "omitted": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "exactCases": 8
+      },
+      "totalMs": 2000
+    },
+    {
+      "model": "gemini-3.5-flash-lite",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "STOP",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 492,
+        "totalTokenCount": 1632,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": true,
+        "correct": 11,
+        "expected": 11,
+        "wrongOrDuplicate": 0,
+        "omitted": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "exactCases": 8
+      },
+      "totalMs": 1875
+    },
+    {
+      "model": "gemini-2.5-flash-lite",
+      "prompt": "strict",
+      "status": "HTTP_ERROR",
+      "httpStatus": 404,
+      "totalMs": 437
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "prompt": "strict",
+      "status": "HTTP_ERROR",
+      "httpStatus": 404,
+      "totalMs": 625
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "MAX_TOKENS",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 60,
+        "totalTokenCount": 2926,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "thoughtsTokenCount": 1726,
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": false,
+        "correct": 0,
+        "expected": 11,
+        "exactCases": 0
+      },
+      "totalMs": 7313
+    },
+    {
+      "model": "gemini-3.5-flash",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "MAX_TOKENS",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 68,
+        "totalTokenCount": 2936,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "thoughtsTokenCount": 1728,
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": false,
+        "correct": 0,
+        "expected": 11,
+        "exactCases": 0
+      },
+      "totalMs": 8984
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "MAX_TOKENS",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 71,
+        "totalTokenCount": 2936,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "thoughtsTokenCount": 1725,
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": false,
+        "correct": 0,
+        "expected": 11,
+        "exactCases": 0
+      },
+      "totalMs": 8656
+    },
+    {
+      "model": "gemini-3.7-flash",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "STOP",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 241,
+        "totalTokenCount": 2591,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "thoughtsTokenCount": 1210,
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": true,
+        "correct": 11,
+        "expected": 11,
+        "wrongOrDuplicate": 0,
+        "omitted": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "exactCases": 8
+      },
+      "totalMs": 10079
+    },
+    {
+      "model": "gemini-3.8-flash",
+      "prompt": "strict",
+      "status": "COMPLETE",
+      "finishReason": "STOP",
+      "usage": {
+        "promptTokenCount": 1140,
+        "candidatesTokenCount": 242,
+        "totalTokenCount": 2295,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 1140
+          }
+        ],
+        "thoughtsTokenCount": 913,
+        "serviceTier": "standard"
+      },
+      "score": {
+        "schemaValid": true,
+        "correct": 11,
+        "expected": 11,
+        "wrongOrDuplicate": 0,
+        "omitted": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "exactCases": 8
+      },
+      "totalMs": 17171
+    },
+    {
+      "model": "gemini-omni-1.1-flash",
+      "prompt": "strict",
+      "status": "HTTP_ERROR",
+      "httpStatus": 429,
+      "totalMs": 766
+    }
+  ],
+  "usedTokens": 31870,
+  "stopReason": "PROVIDER_STOP_429",
+  "reportedTokens": 16948,
+  "actualSamples": [
+    {
+      "sample": 1,
+      "beforeFields": 11,
+      "afterFields": 21,
+      "supported": 16,
+      "reviewRequired": 5,
+      "modelCalls": 0,
+      "allSourceOffsetsExact": true
+    },
+    {
+      "sample": 2,
+      "beforeFields": 6,
+      "afterFields": 29,
+      "supported": 24,
+      "reviewRequired": 5,
+      "modelCalls": 0,
+      "allSourceOffsetsExact": true
+    },
+    {
+      "sample": 3,
+      "beforeFields": 11,
+      "afterFields": 11,
+      "supported": 0,
+      "reviewRequired": 11,
+      "modelCalls": 0,
+      "allSourceOffsetsExact": true
+    }
+  ],
+  "actualSampleChecks": [
+    "sample1 ENGLISH numeric marks",
+    "sample1 MA THEMA TICS numeric marks",
+    "sample1 PHYSICS numeric marks",
+    "sample1 CHEMISTRY numeric marks",
+    "sample1 COMPUTER SCIENCE numeric marks",
+    "sample1 separator excluded as name",
+    "sample2 ENGLISH CORE theory",
+    "sample2 ENGLISH CORE practical",
+    "sample2 ENGLISH CORE total",
+    "sample2 MATHEMATICS theory",
+    "sample2 MATHEMATICS practical",
+    "sample2 MATHEMATICS total",
+    "sample2 PHYSICS theory",
+    "sample2 PHYSICS practical",
+    "sample2 PHYSICS total",
+    "sample2 CHEMISTRY theory",
+    "sample2 CHEMISTRY practical",
+    "sample2 CHEMISTRY total",
+    "sample2 COMPUTER SCIENCE theory",
+    "sample2 COMPUTER SCIENCE practical",
+    "sample2 COMPUTER SCIENCE total",
+    "sample2 Date of declaration of result corroborated",
+    "sample2 Mother's Name corroborated",
+    "sample2 correct result corroborated",
+    "sample2 bogus fields withheld",
+    "sample2 wrapped subject preserved",
+    "sample2 following row retained",
+    "all actual samples require zero model calls"
+  ],
+  "limitations": [
+    "One screening request per model; not a statistically ranked accuracy benchmark.",
+    "Text-cell synthetic cloud cases; actual PDFs processed locally only.",
+    "Remaining models and prompt ablation skipped after first HTTP 429.",
+    "No aggregate billing-project quota or balance visibility."
+  ],
+  "localModelScreen": {
+    "model": "qwen3:4b-instruct",
+    "totalMs": 33046,
+    "score": {
+      "schemaValid": true,
+      "correct": 8,
+      "expected": 11,
+      "wrongOrDuplicate": 2,
+      "omitted": 3,
+      "precision": 0.8,
+      "recall": 0.7272727272727273,
+      "exactCases": 5
+    },
+    "doneReason": "stop",
+    "promptTokens": 1115,
+    "outputTokens": 228
+  },
+  "validation": {
+    "java": {
+      "tests": 148,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4
+    },
+    "djangoIntake": {
+      "passed": 11
+    },
+    "edgeBrowser": {
+      "passed": 13
+    },
+    "actualSampleAssertions": 28,
+    "exactSourceCitations": 61
+  }
+}

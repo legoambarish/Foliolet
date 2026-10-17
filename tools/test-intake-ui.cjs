@@ -71,6 +71,17 @@ async function main() {
   const title='Synthetic document '+('long filename '.repeat(6));await page.locator('#name').fill(title);
   await Promise.all([page.waitForURL(/\/wallet\/0x[0-9a-f]{64}\//),page.getByRole('button',{name:'Upload and review facts',exact:true}).click()]);
   await page.waitForFunction(()=>[...document.querySelectorAll('[name=claim_label]')].some(e=>e.value==='Math'),null,{timeout:300000});
+  const credentialId=new URL(page.url()).pathname.split('/')[2];
+  const firstReading=await backend('/api/wallet/intake/documents/'+credentialId,auth);
+  const savedBaseline=JSON.stringify(firstReading.fields);
+  // Simulate a stale autofill without making a user edit; a new completed read
+  // must replace it while preserving the server's write-once baseline.
+  await page.evaluate(()=>{const row=[...document.querySelectorAll('.edit-row')].find(r=>r.querySelector('[name=claim_label]')?.value==='Math');row.querySelector('[name=claim_value]').value='STALE_AUTOFILL';});
+  await page.locator('#retry-intake').click();
+  await page.waitForFunction(()=>[...document.querySelectorAll('.edit-row')].some(r=>r.querySelector('[name=claim_label]')?.value==='Math' && r.querySelector('[name=claim_value]')?.value==='90'),null,{timeout:300000});
+  const secondReading=await backend('/api/wallet/intake/documents/'+credentialId,auth);
+  assert(secondReading.attempts>firstReading.attempts);assert.equal(JSON.stringify(secondReading.fields),savedBaseline);
+  pass('Explicit reread replaces stale autofill while retaining the original server baseline');
   // Synthetic fixture values are known; explicitly accept every review-required suggestion.
   // This preserves the production guard against silently elevating OCR uncertainty.
   while(await page.locator('.use-reviewed-fact:not(:disabled)').count()) await page.locator('.use-reviewed-fact:not(:disabled)').first().click();
@@ -83,6 +94,13 @@ async function main() {
   await page.getByText('Preview: suggested facts unchanged.',{exact:false}).waitFor();
   await mathRow.locator('[name=claim_value]').fill('95');
   await page.getByText('Preview: facts edited since extraction.',{exact:false}).waitFor();
+  await page.locator('#retry-intake').click();
+  await page.waitForFunction(async ({url,previous})=>{const r=await fetch(url);if(!r.ok)return false;const body=await r.json();return body.attempts>previous && !['QUEUED','RUNNING'].includes(body.state);},
+    {url:await page.locator('#intake-analysis').getAttribute('data-url'),previous:secondReading.attempts},{timeout:300000,polling:2500});
+  // Allow the normal page poll to consume the completed report too.
+  await page.waitForTimeout(3000);
+  assert.equal(await mathRow.locator('[name=claim_value]').inputValue(),'95');
+  pass('Reread does not overwrite unsaved holder edits');
   pass('Real Ollama fields populate review rows with Math 90, source quote and immediate edited preview');
   const source=mathRow.locator('.scan-note a');assert.match(await source.getAttribute('href'),/^\/ask-foli\/api\/page\/\?/);
   let image;
