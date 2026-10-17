@@ -110,6 +110,26 @@ class IntakeTests(TestCase):
         self.assertContains(self.client.get('/wallet/abc/'), 'value="91"')
 
     @patch('dashboard.wallet_views.api.call')
+    def test_empty_reread_does_not_restore_old_baseline_rows(self, api):
+        self.login()
+        doc = draft()
+        doc['intake'] = {'fields': [{'path': 'education.math', 'label': 'Math', 'type': 'decimal', 'value': '91'}],
+                         'report': {'currentFields': []}}
+        api.return_value = doc
+        self.assertNotContains(self.client.get('/wallet/abc/'), 'value="91"')
+
+    @patch('dashboard.wallet_views.api.call')
+    def test_latest_reread_is_used_without_javascript(self, api):
+        self.login()
+        doc = draft()
+        doc['intake'] = {'fields': [{'path': 'education.math', 'label': 'Math', 'type': 'decimal', 'value': '71'}],
+                         'report': {'currentFields': [{'path': 'education.math', 'label': 'Math', 'type': 'decimal', 'value': '91'}]}}
+        api.return_value = doc
+        response = self.client.get('/wallet/abc/')
+        self.assertContains(response, 'value="91"')
+        self.assertNotContains(response, 'value="71"')
+
+    @patch('dashboard.wallet_views.api.call')
     def test_names_and_values_do_not_require_user_to_type_paths(self, api):
         self.login()
         api.return_value = draft()

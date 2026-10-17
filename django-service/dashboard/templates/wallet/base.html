@@ -11,31 +11,80 @@
 <link rel="stylesheet" href="{% asset 'wallet/wallet.css' %}">
 {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="{% if current_username and not public %}app{% else %}public-page{% endif %}">
 <a class="skip" href="#main">Skip to content</a>
+{% if current_username and not public %}
+{# ---------- Private app shell: signed-in pages only ---------- #}
+{% include 'wallet/_icons.html' %}
+<header class="app-bar">
+  <button type="button" class="app-bar-btn" id="sidebar-open" aria-controls="sidebar" aria-expanded="false">
+    <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg><span class="sr-only">Open navigation</span>
+  </button>
+  <a class="wordmark" href="{% url 'dashboard:index' %}"><span class="wordmark-mark" aria-hidden="true"><span></span><span></span><span></span></span>{{ product_label }}</a>
+  <a class="app-bar-btn" href="{% url 'dashboard:enroll' %}"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span class="sr-only">Upload a document</span></a>
+</header>
+
+{% with here=request.resolver_match.url_name q=request.GET.q c=request.GET.category %}
+<aside class="sidebar" id="sidebar" aria-label="{{ product_label }} navigation">
+  <div class="sidebar-head">
+    <a class="sidebar-brand" href="{% url 'dashboard:index' %}">
+      <span class="wordmark-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span class="sidebar-label">{{ product_label }}</span>
+    </a>
+    <button type="button" class="app-bar-btn sidebar-close" id="sidebar-close">
+      <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg><span class="sr-only">Close navigation</span>
+    </button>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Main">
+    <ul>
+      <li><a class="nav-link" href="{% url 'dashboard:index' %}" data-tip="Home" data-nav="home"{% if here == 'index' and not q and not c %} aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg><span class="sidebar-label">Home</span></a></li>
+      <li><a class="nav-link" href="{% url 'dashboard:index' %}#documents" data-tip="Documents" data-nav="documents"{% if here == 'detail' or here == 'compose' or here == 'signature-inspect' or here == 'document_action' or here == 'index' and q or here == 'index' and c %} aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true"><use href="#i-documents"></use></svg><span class="sidebar-label">Documents</span></a></li>
+      <li><a class="nav-link" href="{% url 'dashboard:enroll' %}" data-tip="Upload a document"{% if here == 'enroll' or here == 'version' %} aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span class="sidebar-label">Upload</span></a></li>
+      <li><a class="nav-link" href="{% url 'dashboard:foli' %}" data-tip="Ask Foli"{% if here == 'foli' %} aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true"><use href="#i-foli"></use></svg><span class="sidebar-label">Ask Foli</span></a></li>
+      <li><a class="nav-link" href="{% url 'dashboard:sharing' %}" data-tip="Shared proofs"{% if here == 'sharing' %} aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span class="sidebar-label">Shared</span></a></li>
+      <li><a class="nav-link" href="{% url 'dashboard:integrity' %}" data-tip="First-seen records"{% if here == 'integrity' %} aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true"><use href="#i-first-seen"></use></svg><span class="sidebar-label">First-seen</span></a></li>
+    </ul>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="sidebar-fold">
+      <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-choice="light" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-sun"></use></svg><span>Light</span></button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg><span>Dark</span></button>
+        <button type="button" data-theme-choice="system" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-auto"></use></svg><span>Auto</span></button>
+      </div>
+    </div>
+    <div class="sidebar-user" data-tip="Signed in as {{ current_username }}">
+      <span class="avatar" aria-hidden="true">{{ current_username|slice:':1'|upper }}</span>
+      <span class="sidebar-label"><span class="sidebar-user-k">Signed in as</span><strong>{{ current_username }}</strong></span>
+    </div>
+    <form action="{% url 'dashboard:logout' %}" method="post" class="sidebar-form">{% csrf_token %}
+      <button class="nav-link" data-tip="Sign out"><svg class="icon" aria-hidden="true"><use href="#i-signout"></use></svg><span class="sidebar-label">Sign out</span></button>
+    </form>
+    <button type="button" class="nav-link sidebar-toggle" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="true" data-tip="Expand sidebar">
+      <svg class="icon" aria-hidden="true"><use href="#i-sidebar"></use></svg><span class="sidebar-label">Collapse sidebar</span>
+    </button>
+  </div>
+</aside>
+{% endwith %}
+<div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
+<div class="app-main">
+{% else %}
+{# ---------- Public and signed-out pages: their own header, no private navigation ---------- #}
 <header class="masthead">
   <div class="masthead-inner">
     {% if public %}
     <span class="wordmark"><span class="wordmark-mark" aria-hidden="true"><span></span><span></span><span></span></span>{{ product_label }}</span>
     <span class="wordmark-note">Disclosure verification</span>
-    <div class="masthead-tools">
-      <div class="theme-switch" role="group" aria-label="Colour theme">
-        <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-        <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
-        <button type="button" data-theme-choice="system" aria-pressed="true">Auto</button>
-      </div>
-    </div>
     {% else %}
     <a class="wordmark" href="{% url 'dashboard:index' %}"><span class="wordmark-mark" aria-hidden="true"><span></span><span></span><span></span></span>{{ product_label }}</a>
-    {% if current_username %}
-    {% with here=request.resolver_match.url_name %}
-    <nav class="primary-nav" aria-label="Main">
-      <a href="{% url 'dashboard:index' %}" {% if here == 'index' or here == 'detail' or here == 'compose' or here == 'enroll' or here == 'version' %}aria-current="page"{% endif %}>Documents</a>
-      <a href="{% url 'dashboard:sharing' %}" {% if here == 'sharing' %}aria-current="page"{% endif %}>Shared</a>
-      <a href="{% url 'dashboard:integrity' %}" {% if here == 'integrity' %}aria-current="page"{% endif %}>First-seen</a>
-      <a href="{% url 'dashboard:foli' %}" {% if here == 'foli' %}aria-current="page"{% endif %}>Ask Foli</a>
-    </nav>
-    {% endwith %}
     {% endif %}
     <div class="masthead-tools">
       <div class="theme-switch" role="group" aria-label="Colour theme">
@@ -43,16 +92,10 @@
         <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
         <button type="button" data-theme-choice="system" aria-pressed="true">Auto</button>
       </div>
-      {% if current_username %}
-      <div class="account">
-        <span class="who">Signed in as <strong class="ink-2">{{ current_username }}</strong></span>
-        <form action="{% url 'dashboard:logout' %}" method="post">{% csrf_token %}<button class="text-btn">Sign out</button></form>
-      </div>
-      {% endif %}
     </div>
-    {% endif %}
   </div>
 </header>
+{% endif %}
 <main id="main" class="page{% block page_class %}{% endblock %}">
   {% if messages or error %}
   <div class="notices">
@@ -65,6 +108,8 @@
 <footer class="site-foot">
   <div><span>Share the fact, not the file.</span><span>A valid proof shows a fact was committed. It does not show the document is authentic.</span></div>
 </footer>
+{% if current_username and not public %}</div>
+<script src="{% asset 'wallet/shell.js' %}" defer></script>{% endif %}
 <script src="{% asset 'wallet/wallet.js' %}" defer></script>
 {% block scripts %}{% endblock %}
 </body>

@@ -113,16 +113,16 @@ class LayoutFactsTest {
         List.of(new Page(1,text,"TEXT",null,0,0,0,List.of(),List.of(),List.of(layer))),null);
   }
   @Test void localModelCanOnlyLinkExistingCellsAndCannotSupplyItsOwnValue() {
-    when(model.ask(anyString(),anyString(),eq(true))).thenReturn(new FoliLocalModel.Reply("{\"pairs\":[{\"labelCell\":\"P1_native_R0_C0\",\"valueCell\":\"P1_native_R0_C1\",\"value\":\"FORGED\"}]}",1,1));
+    when(model.ask(anyString(),anyString(),anyMap())).thenReturn(new FoliLocalModel.Reply("{\"pairs\":[{\"labelCell\":\"P1_native_R0_C0\",\"valueCell\":\"P1_native_R0_C1\",\"value\":\"FORGED\"}]}",1,1));
     var r=suggest(unusualCells());assertEquals(1,r.fields().size());assertEquals("NV001",r.fields().get(0).value());
     assertEquals("REVIEW_REQUIRED",r.fields().get(0).support().quality());assertEquals(1,r.diagnostics().get("modelCalls"));
   }
   @Test void unknownModelReferencesNeverBecomeSuggestions() {
-    when(model.ask(anyString(),anyString(),eq(true))).thenReturn(new FoliLocalModel.Reply("{\"pairs\":[{\"labelCell\":\"P9_native_R0_C0\",\"valueCell\":\"P1_native_R0_C1\"}]}",1,1));
+    when(model.ask(anyString(),anyString(),anyMap())).thenReturn(new FoliLocalModel.Reply("{\"pairs\":[{\"labelCell\":\"P9_native_R0_C0\",\"valueCell\":\"P1_native_R0_C1\"}]}",1,1));
     var r=suggest(unusualCells());assertTrue(r.fields().isEmpty());assertEquals(1,((Map<?,?>)r.diagnostics().get("rejections")).get("MODEL_UNKNOWN_CELL"));
   }
   @Test void offlineLinkerDoesNotRemoveOriginalOrPretendSourceChecksFailed() {
-    when(model.ask(anyString(),anyString(),eq(true))).thenThrow(new FoliException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"OFFLINE","offline"));
+    when(model.ask(anyString(),anyString(),anyMap())).thenThrow(new FoliException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"OFFLINE","offline"));
     var r=suggest(unusualCells());assertTrue(r.fields().isEmpty());assertEquals("OFFLINE",r.diagnostics().get("modelStatus"));
   }
   @Test void exactDobAnchorDoesNotAcquireUnrelatedBilingualLabelNoise() {
@@ -218,5 +218,67 @@ class LayoutFactsTest {
         {"30","85","INTERNAL ASSESSMENT"},{"30","110","COMMUNITY SERVICE"},{"800","110","A"}}));
     assertEquals(2,r.fields().size());assertTrue(r.fields().stream().allMatch(f -> f.label().startsWith("COMPUTER SCIENCE ")));
     assertTrue(r.fields().stream().noneMatch(f -> f.label().contains("ASSESSMENT")));
+  }
+  @Test void unknownExplicitOcrLabelsAreRetainedWithoutInventingCharacters() {
+    var source=positioned(new String[][]{{"30","20","Policy Number: 0000719"},{"30","60","Blood Group: O+"},
+        {"30","100","Invoice Reference:"},{"400","100","INV-0042"},{"30","140","नाम: मीरा"}});
+    var p=source.pages().get(0);var l=p.layers().get(0);
+    var scan=new Page(1,p.text(),"OCR",99d,0,0,0,l.words(),List.of(),List.of(new Layer("ocr","OCR",0,l.width(),l.height(),l.words(),List.of())));
+    var r=suggest(new Snapshot(source.document(),source.hash(),List.of(scan),null));
+    assertEquals(4,r.fields().size());assertTrue(r.fields().stream().allMatch(f -> f.support().quality().equals("REVIEW_REQUIRED")));
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Policy Number") && f.value().equals("0000719") && f.type().equals("string")));
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("नाम") && f.value().equals("मीरा")));
+    verifyNoInteractions(model);
+  }
+  @Test void partialStructuredSuccessStillLinksOnlyTheUnresolvedPair() {
+    when(model.ask(anyString(),anyString(),anyMap())).thenAnswer(call -> {
+      String prompt=call.getArgument(1);assertFalse(prompt.contains("MIRA"));assertFalse(prompt.contains("Result"));
+      return new FoliLocalModel.Reply("{\"pairs\":[{\"labelCell\":\"P1_native_R1_C0\",\"valueCell\":\"P1_native_R1_C1\"}]}",1,1);
+    });
+    var r=suggest(positioned(new String[][]{{"30","20","Name: MIRA EXAMPLE"},{"30","60","Award Code"},{"400","60","NV001"},
+        {"30","100","Result: PASS"}}));
+    assertEquals(3,r.fields().size());assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Award Code") && f.value().equals("NV001")));
+    verify(model,times(1)).ask(anyString(),anyString(),anyMap());
+  }
+  @Test void rightAlignedTableValuesDoNotMoveIntoTheNextColumn() {
+    var r=suggest(positioned(new String[][]{{"30","20","Subject"},{"300","20","Max Marks"},{"400","20","Marks Obtained"},{"600","20","Grade"},
+        {"30","60","Physics"},{"370","60","100"},{"560","60","086"},{"620","60","A2"}}));
+    assertEquals(3,r.fields().size());
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Physics maximum marks") && f.value().equals("100")));
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Physics marks") && f.value().equals("86")));
+    verifyNoInteractions(model);
+  }
+  @Test void meaningfulLabelPrefixesAndLongOrUnicodePathsRemainDistinct() {
+    var r=suggest(positioned(new String[][]{{"30","20","Previous School: North Valley"},{"30","60","School: South Valley"}}));
+    assertEquals(2,r.fields().size());assertTrue(r.fields().stream().noneMatch(f -> f.support().reasons().contains("CONFLICTING_READINGS")));
+    assertNotEquals(FactSuggestions.path("नाम"),FactSuggestions.path("पता"));
+    assertNotEquals(FactSuggestions.path("a".repeat(65)+" x"),FactSuggestions.path("a".repeat(65)+" y"));
+  }
+  @Test void fullWalletCapacityIsExtractedAndOverflowIsExplicit() {
+    var text=new StringBuilder();for(int i=1;i<=70;i++)text.append("Custom field ").append(i).append(": value ").append(i).append('\n');
+    var doc=new Document("wallet:0x"+"c".repeat(64),"Fields","source.txt","txt","DRAFT","1",true);
+    var r=suggest(new Snapshot(doc,"c".repeat(64),List.of(new Page(1,text.toString(),"TEXT",null,1,70,0,List.of(),List.of())),null));
+    assertEquals(64,r.fields().size());assertTrue(r.partial());assertEquals(6,((Map<?,?>)r.diagnostics().get("rejections")).get("FIELD_COUNT_LIMIT"));
+    assertTrue(r.warnings().stream().anyMatch(w -> w.contains("64 facts")));verifyNoInteractions(model);
+  }
+  @Test void unfamiliarSeparatedDelimitersAndPrintedAbsentMarksAreNotLost() {
+    var r=suggest(positioned(new String[][]{{"30","20","Policy Number"},{"300","20",":"},{"400","20","000123"},
+        {"30","80","Subject"},{"400","80","Marks Obtained"},{"30","120","Physics"},{"400","120","AB"}}));
+    assertEquals(2,r.fields().size());
+    assertTrue(r.fields().stream().anyMatch(f -> f.label().equals("Policy Number") && f.value().equals("000123")));
+    var absent=r.fields().stream().filter(f -> f.label().equals("Physics marks")).findFirst().orElseThrow();
+    assertEquals("AB",absent.value());assertEquals("string",absent.type());assertEquals("REVIEW_REQUIRED",absent.support().quality());
+    verifyNoInteractions(model);
+  }
+  @Test void discardedOrientationsAndWeakOrphanCellsDoNotTriggerSlowModelCalls() {
+    var s=ocr("91","91",99,false);var p=s.pages().get(0);
+    String extra="\nAward Code NV001";int at=p.text().length()+1;
+    var bad=new Layer("wrong-direction","OCR_CHECK",90,600,800,List.of(
+        new Word("Award Code",at,at+10,20,300,80,18,99),new Word("NV001",at+11,at+16,220,300,50,18,99)),List.of());
+    var layers=new ArrayList<>(p.layers());layers.add(bad);
+    var page=new Page(1,p.text()+extra,p.status(),p.confidence(),0,0,0,p.words(),List.of(),layers);
+    var r=suggest(new Snapshot(s.document(),s.hash(),List.of(page),null));
+    assertEquals(1,r.fields().size());assertEquals("91",r.fields().get(0).value());
+    assertEquals(1,((Map<?,?>)r.diagnostics().get("rejections")).get("OTHER_OCR_ORIENTATION"));verifyNoInteractions(model);
   }
 }

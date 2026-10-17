@@ -83,9 +83,15 @@ public class OcrService {
       }
     }
     best=readings.stream().max(java.util.Comparator.comparingDouble(OcrService::quality)).orElse(original);
-    if(compact && (best.confidence()<85 || best.words().size()<5) && System.nanoTime()<deadline) {
+    boolean weakPage=best.confidence()<85 || best.words().size()<5;
+    // Page averages hide a weak ID or score surrounded by easy headings. A
+    // single bounded independent reading can recover that value without guessing
+    // letters/digits or slowing every clean native/scanned page.
+    boolean weakValue=needsValueCheck(best);
+    if(compact && (weakPage || weakValue) && System.nanoTime()<deadline) {
       int angle=best.rotation();var frame=angle==0?input:rotate(input,angle);
-      Result extra;try{extra=runCompact(frame,deadline);}finally{if(frame!=input)frame.flush();}
+      long checkDeadline=weakPage?deadline:Math.min(deadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(8));
+      Result extra;try{extra=runCompact(frame,checkDeadline);}finally{if(frame!=input)frame.flush();}
       if(extra.text().isBlank()) {
         original=new Result(original.text(),original.confidence(),original.rotation(),original.words(),original.warning()+" "+extra.warning(),original.method());readings.set(0,original);
       } else readings.add(new Result(extra.text(),extra.confidence(),angle,extra.words(),extra.warning(),extra.method()));
@@ -96,6 +102,11 @@ public class OcrService {
     var kept=new ArrayList<Result>();kept.add(readings.get(0));if(original!=readings.get(0) && !original.text().isBlank())kept.add(original);
     for(var r:readings)if(kept.size()<4 && !kept.contains(r))kept.add(r);
     return List.copyOf(kept);
+  }
+
+  static boolean needsValueCheck(Result result) {
+    return result.words().stream().anyMatch(w -> w.confidence()>=45 && w.confidence()<80
+        && w.text().length()>=2 && w.text().matches("(?=.*[0-9])[A-Za-z0-9./%+_-]+"));
   }
 
   private Result runCompact(BufferedImage image,long deadline) {

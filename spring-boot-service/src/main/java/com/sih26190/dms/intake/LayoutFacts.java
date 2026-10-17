@@ -52,12 +52,23 @@ final class LayoutFacts {
     long start=System.nanoTime();var raw=new ArrayList<Raw>();var pageStats=new ArrayList<Map<String,Object>>();
     for(var page:snapshot.pages()) {
       progress.accept("Locating labels, values and table cells · page "+page.number());int before=raw.size();
-      if(page.layers()!=null && !page.layers().isEmpty()) for(var layer:page.layers()) discover(page,layer,raw);
+      if(page.layers()!=null && !page.layers().isEmpty()) {
+        var primary=page.layers().stream().filter(l -> l.kind().equals("OCR")).findFirst().orElse(null);
+        for(var layer:page.layers()) {
+          // Retain every reading in the snapshot, but upside-down/sideways trial
+          // text is not another independent field in the selected orientation.
+          if(primary!=null && layer.kind().startsWith("OCR") && layer.rotation()!=primary.rotation()) {
+            reject("OTHER_OCR_ORIENTATION");continue;
+          }
+          discover(page,layer,raw);
+        }
+      }
       else if(page.status().equals("TEXT") && !snapshot.document().format().equals("pdf")) plain(page,raw);
       else reject(page.readable()?"NO_ALIGNED_GEOMETRY":"PAGE_UNREADABLE");
       pageStats.add(Map.of("page",page.number(),"readable",page.readable(),"layers",page.layers()==null?0:page.layers().size(),"candidates",raw.size()-before));
     }
-    if(raw.isEmpty() && !modelCells.isEmpty()) modelPairs(model,raw,progress);
+    // A recognized field on one page must not suppress linking elsewhere.
+    if(!modelCells.isEmpty()) modelPairs(model,raw,progress);
     discovered=raw.size();var groups=new LinkedHashMap<String,List<Raw>>();
     for(var r:raw) {
       try {
@@ -69,7 +80,7 @@ final class LayoutFacts {
     }
     var fields=new ArrayList<Candidate>();int supported=0,review=0;
     for(var entry:groups.entrySet()) {
-      if(fields.size()>=40){reject("FIELD_COUNT_LIMIT");continue;}
+      if(fields.size()>=64){reject("FIELD_COUNT_LIMIT");continue;}
       var options=entry.getValue();
       // Native and independently positioned OCR readings are reconciled field by field.
       Raw chosen=options.stream().filter(r -> r.layer().kind().equals("NATIVE") || r.layer().kind().equals("TEXT")).findFirst()
@@ -137,7 +148,8 @@ final class LayoutFacts {
     var warnings=new ArrayList<String>();if(review>0)warnings.add(review+" fields need review against the original before use. OCR confidence is not proof of correct transcription.");
     if(!modelStatus.equals("NOT_REQUIRED_FOR_STRUCTURED_SOURCE") && !modelStatus.equals("LOCAL_SOURCE_LINKER_COMPLETE"))warnings.add("The local source-linking fallback did not complete ("+modelStatus+"). Structured source checks and manual entry remain available.");
     if(fields.isEmpty())warnings.add(discovered==0?"No safe label/value association was located. Check layout diagnostics or enter facts from the original.":"Located candidates did not pass field-level source checks. See the specific rejection reasons.");
-    boolean partial=reasons.containsKey("FIELD_COUNT_LIMIT");
+    boolean partial=reasons.containsKey("FIELD_COUNT_LIMIT") || !Set.of("NOT_REQUIRED_FOR_STRUCTURED_SOURCE","LOCAL_SOURCE_LINKER_COMPLETE").contains(modelStatus);
+    if(reasons.containsKey("FIELD_COUNT_LIMIT"))warnings.add("The wallet supports 64 facts per document. Additional associations were located but omitted; review the original for remaining fields.");
     return new Result(List.copyOf(fields),reasons.values().stream().mapToInt(Integer::intValue).sum(),partial,List.copyOf(warnings),diagnostics);
   }
   private void modelPairs(FoliLocalModel model,List<Raw> out,Consumer<String> progress) {
@@ -146,24 +158,31 @@ final class LayoutFacts {
         +"The label and value must be separate adjacent cells in the same row or directly one above the other. "
         +"Headers, punctuation, notes, subject lists and instructions are never field values. Never pair TOTAL with TOTAL (IN WORDS). "
         +"A result must be a printed outcome, not a list of subjects. Do not return values, rewrite text, infer a name from prose, join table columns, calculate, or correct OCR. Omit ambiguity and conflicting readings. At most 12 pairs.";
-    var chunks=new ArrayList<String>();var block=new StringBuilder();
+    var chunks=new ArrayList<String>();var block=new StringBuilder();var pairBlock=new StringBuilder();int cellIndex=0;
     for(var entry:modelCells.entrySet()) {
       var c=entry.getValue();String line=entry.getKey()+" [x="+Math.round(c.left()*100/c.layer().width())+", y="+Math.round(c.top()*100/c.layer().height())+"]: "+c.text()+"\n";
-      if(block.length()+line.length()>2100){chunks.add(block.toString());block.setLength(0);}block.append(line);
+      pairBlock.append(line);
+      if(++cellIndex%2==0) {
+        if(block.length()+pairBlock.length()>2100){chunks.add(block.toString());block.setLength(0);}
+        block.append(pairBlock);pairBlock.setLength(0);
+      }
     }
     if(!block.isEmpty())chunks.add(block.toString());
-    long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(120);modelStatus="LOCAL_SOURCE_LINKER_COMPLETE";
-    for(int part=0;part<Math.min(4,chunks.size()) && System.nanoTime()<deadline;part++) {
+    long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(15);modelStatus="LOCAL_SOURCE_LINKER_COMPLETE";
+    int processed=0;
+    for(int part=0;part<Math.min(2,chunks.size()) && System.nanoTime()<deadline;part++) {
+      processed++;
       progress.accept("Checking unassociated source cells locally · part "+(part+1)+" of "+chunks.size());
       try {
         String prompt="Located source cells:\n"+chunks.get(part);
-        modelCalls++;var reply=boundedModel(model,system,prompt,deadline);
-        if(reply==null || reply.text()==null || reply.text().length()>16000){reject("MODEL_INVALID_SCHEMA");continue;}
+        var ids=modelCells.keySet().stream().filter(id -> prompt.contains(id+" [x=")).toList();
+        modelCalls++;var reply=boundedModel(model,system,prompt,ids,deadline);
+        if(reply==null || reply.text()==null || reply.text().length()>16000){reject("MODEL_INVALID_SCHEMA");modelStatus="INVALID_PROPOSAL";continue;}
         var pairs=new com.fasterxml.jackson.databind.ObjectMapper().readTree(reply.text()).path("pairs");
-        if(!pairs.isArray() || pairs.size()>24){reject("MODEL_INVALID_SCHEMA");continue;}
+        if(!pairs.isArray() || pairs.size()>24){reject("MODEL_INVALID_SCHEMA");modelStatus="INVALID_PROPOSAL";continue;}
         for(var pair:pairs) {
           var label=modelCells.get(pair.path("labelCell").asText());var value=modelCells.get(pair.path("valueCell").asText());
-          if(label==null || value==null || label==value){reject("MODEL_UNKNOWN_CELL");continue;}
+          if(label==null || value==null || label==value){reject("MODEL_UNKNOWN_CELL");modelStatus="INVALID_PROPOSAL";continue;}
           if(!chunks.get(part).contains(pair.path("labelCell").asText()+" [x=") || !chunks.get(part).contains(pair.path("valueCell").asText()+" [x=")){reject("MODEL_OUTSIDE_CHUNK");continue;}
           if(label.page()!=value.page() || label.layer()!=value.layer() || !label.text().matches(".*\\p{L}.*")){reject("MODEL_CROSS_SOURCE_ASSOCIATION");continue;}
           double height=Math.max(label.bottom()-label.top(),value.bottom()-value.top());
@@ -176,11 +195,19 @@ final class LayoutFacts {
       catch(FoliException e){modelStatus=e.code();break;}
       catch(Exception e){reject("MODEL_INVALID_SCHEMA");modelStatus="INVALID_PROPOSAL";}
     }
-    if(chunks.size()>4)reject("MODEL_SOURCE_BUDGET");
+    if(chunks.size()>2){reject("MODEL_SOURCE_BUDGET");modelStatus="MODEL_SOURCE_BUDGET";}
+    if(processed<Math.min(2,chunks.size()) && modelStatus.equals("LOCAL_SOURCE_LINKER_COMPLETE"))modelStatus="MODEL_TIME_BUDGET";
   }
-  private static FoliLocalModel.Reply boundedModel(FoliLocalModel model,String system,String prompt,long deadline) {
+  private static FoliLocalModel.Reply boundedModel(FoliLocalModel model,String system,String prompt,List<String> ids,long deadline) {
+    // Constrain generation itself as well as validating afterward. JSON mode
+    // alone lets small local models invent source IDs and silently lose fields.
+    var cell=Map.of("type","string","enum",ids);
+    var pair=Map.of("type","object","properties",Map.of("labelCell",cell,"valueCell",cell),
+        "required",List.of("labelCell","valueCell"),"additionalProperties",false);
+    var schema=Map.of("type","object","properties",Map.of("pairs",Map.of("type","array","items",pair,"maxItems",12)),
+        "required",List.of("pairs"),"additionalProperties",false);
     var executor=java.util.concurrent.Executors.newSingleThreadExecutor(r -> {var thread=new Thread(r,"intake-local-linker");thread.setDaemon(true);return thread;});
-    var call=executor.submit(() -> model.ask(system,prompt,true));
+    var call=executor.submit(() -> model.ask(system,prompt,schema));
     try {return call.get(Math.max(1,deadline-System.nanoTime()),java.util.concurrent.TimeUnit.NANOSECONDS);}
     catch(InterruptedException e){Thread.currentThread().interrupt();throw new java.util.concurrent.CancellationException();}
     catch(java.util.concurrent.TimeoutException e){throw new FoliException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"MODEL_TIME_BUDGET","Local source linking reached its time budget.");}
@@ -240,28 +267,41 @@ final class LayoutFacts {
       if(!part.isEmpty())cells.add(cell(page,layer,part));grid.add(cells);rowsSeen++;cellsSeen+=cells.size();
     }
     var tableCells=Collections.newSetFromMap(new IdentityHashMap<Cell,Boolean>());
-    for(int ri=0;ri<grid.size();ri++)for(int ci=0;ci<grid.get(ri).size();ci++) {
-      var c=grid.get(ri).get(ci);if(c.text().length()<=200 && modelCells.size()<400)
-        modelCells.put("P"+page.number()+"_"+layer.id()+"_R"+ri+"_C"+ci,c);
-    }
     for(int ri=0;ri<grid.size();ri++) table(grid,ri,out,tableCells);
+    var handled=Collections.newSetFromMap(new IdentityHashMap<Cell,Boolean>());
     for(int ri=0;ri<grid.size();ri++) {
       var row=grid.get(ri);
       for(int ci=0;ci<row.size();ci++) {
         var label=row.get(ci);if(tableCells.contains(label))continue;
-        if(inline(label,out))continue;
-        if(!knownLabel(anchoredLabel(label.text())))continue;
+        if(inline(label,out)){handled.add(label);continue;}
+        boolean explicitLabel=(label.text().matches(".*[:=]$") || ci+1<row.size() && row.get(ci+1).text().matches("[:=]"))
+            && safeLabel(label.text().replaceAll("[:=]$", "").strip());
+        if(!knownLabel(anchoredLabel(label.text())) && !explicitLabel)continue;
+        handled.add(label);
         int next=ci+1;
         // A separately positioned ':' is a separator, not the name or identifier.
         if(next<row.size() && row.get(next).text().matches("[:=]"))next++;
         if(next<row.size() && !knownLabel(anchoredLabel(row.get(next).text()))) {
-          var value=row.get(next);ci=next;add(label,value,List.of(),"ADJACENT_CELLS",out,List.of());
+          var value=row.get(next);handled.add(value);ci=next;add(label,value,List.of(),"ADJACENT_CELLS",out,List.of());
         } else if(row.size()==1 && ri+1<grid.size() && grid.get(ri+1).size()==1) {
           var value=grid.get(ri+1).get(0);double gap=value.top()-label.bottom();
           if(!knownLabel(value.text()) && gap>=0 && gap<=Math.max(label.bottom()-label.top(),value.bottom()-value.top())*4
-              && Math.abs(value.left()-label.left())<Math.max(20,layer.width()*.025))add(label,value,List.of(),"LABEL_ABOVE_VALUE",out,List.of());
+              && Math.abs(value.left()-label.left())<Math.max(20,layer.width()*.025)){handled.add(value);add(label,value,List.of(),"LABEL_ABOVE_VALUE",out,List.of());}
         }
       }
+    }
+    // Send only unresolved, plausible pairs. Never reintroduce rejected fields,
+    // tables, headings or already supported cells through the model fallback.
+    if(layer.kind().equals("OCR_CHECK"))return;
+    for(int ri=0;ri<grid.size();ri++) {
+      var row=grid.get(ri);if(row.size()!=2)continue;
+      var a=row.get(0);var b=row.get(1);
+      if(tableCells.contains(a)||tableCells.contains(b)||handled.contains(a)||handled.contains(b)
+          || !safeLabel(a.text()) || !plausible(a.text(),b.text()) || headerRole(key(a.text()))!=null
+          || a.text().length()>80 || b.text().length()>200 || modelCells.size()>=200
+          || java.util.stream.Stream.concat(a.words().stream(),b.words().stream()).anyMatch(w -> w.confidence()<80))continue;
+      String prefix="P"+page.number()+"_"+layer.id()+"_R"+ri+"_C";
+      modelCells.put(prefix+"0",a);modelCells.put(prefix+"1",b);
     }
   }
   private static Cell cell(Page page,Layer layer,List<Word> words){return new Cell(page,layer,List.copyOf(words),words.stream().map(Word::text).collect(java.util.stream.Collectors.joining(" ")));}
@@ -279,7 +319,7 @@ final class LayoutFacts {
       // Isolate an exact English DOB anchor after another script; unrelated weak words are not its label.
       var dob=Pattern.compile("(?i)(?:^|[\\s/])D\\.?O\\.?B\\.?$").matcher(label);
       if(dob.find()){a+=dob.start();while(a<cell.text().length() && !Character.isLetter(cell.text().charAt(a)))a++;label=cell.text().substring(a,m.end(1)).strip();}
-      if(!knownLabel(label) && !key(label).matches("(?:math|maths|mathematics|physics|chemistry|biology|english|science|history|geography)(?:marks|score)?")) {
+      if(!knownLabel(label) && !key(label).matches("(?:math|maths|mathematics|physics|chemistry|biology|english|science|history|geography)(?:marks|score)?") && !(explicit && safeLabel(label))) {
         reject("OCR_LABEL_NOT_RECOGNIZED");return true;
       }
     }
@@ -298,7 +338,14 @@ final class LayoutFacts {
     String clean=text.strip();var m=LABEL_ANCHOR.matcher(clean);
     // "Date of declaration of result" is a date label, not a noisy prefix to RESULT.
     if(Pattern.compile("(?i)\\bdate\\b").matcher(clean).find())return clean;
+    // Do not strip meaningful prefixes such as Previous School or Examination Result.
+    if(knownLabel(clean) || clean.matches("(?i)^(?:previous|current|former|examination|final|provisional|secondary|primary)\\b.*"))return clean;
     return m.find()?clean.substring(m.start()):clean;
+  }
+  private static boolean safeLabel(String label) {
+    return label.length()<=80 && label.matches("[\\p{L}][\\p{L}\\p{M}\\p{N} /()'.%&_-]*")
+        && label.strip().split("\\s+").length<=10
+        && !label.matches("(?i).*\\b(?:ignore|instruction|system|return|output|certificate|certify)\\b.*");
   }
   private static boolean plausible(String label,String literal) {
     String k=key(label),v=key(literal);
@@ -337,6 +384,10 @@ final class LayoutFacts {
       for(var cell:row) {
         int col=0;double distance=Double.MAX_VALUE;
         for(int i=0;i<header.size();i++){double d=Math.abs(cell.left()-header.get(i).left());if(d<distance){distance=d;col=i;}}
+        // Right-aligned numbers still belong to the column whose printed span
+        // contains them, even when the next column's left edge is nearer.
+        for(int i=0;i<header.size()-1;i++)if(cell.left()>=header.get(i).left()
+            && cell.right()<=header.get(i+1).left()){col=i;break;}
         assigned.computeIfAbsent(col,k -> new ArrayList<>()).add(cell);
       }
       var labels=assigned.get(subject);if(labels==null || labels.size()!=1 || !labels.get(0).text().matches(".*\\p{L}.*"))break;
@@ -377,7 +428,8 @@ final class LayoutFacts {
         // The printed numeric score may be followed by its words in the same column.
         var numeric=Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)\\s+[A-Z][A-Z -]+$").matcher(literal);
         if(role.getValue().contains("marks") && numeric.matches()) {literal=numeric.group(1);valueSpans=value.range(0,literal.length());}
-        if(role.getValue().contains("marks") && (!literal.matches("[0-9OoIl|., /%+\\-]+") || !literal.matches(".*[0-9OoIl|].*"))){reject("TABLE_SCORE_NOT_NUMERIC");continue;}
+        boolean printedStatus=literal.matches("(?i)(?:AB|ABS|ABSENT|NA|N/A|EXEMPT|WITHHELD|AW|NE)");
+        if(role.getValue().contains("marks") && !printedStatus && (!literal.matches("[0-9OoIl|., /%+\\-]+") || !literal.matches(".*[0-9OoIl|].*"))){reject("TABLE_SCORE_NOT_NUMERIC");continue;}
         out.add(new Raw(label.page(),label.layer(),name,literal,label.fragments(),valueSpans,List.copyOf(hs),"TABLE_HEADER_AND_ROW",List.copyOf(problems)));
       }
     }

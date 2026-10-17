@@ -137,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const analysis = document.getElementById('intake-analysis');
   if (!analysis) return;
   const rows = document.getElementById('fact-rows'), stage = document.getElementById('intake-stage');
+  const rowTemplate = rows?.firstElementChild?.cloneNode(true);
   let dirty = false, applied = false, baseline = [], timer, appliedAttempt = -1;
   const preview = document.createElement('p'); preview.className = 'help'; preview.setAttribute('role', 'status');
   document.getElementById('claim-form')?.prepend(preview);
@@ -195,10 +196,14 @@ document.addEventListener('DOMContentLoaded', () => {
     source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = analysis.dataset.pdf === 'yes' ? 'View original page' : 'View original file';
     return source;
   }
-  function showFields(fields, originalFields = fields) {
+  function showFields(fields, originalFields = fields, attempt = 0) {
     baseline = originalFields;
-    if (!rows || !fields.length || dirty || applied || analysis.dataset.editable !== 'yes') { changed(); return; }
-    const template = rows.firstElementChild.cloneNode(true); rows.replaceChildren();
+    if (!rows || !rowTemplate || applied && attempt === appliedAttempt || analysis.dataset.editable !== 'yes') { changed(); return; }
+    const template = rowTemplate.cloneNode(true);
+    template.querySelectorAll('.scan-note').forEach(n => n.remove());
+    for (const key of ['path','label','value']) template.querySelector('[name=claim_' + key + ']').value = '';
+    template.querySelector('[name=claim_type]').value = 'string';
+    if (!dirty) rows.replaceChildren();
     function append(field) {
       const row = template.cloneNode(true); row.querySelector('.scan-note')?.remove();
       for (const key of ['path','label','type','value']) row.querySelector('[name=claim_' + key + ']').value = field[key];
@@ -211,18 +216,21 @@ document.addEventListener('DOMContentLoaded', () => {
       details.append(summary, quote); row.append(details);
       row.appendChild(note); rows.appendChild(row);
     }
-    const uncertain = fields.filter(f => f.support?.quality === 'REVIEW_REQUIRED');
-    for (const field of fields.filter(f => f.support?.quality !== 'REVIEW_REQUIRED')) append(field);
+    const uncertain = dirty ? fields : fields.filter(f => f.support?.quality === 'REVIEW_REQUIRED');
+    if (!dirty) for (const field of fields.filter(f => f.support?.quality !== 'REVIEW_REQUIRED')) append(field);
     const review = document.getElementById('intake-review'); review?.replaceChildren();
     if (review && uncertain.length) {
-      const heading = document.createElement('h3'); heading.textContent = 'Check before using'; review.append(heading);
+      const heading = document.createElement('h3'); heading.textContent = dirty ? 'Latest reading · your edits were kept' : 'Check before using'; review.append(heading);
       const explain = document.createElement('p'); explain.className = 'help'; explain.textContent = 'These values were located, but need your review. Open the original page, then add a value if it is correct. You can edit it in the fact rows.'; review.append(explain);
       for (const field of uncertain) {
         const card = document.createElement('div'); card.className = 'notice warning';
         const title = document.createElement('strong'); title.textContent = field.label + ': ' + field.value;
         const reason = document.createElement('p'); reason.className = 'help'; reason.textContent = [...new Set((field.support.reasons || []).map(r => reviewReasons[r] || 'Check this source association.'))].join(' ');
         const add = document.createElement('button'); add.type = 'button'; add.className = 'btn line small use-reviewed-fact'; add.textContent = 'Use after checking';
+        const alreadyPresent = () => [...rows.children].some(r => r.querySelector('[name=claim_path]').value === field.path && r.querySelector('[name=claim_value]').value);
+        if (alreadyPresent()) { add.disabled = true; add.textContent = 'Already in review rows'; }
         add.addEventListener('click', () => {
+          if (alreadyPresent()) { add.disabled = true; return; }
           if (rows.children.length === 1 && !rows.firstElementChild.querySelector('[name=claim_value]').value) rows.replaceChildren();
           append(field); add.disabled = true; add.textContent = 'Added to review rows'; dirty = true; changed();
         });
@@ -256,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // the comparison baseline. Never replace edits made in this browser.
         if (body.attempts !== appliedAttempt && !dirty) applied = false;
         const latest = body.report?.currentFields;
-        showFields(Array.isArray(latest) && latest.length ? latest : (body.fields || []), body.fields || []);
+        showFields(Array.isArray(latest) ? latest : (body.fields || []), body.fields || [], body.attempts);
         appliedAttempt = body.attempts;
       }
       const manifest = body.report?.manifest, indicators = body.report?.indicators;
@@ -266,6 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (diagnostic) {
           const counts = document.createElement('p'); counts.textContent = diagnostic.candidates + ' associations located · ' + diagnostic.supported + ' supported · ' + diagnostic.reviewRequired + ' need review.'; diagnosticBox.append(counts);
           const reasonNames = {LABEL_VALUE_SEMANTIC_MISMATCH:'A heading, separator or unrelated text was excluded as a value',TABLE_SCORE_NOT_NUMERIC:'A table score had no readable numeric value',OVERLAPPING_VALUE_WITHHELD:'An overprinted number could not be read safely',OCR_LABEL_NOT_RECOGNIZED:'An OCR field label could not be identified safely',NO_ALIGNED_GEOMETRY:'Readable text had no aligned field locations',PAGE_UNREADABLE:'A page could not be read',INVISIBLE_SOURCE_TEXT:'Hidden PDF text excluded',WORD_OFFSET_OR_GEOMETRY_MISMATCH:'Text with mismatched locations excluded',OCR_TOO_WEAK_TO_SUGGEST:'Fields too unclear to suggest safely',INVALID_LITERAL_VALUE:'Invalid field values excluded',TABLE_VALUE_MISSING:'Table cells were missing',TABLE_COLUMN_COLLISION:'More than one value occupied a table cell',TABLE_OVERLAPPING_COLUMNS:'Overlapping columns could not be paired safely',CITATION_MISMATCH:'A source quote failed exact validation',FIELD_COUNT_LIMIT:'The field limit was reached',UNSAFE_CGPA_LITERAL:'An unclear CGPA was withheld',INVALID_LABEL_PATH:'A label could not be safely identified',EVIDENCE_SPAN_LIMIT:'Evidence was too spread out to associate safely',CONFLICTING_READINGS:'Conflicting source readings held for review'};
+          reasonNames.OTHER_OCR_ORIENTATION = 'Sideways or upside-down trial readings excluded from field associations';
+          reasonNames.MODEL_SOURCE_BUDGET = 'Additional unresolved cells exceeded the local linking budget';
           for (const [code, count] of Object.entries(diagnostic.rejections || {})) { const p = document.createElement('p'); p.textContent = (reasonNames[code] || 'Other source checks') + ': ' + count + '.'; diagnosticBox.append(p); }
         }
       }

@@ -1,52 +1,99 @@
 {% extends 'wallet/base.html' %}{% load wallet_ui %}
-{% block title %}Documents · {{ product_label }}{% endblock %}
+{% block title %}{% if query or category %}Documents{% else %}Home{% endif %} · {{ product_label }}{% endblock %}
+{% block page_class %} home-page{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1>Your documents</h1>
-    <p class="lede">{% if document_count %}{{ document_count }} document{{ document_count|pluralize }}, {{ active_count }} ready to share, {{ fact_count }} confirmed fact{{ fact_count|pluralize }} in total.{% else %}Documents you enroll stay encrypted here. You decide later which facts from them to share.{% endif %}</p>
+<section class="home-hero" aria-labelledby="home-title">
+  <div class="home-lockup">
+    <span class="home-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+    <h1 id="home-title" class="home-wordmark">{{ product_label }}</h1>
   </div>
-  <a class="btn" href="{% url 'dashboard:enroll' %}">Enroll a document</a>
-</div>
-
-{% if document_count %}
-<form method="get" class="toolbar" role="search" aria-label="Filter documents">
-  <div class="field"><label for="search">Search by name</label><input id="search" name="q" value="{{ query }}" type="search"></div>
-  <div class="field narrow"><label for="category">Category</label>
-    <select id="category" name="category"><option value="">All categories</option>{% for c in categories %}<option {% if category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
-  </div>
-  <button class="btn line">Apply</button>
-  {% if query or category %}<a class="btn quiet" href="{% url 'dashboard:index' %}">Clear</a>{% endif %}
-</form>
-{% endif %}
-
-{% if documents %}
-<div class="register-head" aria-hidden="true"><span>Document</span><span>State</span><span>Source assurance</span><span></span></div>
-<ul class="register" aria-label="Documents">
-  {% for d in documents %}{% with state=d|doc_state %}
-  <li class="cat-{{ d.category|lower }}">
-    <div class="register-name">
-      <a href="{% url 'dashboard:detail' d.id %}">{{ d.displayName }}</a>
-      <span class="meta">{{ d.category }} · version {{ d.version }} · {{ d.claimCount }} fact{{ d.claimCount|pluralize }}</span>
-      <div class="intake-labels">{% include 'wallet/_intake_labels.html' with intake=d.intake %}</div>
-    </div>
-    <div class="register-col"><span class="k">State</span><span class="mark {{ state.1 }}">{{ state.0 }}</span></div>
-    <div class="register-col"><span class="k">Source assurance</span>{% if d.provenanceLevel|first_seen %}<span class="mark seal">First-seen tracked</span>{% else %}<span class="mark none">Self-enrolled</span>{% endif %}</div>
-    <div class="register-act">
-      {% if d.status == 'ACTIVE' %}<a class="btn small seal" href="{% url 'dashboard:compose' d.id %}">Share a proof</a>
-      {% elif d.status == 'DRAFT' or d.status == 'ANCHOR_PENDING' %}<a class="btn small line" href="{% url 'dashboard:detail' d.id %}">{{ state.2 }}</a>
-      {% else %}<a class="btn small quiet" href="{% url 'dashboard:detail' d.id %}">Open</a>{% endif %}
-    </div>
-  </li>
-  {% endwith %}{% endfor %}
-</ul>
-{% elif query or category %}
-<section class="empty"><h2>No documents match</h2><p>Nothing is named “{{ query|default:'…' }}”{% if category %} in {{ category }}{% endif %}.</p><a class="btn line" href="{% url 'dashboard:index' %}">Show all documents</a></section>
-{% elif not error %}
-<section class="empty">
-  <h2>No documents yet</h2>
-  <p>Start with a document you are often asked to show, like a marksheet, payslip or invoice. You will check the facts in it before anything is committed.</p>
-  <a class="btn" href="{% url 'dashboard:enroll' %}">Enroll your first document</a>
+  <p class="home-tagline">Share the fact, not the file.</p>
+  {% if document_count %}
+  <dl class="home-stats">
+    <div><dt>Documents</dt><dd>{{ document_count }}</dd></div>
+    <div><dt>Ready to share</dt><dd>{{ active_count }}</dd></div>
+    <div><dt>Confirmed facts</dt><dd>{{ fact_count }}</dd></div>
+  </dl>
+  {% else %}
+  <p class="home-intro">Documents you enroll stay encrypted here. You decide later which facts from them to share.</p>
+  {% endif %}
 </section>
-{% endif %}
+
+<nav class="tiles" aria-label="Quick access">
+  <a class="tile" href="{% url 'dashboard:foli' %}">
+    <span class="tile-icon" aria-hidden="true"><svg class="icon"><use href="#i-foli"></use></svg></span>
+    <span class="tile-title">Ask Foli</span>
+    <span class="tile-text">Read a document privately and follow each answer back to its source.</span>
+    <svg class="tile-go icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+  </a>
+  <a class="tile" href="{% url 'dashboard:enroll' %}">
+    <span class="tile-icon" aria-hidden="true"><svg class="icon"><use href="#i-upload"></use></svg></span>
+    <span class="tile-title">Upload a document</span>
+    <span class="tile-text">Enroll a file or bring one from DigiLocker, then confirm its facts.</span>
+    <svg class="tile-go icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+  </a>
+  <a class="tile" href="#documents">
+    <span class="tile-icon" aria-hidden="true"><svg class="icon"><use href="#i-documents"></use></svg></span>
+    <span class="tile-title">Documents</span>
+    <span class="tile-text">{% if document_count %}{{ document_count }} document{{ document_count|pluralize }}, {{ active_count }} ready to share.{% else %}Your enrolled documents and their state appear here.{% endif %}</span>
+    <svg class="tile-go icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+  </a>
+  <a class="tile" href="{% url 'dashboard:sharing' %}">
+    <span class="tile-icon" aria-hidden="true"><svg class="icon"><use href="#i-shared"></use></svg></span>
+    <span class="tile-title">Shared proofs</span>
+    <span class="tile-text">Every proof link you created, who it is for, and whether it is still open.</span>
+    <svg class="tile-go icon" aria-hidden="true"><use href="#i-arrow"></use></svg>
+  </a>
+</nav>
+
+<section class="home-docs" id="documents" aria-labelledby="documents-title">
+  <div class="page-head">
+    <div>
+      <h2 id="documents-title" class="page-title">Your documents</h2>
+      <p class="lede">{% if document_count %}{{ document_count }} document{{ document_count|pluralize }}, {{ active_count }} ready to share, {{ fact_count }} confirmed fact{{ fact_count|pluralize }} in total.{% else %}Start with a document you are often asked to show.{% endif %}</p>
+    </div>
+    <a class="btn" href="{% url 'dashboard:enroll' %}"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>Enroll a document</a>
+  </div>
+
+  {% if document_count %}
+  <form method="get" action="{% url 'dashboard:index' %}#documents" class="toolbar" role="search" aria-label="Filter documents">
+    <div class="field search-field"><label for="search">Search by name</label><input id="search" name="q" value="{{ query }}" type="search"></div>
+    <div class="field narrow"><label for="category">Category</label>
+      <select id="category" name="category"><option value="">All categories</option>{% for c in categories %}<option {% if category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+    </div>
+    <button class="btn line">Apply</button>
+    {% if query or category %}<a class="btn quiet" href="{% url 'dashboard:index' %}#documents">Clear</a>{% endif %}
+  </form>
+  {% endif %}
+
+  {% if documents %}
+  <div class="register-head" aria-hidden="true"><span>Document</span><span>State</span><span>Source assurance</span><span></span></div>
+  <ul class="register" aria-label="Documents">
+    {% for d in documents %}{% with state=d|doc_state %}
+    <li class="cat-{{ d.category|lower }}">
+      <div class="register-name">
+        <a href="{% url 'dashboard:detail' d.id %}">{{ d.displayName }}</a>
+        <span class="meta"><span class="cat-dot" aria-hidden="true"></span>{{ d.category }} · version {{ d.version }} · {{ d.claimCount }} fact{{ d.claimCount|pluralize }}</span>
+        <div class="intake-labels">{% include 'wallet/_intake_labels.html' with intake=d.intake %}</div>
+      </div>
+      <div class="register-col"><span class="k">State</span><span class="mark {{ state.1 }}">{{ state.0 }}</span></div>
+      <div class="register-col"><span class="k">Source assurance</span>{% if d.provenanceLevel|first_seen %}<span class="mark seal">First-seen tracked</span>{% else %}<span class="mark none">Self-enrolled</span>{% endif %}</div>
+      <div class="register-act">
+        {% if d.status == 'ACTIVE' %}<a class="btn small seal" href="{% url 'dashboard:compose' d.id %}">Share a proof</a>
+        {% elif d.status == 'DRAFT' or d.status == 'ANCHOR_PENDING' %}<a class="btn small line" href="{% url 'dashboard:detail' d.id %}">{{ state.2 }}</a>
+        {% else %}<a class="btn small quiet" href="{% url 'dashboard:detail' d.id %}">Open</a>{% endif %}
+      </div>
+    </li>
+    {% endwith %}{% endfor %}
+  </ul>
+  {% elif query or category %}
+  <section class="empty"><h2>No documents match</h2><p>Nothing is named “{{ query|default:'…' }}”{% if category %} in {{ category }}{% endif %}.</p><a class="btn line" href="{% url 'dashboard:index' %}#documents">Show all documents</a></section>
+  {% elif not error %}
+  <section class="empty">
+    <h2>No documents yet</h2>
+    <p>Start with a document you are often asked to show, like a marksheet, payslip or invoice. You will check the facts in it before anything is committed.</p>
+    <a class="btn" href="{% url 'dashboard:enroll' %}">Enroll your first document</a>
+  </section>
+  {% endif %}
+</section>
 {% endblock %}

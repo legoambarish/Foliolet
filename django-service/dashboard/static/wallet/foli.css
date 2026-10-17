@@ -4,3 +4,57 @@
 @media(max-width:900px){.foli-workspace{grid-template-columns:210px minmax(0,1fr);gap:14px}.foli-library{padding:14px 8px}.foli-log{padding:20px}.foli-context{padding:14px}.foli-context-actions{flex-direction:column}.foli-compose-area{padding:12px 14px}.foli-footnote{margin-left:224px}.foli-reading-tools>span{max-width:160px}.foli-welcome h2{font-size:1.75rem}.foli-suggestions{grid-template-columns:1fr}.foli-suggestions button{padding:8px 11px}.foli-welcome{min-height:430px}}
 @media(max-width:650px){.foli-page{padding:20px 14px}.foli-heading{align-items:flex-start;margin-bottom:16px;gap:10px}.foli-heading h1{font-size:2.1rem}.foli-heading>.muted{font-size:.8rem}.foli-heading .muted{font-size:.75rem}.foli-eyebrow{font-size:.55rem}.foli-runtime{font-size:.62rem;gap:5px;padding:8px;margin-top:9px;max-width:145px}.foli-runtime span:last-child{display:none}.foli-workspace{display:flex;flex-direction:column;gap:14px}.foli-library{width:100%;padding:11px 12px}.foli-library-heading{padding-bottom:7px}.foli-library-heading h2{font-size:1rem}.foli-library input{min-height:35px;margin-bottom:8px}.foli-doc-general{min-height:43px;margin-bottom:5px;padding:7px}.foli-doc-general .foli-doc-icon{height:24px}.foli-documents{display:flex;gap:6px;overflow-x:auto;max-height:110px;overflow-y:auto;padding-top:7px}.foli-documents .foli-doc{min-width:185px;max-width:220px;flex-shrink:0;padding:7px;min-height:56px}.foli-documents .foli-doc-icon{flex-basis:24px}.foli-documents .foli-doc strong{font-size:.72rem}.foli-library-note,.foli-privacy{display:none}.foli-chat{width:100%}.foli-context{padding:12px;gap:8px}.foli-context h2{font-size:.78rem}.foli-context p{font-size:.6rem}.foli-context-icon{width:28px;height:32px;font-size:1.5rem}.foli-context-label{gap:8px}.foli-context-actions{gap:4px}.foli-small-btn{padding:5px 7px;font-size:.64rem;min-height:29px}.foli-log{height:410px;min-height:310px;padding:18px 16px}.foli-welcome{min-height:370px}.foli-welcome h2{font-size:1.8rem}.foli-welcome>p{font-size:.72rem}.foli-welcome-mark{font-size:2.2rem;margin-bottom:12px}.foli-suggestions{grid-template-columns:1fr 1fr;gap:6px;margin-top:19px}.foli-suggestions button{font-size:.64rem;padding:10px;line-height:1.4}.foli-compose-area{padding:11px 12px}.foli-reading-tools>span{font-size:.53rem;max-width:150px}.foli-review-btn{font-size:.66rem}.foli-composer{padding-left:13px}.foli-composer textarea{font-size:16px}.foli-compose-note{font-size:.55rem}.foli-footnote{margin-left:0;font-size:.62rem}.foli-message-body{font-size:.81rem}.foli-source-toolbar,.foli-source-nav{padding:12px}.foli-source-toolbar h2{font-size:1rem}.foli-source-nav{gap:7px;font-size:.67rem;flex-wrap:wrap}.foli-source-content{padding:13px}.foli-source-status{padding:9px 12px}.foli-source-content pre{font-size:.82rem}.foli-coverage summary{padding:8px 12px}.foli-coverage-content{padding:0 12px 10px}}
 @media(prefers-reduced-motion:reduce){.foli-spinner{animation:none}}
+
+/* ---------- Refinements: shared shell, icons and radii (presentation only) ---------- */
+.foli-page{padding-top:var(--s6);padding-bottom:var(--s6)}
+.foli-heading{align-items:flex-end;margin-bottom:var(--s5)}
+.foli-heading h1{font-size:var(--t-title);margin:2px 0 6px}
+.foli-heading .kicker{margin-bottom:var(--s1)}
+.foli-runtime{gap:8px;border-color:var(--rule);border-radius:var(--r-control);padding:8px 12px;box-shadow:var(--lift);transition:border-color var(--ease),color var(--ease)}
+.foli-runtime:hover{border-color:var(--rule-strong);color:var(--ink)}
+.foli-runtime .icon{width:15px;height:15px;color:var(--ink-3)}
+.foli-alert{border-radius:var(--r-control);border-color:var(--caution-line)}
+.foli-workspace{grid-template-columns:260px minmax(0,1fr);gap:var(--s4)}
+.foli-library{border-radius:var(--r-sheet);padding:var(--s4) var(--s3);box-shadow:var(--lift)}
+.foli-library-heading{padding:0 6px var(--s3)}
+.foli-icon-btn{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:var(--r-mark);background:none;color:var(--ink-3);cursor:pointer;transition:background-color var(--ease),color var(--ease)}
+.foli-icon-btn:hover{background:var(--nav-hover);color:var(--ink)}
+.foli-icon-btn .icon{width:17px;height:17px}
+.foli-library input{border-radius:var(--r-control);border-color:var(--rule-strong);background:var(--sheet);min-height:38px}
+.foli-doc{border-radius:var(--r-control);transition:background-color var(--ease),border-color var(--ease)}
+.foli-doc:hover{background:var(--nav-hover)}
+.foli-doc[aria-pressed="true"]{background:var(--seal-wash);border-color:var(--seal-line);color:var(--ink)}
+.foli-doc[aria-pressed="true"] strong{color:var(--seal-ink)}
+.foli-doc-icon{border-radius:var(--r-mark);border-color:var(--rule);background:var(--sheet)}
+.foli-doc-general .foli-doc-icon{border:0;background:var(--seal-wash);color:var(--seal);height:32px}
+.foli-doc-general .foli-doc-icon .icon{width:17px;height:17px}
+.foli-privacy>span{display:grid;place-items:start;padding-top:1px}
+.foli-privacy .icon{width:15px;height:15px}
+.foli-chat{border-color:var(--rule);border-radius:var(--r-sheet)}
+.foli-context-icon{border-radius:var(--r-control)}
+.foli-small-btn{border-radius:var(--r-mark);display:inline-flex;align-items:center;gap:4px;transition:border-color var(--ease),color var(--ease)}
+.foli-small-btn .icon{width:14px;height:14px}
+.foli-suggestions button{border-radius:var(--r-control);align-items:center;transition:background-color var(--ease),border-color var(--ease)}
+.foli-suggestions button .icon{width:14px;height:14px;color:var(--ink-3);flex:none;transition:transform var(--ease),color var(--ease)}
+.foli-suggestions button:hover{border-color:var(--seal-line)}
+.foli-suggestions button:hover .icon{color:var(--seal);transform:translateX(2px)}
+.foli-review-btn{display:inline-flex;align-items:center;gap:6px}
+.foli-review-btn .icon{width:15px;height:15px}
+.foli-composer{border-color:var(--rule-strong);border-radius:16px;background:var(--sheet);box-shadow:var(--lift);transition:border-color var(--ease)}
+.foli-composer:focus-within{outline:2px solid var(--seal);outline-offset:1px;border-color:var(--seal)}
+.foli-message-user{border-radius:14px 14px 4px 14px}
+.foli-citation{border-radius:var(--r-mark);transition:border-color var(--ease)}
+.foli-finding{border-radius:var(--r-control)}
+.foli-source-dialog{border-color:var(--rule);border-radius:var(--r-sheet);box-shadow:0 24px 60px -12px rgb(0 0 0/30%)}
+.foli-footnote{margin-left:276px}
+@media(max-width:900px){.foli-workspace{grid-template-columns:220px minmax(0,1fr)}.foli-footnote{margin-left:236px}}
+@media(max-width:650px){
+  .foli-page{padding:var(--s4) var(--gutter) var(--s5)}
+  .foli-heading{align-items:flex-start}
+  .foli-heading h1{font-size:1.875rem}
+  .foli-context h2{font-size:.85rem}
+  .foli-context p,.foli-small-btn,.foli-review-btn,.foli-suggestions button{font-size:.72rem}
+  .foli-reading-tools>span,.foli-compose-note,.foli-footnote,.foli-doc small{font-size:.68rem}
+  .foli-documents .foli-doc strong{font-size:.8rem}
+  .foli-footnote{margin-left:0}
+}
