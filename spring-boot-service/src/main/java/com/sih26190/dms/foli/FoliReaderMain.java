@@ -18,7 +18,7 @@ public final class FoliReaderMain {
       else {
         int originalBudget=request.config().getExtractionTimeoutSeconds();
         long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(Math.max(1,originalBudget-2));
-        if(request.mode().equals("intake"))request.config().setExtractionTimeoutSeconds(Math.max(1,originalBudget-8));
+        if(request.mode().equals("intake"))request.config().setExtractionTimeoutSeconds(Math.max(1,originalBudget-Math.min(45,Math.max(10,originalBudget/3))));
         var snapshot=extractor.extract(request.source(),p -> System.out.println(FoliReader.PROGRESS+p));
         request.config().setExtractionTimeoutSeconds(originalBudget);
         var indicators=request.mode().equals("intake")?new IntakeIndicators(request.config(),extractor,ocr).inspect(request.source(),snapshot,deadline):null;

@@ -1,4 +1,4 @@
-param([string]$RuntimeRoot, [switch]$SkipBuild, [string]$OllamaUrl='http://127.0.0.1:11434', [ValidateRange(512,4096)][int]$MaxHeapMb=768)
+param([string]$RuntimeRoot, [switch]$SkipBuild, [string]$OllamaUrl='http://127.0.0.1:11434', [ValidateRange(512,4096)][int]$MaxHeapMb=768, [ValidateRange(1024,65535)][int]$PgPort=55438, [ValidateRange(1024,65535)][int]$EvmPort=8548, [ValidateRange(1024,65535)][int]$ApiPort=8088, [ValidateRange(1024,65535)][int]$UiPort=8008)
 $ErrorActionPreference = 'Stop'
 $intakeModelOrigin=[uri]$OllamaUrl
 if ($intakeModelOrigin.Scheme -ne 'http' -or $intakeModelOrigin.Host -notin @('127.0.0.1','::1','[::1]') -or $intakeModelOrigin.Port -lt 1 -or $intakeModelOrigin.UserInfo -or $intakeModelOrigin.Query -or $intakeModelOrigin.Fragment -or $intakeModelOrigin.AbsolutePath -ne '/') { throw 'Use a numeric loopback HTTP Ollama origin with an explicit port.' }
@@ -16,7 +16,7 @@ foreach ($intakeRequired in @($intakePython, (Join-Path $intakePgBin 'pg_ctl.exe
 $intakeData = Join-Path $intakeRoot '.local-data'
 New-Item -ItemType Directory -Path $intakeData -Force | Out-Null
 $intakeManifest = Join-Path $intakeData 'intake-processes.json'
-foreach ($intakePort in @(55438, 8548, 8088, 8008)) {
+foreach ($intakePort in @($PgPort, $EvmPort, $ApiPort, $UiPort)) {
     if (Get-NetTCPConnection -State Listen -LocalPort $intakePort -ErrorAction SilentlyContinue) { throw "Port $intakePort is already in use. No process was stopped or reused." }
 }
 function Intake-Status([string]$Message) { Write-Host ('[' + (Get-Date -Format 'HH:mm:ss') + '] ' + $Message) }
@@ -52,25 +52,26 @@ $intakePgConfig = @{bin=$intakePgBin; data=$intakePgData; root=$intakeRoot}
 $intakePgConfig | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeData 'intake-postgres.json') -Encoding utf8
 # Direct native redirection can leave PowerShell waiting on a daemon's inherited
 # handles. Wait on pg_ctl itself, with output redirected to files at process creation.
-$intakePgStart=Start-Process -FilePath (Join-Path $intakePgBin 'pg_ctl.exe') -ArgumentList @('-D', ('"'+$intakePgData+'"'), '-l', ('"'+(Join-Path $intakeData 'intake-postgres.log')+'"'), '-o', '"-p 55438 -h 127.0.0.1"', '-w', 'start') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $intakeData 'intake-pgctl.stdout.log') -RedirectStandardError (Join-Path $intakeData 'intake-pgctl.stderr.log')
+$intakePgStart=Start-Process -FilePath (Join-Path $intakePgBin 'pg_ctl.exe') -ArgumentList @('-D', ('"'+$intakePgData+'"'), '-l', ('"'+(Join-Path $intakeData 'intake-postgres.log')+'"'), '-o', ('"-p '+$PgPort+' -h 127.0.0.1"'), '-w', 'start') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $intakeData 'intake-pgctl.stdout.log') -RedirectStandardError (Join-Path $intakeData 'intake-pgctl.stderr.log')
 $null=$intakePgStart.Handle
 $intakePgStarted=$intakePgStart.WaitForExit(45000)
 $intakePgStart.Refresh()
 if (-not $intakePgStarted -or $intakePgStart.ExitCode -ne 0) { throw 'Isolated PostgreSQL start failed; inspect this worktree logs' }
-$env:PGHOST='127.0.0.1'; $env:PGPORT='55438'; $env:PGUSER='wallet'; $env:PGDATABASE='postgres'
+$env:PGHOST='127.0.0.1'; $env:PGPORT=[string]$PgPort; $env:PGUSER='wallet'; $env:PGDATABASE='postgres'
 & $intakePython -c "import psycopg; c=psycopg.connect(autocommit=True); exists=c.execute('SELECT 1 FROM pg_database WHERE datname=%s',('wallet_intake_demo',)).fetchone(); c.execute('CREATE DATABASE wallet_intake_demo') if not exists else None; c.close()"
 if ($LASTEXITCODE -ne 0) { throw 'Isolated database creation failed' }
 $env:NODE_PATH=(Join-Path $intakeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $intakeRoot 'node_modules') + ';' + (Join-Path $RuntimeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $RuntimeRoot 'node_modules')
+$env:FOLIOLET_EVM_PORT=[string]$EvmPort
 Intake-Launch 'intake-evm' (Get-Command node).Source @((Join-Path $intakeRoot 'tools\digilocker-evm.cjs')) $intakeRoot
-Intake-Wait 8548
+Intake-Wait $EvmPort
 $env:BLOCKCHAIN_PRIVATE_KEY=(Get-Content -LiteralPath (Join-Path $intakeData 'development-relay.key') -Raw).Trim()
-$env:SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:55438/wallet_intake_demo'
+$env:SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:$PgPort/wallet_intake_demo"
 $env:SPRING_DATASOURCE_USERNAME='wallet'; $env:SPRING_DATASOURCE_PASSWORD=''
 $env:SPRING_JPA_HIBERNATE_DDL_AUTO='update'; $env:SPRING_JPA_OPEN_IN_VIEW='false'
-$env:BLOCKCHAIN_RPC_URL='http://127.0.0.1:8548'; $env:BLOCKCHAIN_EXPECTED_CHAIN_ID='1337'
-$env:WALLET_DATA_DIR=$intakeData; $env:WALLET_SHARE_BASE_URL='http://localhost:8008'
+$env:BLOCKCHAIN_RPC_URL="http://127.0.0.1:$EvmPort"; $env:BLOCKCHAIN_EXPECTED_CHAIN_ID='1337'
+$env:WALLET_DATA_DIR=$intakeData; $env:WALLET_SHARE_BASE_URL="http://localhost:$UiPort"
 $env:DMS_STORAGE_LOCATION=(Join-Path $intakeData 'legacy\files'); $env:DMS_BACKUP_LOCATION=(Join-Path $intakeData 'legacy\backups')
-$env:SERVER_ADDRESS='127.0.0.1'; $env:SERVER_PORT='8088'
+$env:SERVER_ADDRESS='127.0.0.1'; $env:SERVER_PORT=[string]$ApiPort
 $env:SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE='20MB'; $env:SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE='21MB'
 $env:OPENROUTER_API_KEY=''; $env:OPENROUTER_MODEL='disabled-for-intake'; $env:FOLI_MODEL='qwen3:4b-instruct'; $env:FOLI_OLLAMA_URL=$OllamaUrl
 $env:FOLI_TESSERACT=$intakeOcr; $env:FOLI_OCR_DATA_DIR=(Join-Path $RuntimeRoot '.local-tools\ocr\share\tessdata')
@@ -80,20 +81,20 @@ $env:LOGGING_LEVEL_ORG_APACHE_PDFBOX='OFF'; $env:LOGGING_LEVEL_ORG_SPRINGFRAMEWO
 $env:SERVER_TOMCAT_ACCESSLOG_ENABLED='false'
 @{root=$intakeRoot;runtimeRoot=$RuntimeRoot;modelUrl=$OllamaUrl} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeData 'intake-runtime.json') -Encoding utf8
 Intake-Launch 'intake-spring' (Get-Command java).Source @("-Xmx${MaxHeapMb}m", '-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
-Intake-Wait 8088 90
+Intake-Wait $ApiPort 90
 & node (Join-Path $intakeRoot 'tools\provision-digilocker-trust.cjs')
 if ($LASTEXITCODE -ne 0) { throw 'Isolated registry trust provisioning failed' }
-$env:SPRING_BOOT_API_BASE_URL='http://127.0.0.1:8088'; $env:PUBLIC_EVM_RPC_URL='http://127.0.0.1:8548'
+$env:SPRING_BOOT_API_BASE_URL="http://127.0.0.1:$ApiPort"; $env:PUBLIC_EVM_RPC_URL="http://127.0.0.1:$EvmPort"
 # Keep the private UI local; publish selected disclosure links through the receiver.
 # An operator can still explicitly select local/named mode before starting.
 if (-not $env:FOLIOLET_SHARE_MODE) { $env:FOLIOLET_SHARE_MODE='quick' }
 $env:DJANGO_ALLOWED_HOSTS='localhost,127.0.0.1,testserver'
 & $intakePython (Join-Path $intakeRoot 'django-service\manage.py') migrate --noinput
 if ($LASTEXITCODE -ne 0) { throw 'Private Django migration failed' }
-Intake-Launch 'intake-django' $intakePython @((Join-Path $intakeRoot 'django-service\manage.py'), 'runserver', '127.0.0.1:8008', '--noreload') $intakeRoot
-Intake-Wait 8008
+Intake-Launch 'intake-django' $intakePython @((Join-Path $intakeRoot 'django-service\manage.py'), 'runserver', "127.0.0.1:$UiPort", '--noreload') $intakeRoot
+Intake-Wait $UiPort
 & (Join-Path $PSScriptRoot 'start-digilocker-watcher.ps1') -Resume
-Intake-Status ('Ready: http://127.0.0.1:8008/; sharing mode: ' + $env:FOLIOLET_SHARE_MODE)
+Intake-Status ("Ready: http://127.0.0.1:$UiPort/; sharing mode: " + $env:FOLIOLET_SHARE_MODE)
 if (-not (Test-Path -LiteralPath $intakeOcr)) { Intake-Status 'OCR is unavailable; originals and manual facts still work.' }
 try {
     $intakeModel=Invoke-RestMethod ($OllamaUrl.TrimEnd('/')+'/api/tags') -TimeoutSec 3

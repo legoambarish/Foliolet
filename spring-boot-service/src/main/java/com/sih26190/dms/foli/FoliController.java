@@ -18,15 +18,17 @@ public class FoliController {
   private final FoliJobs jobs;
   private final FoliLocalModel model;
   private final OcrService ocr;
+  private final FoliGeminiModel gemini;
   public FoliController(UserRepository users, AuthorizedDocumentResolver resolver, FoliIndex index,
-      FoliReader extraction, FoliWorkGate gate, FoliJobs jobs, FoliLocalModel model, OcrService ocr) {
+      FoliReader extraction, FoliWorkGate gate, FoliJobs jobs, FoliLocalModel model, OcrService ocr,FoliGeminiModel gemini) {
     this.users=users; this.resolver=resolver; this.index=index; this.extraction=extraction; this.gate=gate;
     this.jobs=jobs; this.model=model; this.ocr=ocr;
+    this.gemini=gemini;
   }
   User user(Authentication auth) { return users.findByUsername(auth.getName()).orElseThrow(AuthorizedDocumentResolver::missing); }
   @GetMapping("/documents") public List<FoliData.Document> documents(Authentication auth) { return resolver.list(user(auth)); }
   @GetMapping("/health") public Map<String,Object> health(Authentication auth) {
-    user(auth); return Map.of("ollama",model.health(),"ocr",ocr.version(),"historyPersisted",false,"retentionSeconds",600);
+    user(auth); return Map.of("ollama",model.health(),"ocr",ocr.version(),"historyPersisted",false,"retentionSeconds",600,"geminiAvailable",gemini.available());
   }
   @PostMapping("/jobs") public ResponseEntity<?> create(@jakarta.validation.Valid @RequestBody FoliJobs.Request request,Authentication auth) {
     return ResponseEntity.accepted().body(jobs.create(request,user(auth)));

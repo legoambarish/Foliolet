@@ -51,6 +51,7 @@
           {% endwith %}
         </div>
       </fieldset>
+      <label class="check section-tight"><input type="checkbox" name="include_document_status" value="yes" {% if form.include_document_status == 'yes' %}checked{% endif %}><span><strong>Include document indicator checks</strong>Share recorded QR, branding and assisted-import states. These do not establish issuer authenticity. Selected facts always include their own extraction lineage; hidden facts and changes stay private.</span></label>
       <label class="check section-tight"><input type="checkbox" name="one_time" value="yes" {% if form.one_time == 'yes' %}checked{% endif %}><span><strong>Release only once</strong>The first person to open the link sees the facts, and it closes after that. They can still keep what they saw.</span></label>
     </fieldset>
   </div>

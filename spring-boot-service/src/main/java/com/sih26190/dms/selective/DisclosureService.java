@@ -32,6 +32,7 @@ public class DisclosureService {
   private final PrivateVault vault;
   private final AuditService audit;
   private final String shareBase;
+  private final com.sih26190.dms.intake.IntakeMetadata intake;
 
   public DisclosureService(
       DisclosureGrantRepository grants,
@@ -46,6 +47,7 @@ public class DisclosureService {
       WalletJson json,
       PrivateVault vault,
       AuditService audit,
+      com.sih26190.dms.intake.IntakeMetadata intake,
       @Value("${wallet.share-base-url:http://localhost:8000}") String shareBase) {
     this.grants = grants;
     this.receipts = receipts;
@@ -59,6 +61,7 @@ public class DisclosureService {
     this.json = json;
     this.vault = vault;
     this.audit = audit;
+    this.intake = intake;
     this.shareBase = shareBase.replaceAll("/$", "");
   }
 
@@ -70,10 +73,12 @@ public class DisclosureService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     if (!d.ownerId.equals(owner.getId())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     var onChain = wallet.requireCurrent(d);
+    String sourceHash;
     try {
+      byte[] original=vault.read(d.filePath,d.id);sourceHash=PrivateVault.sha256(original);
       String current =
           org.web3j.utils.Numeric.toHexString(
-              org.web3j.crypto.Hash.sha3(vault.read(d.filePath, d.id)));
+              org.web3j.crypto.Hash.sha3(original));
       if (!PrivateVault.commitment(d.documentSalt, current).equals(d.documentCommitment))
         throw new IllegalStateException("Changed file");
     } catch (Exception e) {
@@ -138,7 +143,8 @@ public class DisclosureService {
                 presentation,
                 disclosed,
                 null,
-                null));
+                null,
+                intake.disclosure(d,disclosed,sourceHash,request.includeDocumentStatus())));
     grant.signedBundle = vault.seal(json.write(bundle), grant.id);
     grants.save(grant);
     audit.logWallet(owner, d.id, grant.id, "DISCLOSURE_CREATED");

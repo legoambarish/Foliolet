@@ -19,15 +19,19 @@ public class FoliJobs {
   public record Request(@Size(max=100) String documentId, @Size(max=4000) String question,
       @Pattern(regexp="index|chat|review") String mode,
       @Size(max=6) List<@Valid Turn> history,
-      @Pattern(regexp="[0-9a-f]{64}") String sourceHash) {}
+      @Pattern(regexp="[0-9a-f]{64}") String sourceHash,Boolean cloudConsent) {
+    public Request {if(cloudConsent==null)cloudConsent=false;}
+    public Request(String documentId,String question,String mode,List<Turn> history,String sourceHash){this(documentId,question,mode,history,sourceHash,false);}
+  }
   private static class Job {
     final String id=UUID.randomUUID().toString(); final long owner,created=System.currentTimeMillis();
     final String documentId,hash,version; volatile String state="QUEUED",stage="Queued",code="",message="";
-    volatile Object result; volatile Future<?> future;
+    volatile Object result,preview; volatile Future<?> future;
     Job(long owner,String documentId,String hash,String version) { this.owner=owner; this.documentId=documentId; this.hash=hash; this.version=version; }
     boolean active() { return state.equals("QUEUED") || state.equals("RUNNING"); }
   }
   private final Map<String,Job> jobs=new ConcurrentHashMap<>();
+  private final Map<String,String> completedRequests=new ConcurrentHashMap<>();
   private final Map<Long,ArrayDeque<Long>> requests=new HashMap<>();
   private final ThreadPoolExecutor executor=new ThreadPoolExecutor(1,1,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(4),r -> {
     var thread=new Thread(r,"foli-private-worker"); thread.setDaemon(true); return thread;
@@ -61,9 +65,14 @@ public class FoliJobs {
     if (id==null && !mode.equals("chat")) throw new IllegalArgumentException();
     Source source=id==null?null:resolver.open(id,user);
     if (source!=null && request.sourceHash()!=null) FoliController.requireHash(request.sourceHash(),source.hash());
+    if(request.cloudConsent() && (!mode.equals("chat") || !chat.cloudAvailable()))throw new FoliException(HttpStatus.FORBIDDEN,"CLOUD_DISABLED","This request requires local mode or configured, reviewed Gemini access.");
+    String requestKey=user.getId()+":"+Objects.toString(id,"")+":"+(source==null?"":source.hash()+":"+source.document().version())+":"+mode+":"+request.toString();
+    // Memory-only, same owner/source/version/request. Every release reauthorizes current access.
+    var previous=jobs.get(completedRequests.getOrDefault(requestKey,""));
+    if(previous!=null && previous.state.equals("COMPLETE")){current(previous,user);return view(previous);}
     var job=new Job(user.getId(),id,source==null?"":source.hash(),source==null?"":source.document().version());
     jobs.put(job.id,job);
-    try { job.future=executor.submit(() -> execute(job,request,mode)); }
+    try { job.future=executor.submit(() -> execute(job,request,mode));completedRequests.put(requestKey,job.id); }
     catch(RejectedExecutionException e) { jobs.remove(job.id); throw new FoliException(HttpStatus.TOO_MANY_REQUESTS,"BUSY","Foli's local queue is full. Retry shortly."); }
     bucket.addLast(System.currentTimeMillis()); return view(job);
   }
@@ -78,10 +87,15 @@ public class FoliJobs {
         FoliController.requireHash(job.hash,source.hash());
         if (!job.version.equals(source.document().version())) throw AuthorizedDocumentResolver.failure("SOURCE_CHANGED","Document version changed. Select it again.");
       }
+      if(mode.equals("review")) {
+        var preview=review.checklist(source,stage -> progress(job,stage));current(job,user);
+        synchronized(job){if(job.active())job.preview=preview;}
+      }
       Object result=switch(mode) {
         case "index" -> source.manifest();
         case "review" -> review.review(source,stage -> progress(job,stage));
-        default -> chat.chat(request.question(),request.history(),source,stage -> progress(job,stage));
+        default -> request.cloudConsent()?chat.chat(request.question(),request.history(),source,stage -> progress(job,stage),true)
+            :chat.chat(request.question(),request.history(),source,stage -> progress(job,stage));
       };
       progress(job,"Checking current source access");
       current(job,user);
@@ -118,16 +132,17 @@ public class FoliJobs {
       throw AuthorizedDocumentResolver.missing();
     return job;
   }
-  private static void cancel(Job job) { synchronized(job) { job.state="CANCELLED"; job.stage="Stopped"; job.result=null; if(job.future!=null) job.future.cancel(true); } }
+  private static void cancel(Job job) { synchronized(job) { job.state="CANCELLED"; job.stage="Stopped"; job.result=null;job.preview=null; if(job.future!=null) job.future.cancel(true); } }
   private static void fail(Job job,String code,String message) { synchronized(job) { if(job.active()) { job.state="ERROR"; job.stage="Failed"; job.code=code; job.message=message; job.result=null; } } }
   private static Map<String,Object> view(Job job) {
     var out=new LinkedHashMap<String,Object>(); out.put("id",job.id); out.put("state",job.state); out.put("stage",job.stage);
     out.put("documentId",job.documentId); out.put("sourceHash",job.hash); out.put("code",job.code); out.put("message",job.message);
-    out.put("result",job.state.equals("COMPLETE")?job.result:null); return out;
+    out.put("result",job.state.equals("COMPLETE")?job.result:null);out.put("preview",job.active()?job.preview:null); return out;
   }
   @Scheduled(fixedDelay=15000) public synchronized void cleanup() {
     long now=System.currentTimeMillis();
     jobs.values().removeIf(j -> { if(j.created+config.getRetentionSeconds()*1000L>=now) { if(j.active() && now-j.created>300000) cancel(j); return false; } cancel(j); return true; });
+    completedRequests.entrySet().removeIf(e -> !jobs.containsKey(e.getValue()));
     requests.entrySet().removeIf(e -> e.getValue().isEmpty() || e.getValue().peekLast()<now-60000);
     executor.purge();
   }

@@ -58,7 +58,7 @@ async function main() {
   const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Enable folder intake'}).click();
   const download=await downloadPromise;assert.equal(download.suggestedFilename(),'foliolet-intake.json');
   const privateFile=path.join(OUT,'ui-pair-private.json');await download.saveAs(privateFile);
-  const pair=JSON.parse(fs.readFileSync(privateFile,'utf8'));assert.equal(pair.folder,folder);assert.equal(pair.apiUrl,SPRING);assert.equal(pair.maxFiles,10);
+  const pair=JSON.parse(fs.readFileSync(privateFile,'utf8'));assert.equal(pair.folder,folder);assert.equal(pair.apiUrl,SPRING);assert.equal(pair.maxFiles,0);assert.equal(pair.expiresAt,null);
   await page.locator('#intake-stop').waitFor({state:'visible'});await page.waitForFunction(()=>!document.getElementById('intake-stop').disabled);
   await Promise.all([page.waitForResponse(response=>response.url().includes('/stop/') && response.request().method()==='POST'),page.locator('#intake-stop').click()]);
   const refused=await fetch(SPRING+'/api/intake-agent/heartbeat',{method:'POST',headers:{Authorization:'Bearer '+pair.token,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({folderHash:pair.folderHash})});
@@ -100,7 +100,7 @@ async function main() {
   pass('Review exposes labeled form controls, keyboard focus and live progress to accessibility tree');
   await page.locator('[name=confirm]').check();
   await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.getByRole('button',{name:'Confirm facts',exact:true}).click()]);
-  await page.getByText('Facts edited since extraction',{exact:true}).first().waitFor();
+  await page.locator('[data-check="modified"][data-state="MODIFIED"]').first().waitFor();
   assert(await page.getByText('Issuer not verified',{exact:true}).count()>0);
   pass('Confirmed edit is recorded by server and shown separately from issuer status');
   assert.equal(errors.length,0,JSON.stringify(errors));

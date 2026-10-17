@@ -11,12 +11,14 @@ public final class P0BenchmarkMain {
     config.setOllamaUrl(System.getenv().getOrDefault("FOLI_OLLAMA_URL","http://127.0.0.1:11444"));
     config.setTesseract(System.getenv().getOrDefault("FOLI_TESSERACT","tesseract"));
     config.setOcrDataDir(System.getenv().getOrDefault("FOLI_OCR_DATA_DIR",""));
+    config.setLayoutPython(System.getenv().getOrDefault("FOLI_LAYOUT_PYTHON",""));
+    config.setLayoutScript(System.getenv().getOrDefault("FOLI_LAYOUT_SCRIPT",""));
     config.setTempDir(Path.of(args[1]).toAbsolutePath().getParent().resolve("scratch").toString());
     var rows=new ArrayList<Map<String,Object>>();
     if(args[0].equals("image")) {
       var image=javax.imageio.ImageIO.read(Path.of(args[2]).toFile());
       for(int i=0;i<3;i++) {
-        long start=System.nanoTime();var qr=IntakeIndicators.decode(image);long qrMs=(System.nanoTime()-start)/1_000_000;
+        long start=System.nanoTime();var qr=IntakeIndicators.decode(image,config,System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(10));long qrMs=(System.nanoTime()-start)/1_000_000;
         var logo=IntakeIndicators.recognizeLogo(image,new OcrService(config));
         rows.add(Map.of("iteration",i,"qr",qr,"logo",logo,"qrMs",qrMs,"totalMs",(System.nanoTime()-start)/1_000_000));
         System.out.println("IMAGE iteration="+i+" qr="+qr.size()+" logo="+logo.logo().found());

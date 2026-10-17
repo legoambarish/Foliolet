@@ -41,7 +41,8 @@
     hex32(l.salt);integer(l.index,0,127);
   }
   function schema(b) {
-    object(b,'format credentialId credentialVersion merkleRoot leafCount anchor provenance presentation claims envelopeHash platformSignature');
+    object(b,'format credentialId credentialVersion merkleRoot leafCount anchor provenance presentation claims envelopeHash platformSignature'+(Object.hasOwn(b,'intakeStatus')?' intakeStatus':''));
+    if(Object.hasOwn(b,'intakeStatus'))statusSchema(b);
     if(b.format!==FORMAT)fail('Unsupported proof format');
     hex32(b.credentialId);hex32(b.merkleRoot);hex32(b.envelopeHash);
     integer(b.credentialVersion,1,2147483647);integer(b.leafCount,1,128);
@@ -66,6 +67,18 @@
       if(!Array.isArray(c.proof))fail('Invalid proof path');
       for(const step of c.proof){object(step,'sibling side');hex32(step.sibling);if(!['LEFT','RIGHT'].includes(step.side))fail('Invalid direction');}
     }
+  }
+  function statusSchema(b) {
+    const s=b.intakeStatus;object(s,'schema qr branding imported pdfSignature issuer facts');
+    if(s.schema!=='intake-status-v1'||s.issuer!=='UNVERIFIED')fail('Unsupported intake status');
+    const states=['PASSED','FAILED','INCONCLUSIVE','NOT_CHECKED','NOT_APPLICABLE','NOT_DISCLOSED'];
+    for(const k of ['qr','branding','imported','pdfSignature'])if(!states.includes(s[k]))fail('Invalid intake check');
+    if(!Array.isArray(s.facts)||!Array.isArray(b.claims)||s.facts.length!==b.claims.length)fail('Invalid status scope');
+    s.facts.forEach((f,i)=>{
+      object(f,'index lineage support');
+      if(f.index!==b.claims[i]?.leaf?.index||!['UNCHANGED','EDITED','ADDED','NOT_ASSESSED','STALE_SOURCE','DERIVED'].includes(f.lineage)
+          ||!['SUPPORTED','REVIEW_REQUIRED','NOT_ASSESSED','DERIVED'].includes(f.support))fail('Invalid fact lineage');
+    });
   }
   function trustPins(pins) {
     if(!pins||typeof pins!=='object')fail('Separately trusted registry, operator and chain ID are required');
@@ -109,10 +122,11 @@
     String(p.observedChanges),String(p.enrollmentMatchesFirst),p.agentId||''));}
   function envelopeHash(b) {
     const a=b.anchor,p=b.presentation;
-    return E.keccak256(E.concat([new Uint8Array([3]),encode(b.format,b.credentialId,String(b.credentialVersion),b.merkleRoot,
+    const s=b.intakeStatus,extension=s?[encode(s.schema,s.qr,s.branding,s.imported,s.pdfSignature,s.issuer),...s.facts.map(f=>encode(String(f.index),f.lineage,f.support))]:[];
+    return E.keccak256(E.concat([new Uint8Array([s?4:3]),encode(b.format,b.credentialId,String(b.credentialVersion),b.merkleRoot,
       String(b.leafCount),a.contract.toLowerCase(),String(a.chainId),a.operator.toLowerCase(),a.documentCommitment,
       a.provenanceDigest,String(a.provenanceCode),seconds(a.anchoredAt),p.grantId,p.verifierLabel,p.purpose,p.nonce,
-      seconds(p.createdAt),seconds(p.expiresAt),String(p.oneTime)),...b.claims.map(c=>hex32(leafHash(c.leaf)))]));
+      seconds(p.createdAt),seconds(p.expiresAt),String(p.oneTime)),...b.claims.map(c=>hex32(leafHash(c.leaf))),...extension]));
   }
   function verifyCryptography(b, now=Date.now()) {
     schema(b);

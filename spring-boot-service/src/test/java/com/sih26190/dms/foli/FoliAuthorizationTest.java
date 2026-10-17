@@ -103,8 +103,11 @@ class FoliAuthorizationTest extends WalletTestContext {
     String jobId=job.get("id").toString(); long until=System.currentTimeMillis()+3000;
     while(!jobs.get(jobId,officer).get("state").equals("COMPLETE") && System.currentTimeMillis()<until) Thread.sleep(5);
     assertEquals("COMPLETE",jobs.get(jobId,officer).get("state"));
+    assertEquals(jobId,jobs.create(new FoliJobs.Request(id,null,"index",List.of(),old.hash()),officer).get("id"));
+    assertThrows(FoliException.class,() -> jobs.get(jobId,other));
     Path path=Path.of(record.getFilePath()); Files.writeString(path,"Replacement text: fee INR 777.");
     var changed=index.read(id,officer,s -> {}); assertNotEquals(old.hash(),changed.hash()); assertTrue(changed.pages().get(0).text().contains("777"));
+    assertThrows(FoliException.class,() -> jobs.create(new FoliJobs.Request(id,null,"index",List.of(),old.hash()),officer));
     assertEquals("SOURCE_CHANGED",assertThrows(FoliException.class,() -> jobs.get(jobId,officer)).code());
     mvc.perform(get("/api/foli/source").param("documentId",id).param("hash",old.hash()).param("page","1").with(httpBasic(officer.getUsername(),password))).andExpect(status().isConflict());
     record.setUploadedBy(other); legacy.saveAndFlush(record);

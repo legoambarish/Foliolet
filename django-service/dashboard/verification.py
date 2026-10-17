@@ -76,7 +76,8 @@ def timestamp(value):
 
 
 def validate_bundle(b):
-    shape(b, 'format credentialId credentialVersion merkleRoot leafCount anchor provenance presentation claims envelopeHash platformSignature')
+    shape(b, 'format credentialId credentialVersion merkleRoot leafCount anchor provenance presentation claims envelopeHash platformSignature'
+          + (' intakeStatus' if isinstance(b, dict) and 'intakeStatus' in b else ''))
     if b['format'] != 'salted-merkle-keccak-v1':
         raise ValueError('Unknown format')
     for k in ('credentialId', 'merkleRoot', 'envelopeHash'):
@@ -146,6 +147,23 @@ def validate_bundle(b):
             hex_value(step['sibling'], 32)
             if step['side'] not in ('LEFT', 'RIGHT'):
                 raise ValueError('Malformed direction')
+    if 'intakeStatus' in b:
+        s = b['intakeStatus']
+        shape(s, 'schema qr branding imported pdfSignature issuer facts')
+        if s['schema'] != 'intake-status-v1' or s['issuer'] != 'UNVERIFIED':
+            raise ValueError('Unsupported intake status')
+        states = ('PASSED', 'FAILED', 'INCONCLUSIVE', 'NOT_CHECKED', 'NOT_APPLICABLE', 'NOT_DISCLOSED')
+        if any(s[k] not in states for k in ('qr', 'branding', 'imported', 'pdfSignature')):
+            raise ValueError('Malformed check state')
+        if not isinstance(s['facts'], list) or len(s['facts']) != len(b['claims']):
+            raise ValueError('Invalid status scope')
+        for fact, claim in zip(s['facts'], b['claims']):
+            shape(fact, 'index lineage support')
+            integer(fact['index'], 0, b['leafCount']-1)
+            if (fact['index'] != claim['leaf']['index']
+                    or fact['lineage'] not in ('UNCHANGED', 'EDITED', 'ADDED', 'NOT_ASSESSED', 'STALE_SOURCE', 'DERIVED')
+                    or fact['support'] not in ('SUPPORTED', 'REVIEW_REQUIRED', 'NOT_ASSESSED', 'DERIVED')):
+                raise ValueError('Invalid fact lineage')
 
 
 def recognized_threshold(leaf):

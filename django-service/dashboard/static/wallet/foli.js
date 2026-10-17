@@ -196,14 +196,20 @@
     const generation = ++state.generation; setBusy(true); $('alert').hidden = true; state.retry = () => run(mode, question);
     $('progress-label').textContent = mode === 'review' ? 'Starting a whole-document reading review' : mode === 'index' ? 'Opening your source' : 'Preparing your question';
     const payload = {mode, question, history: mode === 'chat' ? state.history.slice(-6) : []};
+    if(mode === 'chat' && $('cloud-consent')?.checked) payload.cloudConsent = true;
+    if($('cloud-consent')) $('cloud-consent').checked = false;
     if (state.selected) payload.documentId = state.selected.id;
     if (state.manifest) payload.sourceHash = state.manifest.sourceHash;
     try {
       const job = await api('jobs', {method: 'POST', payload});
       if (generation !== state.generation) { await api('jobs/' + job.id, {method: 'DELETE'}); return; }
-      state.activeJob = job.id; let result = job; const start = Date.now();
+      state.activeJob = job.id; let result = job, previewShown = false; const start = Date.now();
       while (result.state === 'QUEUED' || result.state === 'RUNNING') {
         if (generation !== state.generation) return;
+        if(result.preview && !previewShown) {
+          assistantMessage({...result.preview,answer:'Initial source checklist. Model interpretation is still running. '+result.preview.answer});
+          previewShown = true;
+        }
         $('progress-label').textContent = result.stage; await pause(600);
         if (Date.now() - start > 320000) throw {code: 'TIMEOUT', message: 'The local request took too long. Stop it and retry.'};
         result = await api('jobs/' + job.id);
@@ -261,6 +267,7 @@
   async function health() {
     try {
       const result = await api('health'); state.health = result; const runtime = result.ollama;
+      if($('cloud-option')) $('cloud-option').hidden = result.geminiAvailable !== true;
       const labels = {READY: 'Local model ready', OFFLINE: 'Local model offline', MODEL_MISSING: 'Model not installed', CLOUD_NOT_DISABLED: 'Cloud mode blocked', MODEL_SIZE_LIMIT: 'Model exceeds limit'};
       $('health-label').textContent = labels[runtime.status] || 'Local model unavailable'; $('health').dataset.status = runtime.status;
       $('health').title = `${runtime.model} · ${result.ocr}${runtime.cloudDisabled ? ' · cloud disabled' : ''}`;

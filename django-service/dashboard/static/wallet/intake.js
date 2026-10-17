@@ -239,12 +239,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function showLabels(body) {
     const labels = document.getElementById('intake-labels'); labels.replaceChildren();
-    const names = [body.indicator === 'POSSIBLE_DIGILOCKER_FORMAT' ? 'Possible DigiLocker document (unverified)'
-      : body.indicator === 'NO_DIGILOCKER_INDICATOR' ? 'No DigiLocker indicator found' : 'DigiLocker indicator check inconclusive'];
-    if (body.method === 'WATCHER_ASSISTED') names.push('Imported with Foliolet');
-    names.push(body.lineage === 'SUGGESTIONS_UNMODIFIED' ? 'Suggested facts unchanged'
-      : body.lineage === 'SUGGESTIONS_MODIFIED' ? 'Facts edited since extraction' : 'Manual facts / not compared', 'Issuer not verified');
-    for (const text of names) { const tag = document.createElement('span'); tag.className = 'mark quiet'; tag.textContent = text; labels.appendChild(tag); }
+    for (const stamp of body.stamps || []) {
+      const tag = document.createElement('span');
+      tag.className = 'mark ' + (['pass','caution','quiet','fail'].includes(stamp.tone) ? stamp.tone : 'quiet');
+      tag.dataset.check = stamp.id; tag.dataset.state = stamp.state; tag.title = stamp.detail;
+      tag.textContent = (stamp.state === 'PASSED' ? '✓ ' : '') + stamp.label + ' · ' + stamp.display;
+      labels.appendChild(tag);
+    }
   }
   async function poll() {
     try {

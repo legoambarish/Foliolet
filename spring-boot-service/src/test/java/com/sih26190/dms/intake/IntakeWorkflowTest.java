@@ -49,6 +49,8 @@ class IntakeWorkflowTest extends WalletTestContext {
   @Autowired IntegrityService integrity;
   @Autowired IntegrityAgentRepository agents;
   @Autowired WalletService wallet;
+  @Autowired DisclosureService disclosure;
+  @Autowired PresentationSigner signer;
   @Autowired AuthorizedDocumentResolver resolver;
   @Autowired FoliExtractionService extraction;
   @Autowired FoliWorkGate gate;
@@ -189,6 +191,35 @@ class IntakeWorkflowTest extends WalletTestContext {
     fields.set(0,new ClaimInput("education.math","Math","string","90"));assertEquals(1,metadata.compare(baseline,fields).edited());
     fields.set(0,new ClaimInput("education.math_new","Math","decimal","90"));assertEquals(new IntakeMetadata.Changes(0,1,2),metadata.compare(baseline,fields));
     fields.add(fields.get(0));assertThrows(IllegalArgumentException.class,() -> metadata.compare(baseline,fields));
+  }
+  @Test void selectedLineageIsSignedScopedAndSurvivesReloadWithoutHiddenHistory() throws Exception {
+    var anchors=new HashMap<String,com.sih26190.dms.blockchain.SelectiveDisclosureBlockchainService.ChainAnchor>();
+    when(chain.address()).thenReturn("0x"+"11".repeat(20));when(chain.chainId()).thenReturn(1337L);when(chain.operator()).thenReturn(TEST_CREDENTIALS.getAddress());
+    when(chain.get(anyString())).thenAnswer(call -> anchors.get(call.getArgument(0)));
+    when(chain.anchor(anyString(),anyString(),anyString(),anyString(),anyInt(),anyInt(),nullable(String.class))).thenAnswer(call -> {
+      anchors.put(call.getArgument(0),new com.sih26190.dms.blockchain.SelectiveDisclosureBlockchainService.ChainAnchor(call.getArgument(1),call.getArgument(2),call.getArgument(3),chain.operator(),Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS),call.getArgument(4),call.getArgument(5),1,"0x"+"00".repeat(32)));
+      return "0x"+"99".repeat(32);
+    });
+    String id=draft();jobs.automatically(id,owner);done(id);
+    var b=metadata.baseline(records.findById(id).orElseThrow());var fields=new ArrayList<>(b.fields().stream().map(FactSuggestions.Candidate::claim).toList());
+    fields.set(0,new ClaimInput("education.math","Math","decimal","95"));wallet.confirm(id,new ConfirmClaims(fields),owner);
+    wallet.anchor(id,owner);
+    var claim=wallet.claimRecords(id).stream().filter(c -> c.path.equals("education.math")).findFirst().orElseThrow();
+    var share=disclosure.create(new ShareRequest(id,List.of(claim.id),"Test desk","Fictional demonstration",30,false,true),owner);
+    String token=share.get("shareUrl").toString().split("/verify/")[1].replace("/","");
+    var result=disclosure.open(token);assertTrue(result.verification().verified());var proof=result.bundle();
+    assertEquals(1,proof.intakeStatus().facts().size());assertEquals("EDITED",proof.intakeStatus().facts().get(0).lineage());
+    assertEquals("UNVERIFIED",proof.intakeStatus().issuer());assertFalse(proof.intakeStatus().toString().contains("Science"));
+    assertFalse(proof.intakeStatus().toString().contains("90"));
+    var s=proof.intakeStatus();var forged=new IntakeStatus(s.schema(),"PASSED",s.branding(),s.imported(),s.pdfSignature(),s.issuer(),s.facts());
+    var altered=new Bundle(proof.format(),proof.credentialId(),proof.credentialVersion(),proof.merkleRoot(),proof.leafCount(),proof.anchor(),proof.provenance(),proof.presentation(),proof.claims(),proof.envelopeHash(),proof.platformSignature(),forged);
+    assertFalse(signer.verify(altered));assertFalse(disclosure.verify(altered,true).verified());
+    var stripped=new Bundle(proof.format(),proof.credentialId(),proof.credentialVersion(),proof.merkleRoot(),proof.leafCount(),proof.anchor(),proof.provenance(),proof.presentation(),proof.claims(),proof.envelopeHash(),proof.platformSignature());
+    assertFalse(signer.verify(stripped));
+    var privateStatus=metadata.disclosure(wallet.owned(id,owner),proof.claims(),resolver.open("wallet:"+id,owner).hash(),false);
+    assertEquals("NOT_DISCLOSED",privateStatus.qr());assertEquals("NOT_DISCLOSED",privateStatus.imported());
+    assertEquals("EDITED",privateStatus.facts().get(0).lineage());
+    assertEquals("EDITED",disclosure.open(token).bundle().intakeStatus().facts().get(0).lineage());
   }
   @Test void manualConfirmationDuringReadingCannotAcquireALateBaseline() throws Exception {
     var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
