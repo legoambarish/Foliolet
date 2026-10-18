@@ -68,6 +68,15 @@ public class FoliRetrievalService {
     }
     var ranked=new ArrayList<>(scores.keySet());
     ranked.sort(Comparator.<Span>comparingDouble(s -> -scores.get(s)).thenComparingInt(Span::page).thenComparingInt(Span::start));
+    // A broad summary or paraphrased question may share no lexical terms with a
+    // long source. Give the model a bounded overview to interpret, not an empty
+    // source that would make every such question look unsupported. This is still
+    // targeted coverage, never proof of absence or a complete document review.
+    if (ranked.isEmpty() && !spans.isEmpty()) {
+      var overview=new ArrayList<Span>(); int count=Math.min(6,spans.size());
+      for (int i=0;i<count;i++) overview.add(spans.get(count==1?0:i*(spans.size()-1)/(count-1)));
+      return List.copyOf(overview);
+    }
     var chosen=new LinkedHashSet<Span>(); int characters=0;
     double floor=ranked.isEmpty()?0:scores.get(ranked.get(0))*.10;
     for (var span:ranked) {

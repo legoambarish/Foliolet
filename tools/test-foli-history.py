@@ -52,10 +52,11 @@ def manifest(document_id):
 def answer(payload):
     citation = dict(id='E1', documentId=payload.get('documentId'), sourceHash='b' * 64,
                     page=1, provenance='Embedded text', start=0, end=len(source_text), quote=source_text)
-    result = dict(answer='Answer to ' + payload['question'] + ' ' + hostile,
-                  answerKind='GENERAL', citations=[], warnings=['Synthetic reading caution'])
+    result = dict(answer='Select a document from Your sources first.',
+                  answerKind='DOCUMENT_REQUIRED', citations=[], warnings=[])
     if payload.get('documentId'):
-        result.update(answerKind='INTERPRETATION', citations=[citation], manifest=manifest(payload['documentId']))
+        result.update(answer='Answer to ' + payload['question'] + ' ' + hostile,
+                      answerKind='INTERPRETATION', citations=[citation], manifest=manifest(payload['documentId']))
     if payload['mode'] == 'review':
         result.update(answer='Review of synthetic source [E1]', answerKind='DOCUMENT_REVIEW',
                       reviewCoverage=dict(checklistPages=1, totalPages=1, semanticChunks=1, totalChunks=1, semanticComplete=True),
@@ -138,7 +139,11 @@ with sync_playwright() as pw:
     try:
         page.goto(ORIGIN + '/ask-foli/')
         expect(page.locator('#foli-documents button')).to_have_count(2)
+        expect(page.locator('#foli-document-title')).to_have_text('Choose a document')
         ask('General first question')
+        assert 'Select a document from Your sources first.' in log()
+        assert page.locator('.foli-citation').count() == 0
+        passed('No-document response invites source selection and has no citations')
         general = log()
         page.locator('#foli-question').fill('General draft')
         select('Document A')
@@ -224,7 +229,7 @@ with sync_playwright() as pw:
         select('general')
         cancellation.fulfill(json=dict(state='CANCELLED'))
         poll.fulfill(json=dict(id='slow', state='COMPLETE', result=dict(answer='STALE COMPLETION', answerKind='GENERAL')))
-        expect(page.locator('#foli-document-title')).to_have_text('General conversation')
+        expect(page.locator('#foli-document-title')).to_have_text('Choose a document')
         assert len(calls) == call_count
         select('Document A')
         assert 'STALE COMPLETION' not in log()

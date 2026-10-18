@@ -22,6 +22,9 @@ class FoliPrivateTests(TestCase):
     def test_page_has_native_navigation_no_credentials_and_strict_csp(self):
         response=self.client.get('/ask-foli/')
         self.assertContains(response,'Ask Foli')
+        self.assertContains(response,'Choose a document')
+        self.assertNotContains(response,'General conversation')
+        self.assertNotContains(response,'No document needed')
         self.assertContains(response,'href="/ask-foli/" data-tip="Ask Foli" aria-current="page"')
         self.assertContains(response,'wallet/foli.js')
         self.assertContains(response,'wallet/foli.css')

@@ -172,7 +172,7 @@
     if (remember) conversation().messages.push({role: 'assistant', answer});
     dismissWelcome(); const message = node('article', null, 'foli-message foli-message-assistant');
     const header = node('div', null, 'foli-message-header'); header.append(node('strong', 'Foli'));
-    const labels = {GENERAL: 'General explanation', INTERPRETATION: 'AI interpretation · inspect the evidence',
+    const labels = {GENERAL: 'Reading assistant', DOCUMENT_REQUIRED: 'Choose a document', DOCUMENT_SCOPE: 'Document questions only', CLARIFICATION: 'A little more detail needed', INTERPRETATION: 'AI interpretation · inspect the evidence',
       DOCUMENT_REVIEW: 'Whole-document reading review', READ_ONLY_EXPLANATION: 'Read-only assistant', NO_SOURCE_SUPPORT: 'No source support confirmed'};
     header.append(node('span', labels[answer.answerKind] || 'Reading assistant')); message.append(header);
     const body = node('div', null, 'foli-message-body'); safeMarkdown(body, answer.answer, answer.citations || []); message.append(body);
@@ -262,9 +262,9 @@
     void stop(); state.selected = document; state.manifest = null; state.retry = null;
     $('log').replaceChildren(); $('coverage').hidden = true; $('alert').hidden = true; $('source-dialog').close();
     state.sourceGeneration++;
-    $('document-title').textContent = document ? document.name : 'General conversation';
-    $('document-subtitle').textContent = document ? `${document.format.toUpperCase()} · version ${document.version} · ${document.status.toLowerCase()}` : 'General explanations · no source selected';
-    $('question').placeholder = document ? 'Ask anything about this document…' : 'Ask Foli a question…';
+    $('document-title').textContent = document ? document.name : 'Choose a document';
+    $('document-subtitle').textContent = document ? `${document.format.toUpperCase()} · version ${document.version} · ${document.status.toLowerCase()}` : 'Document questions · no source selected';
+    $('question').placeholder = document ? 'Ask anything about this document…' : 'Select a document to begin…';
     const chat = conversation();
     $('question').value = chat.draft; resizeComposer();
     if ($('cloud-consent')) $('cloud-consent').checked = false;
@@ -277,7 +277,7 @@
     if (document) {
       if (!document.supported) alert('This file type is not supported yet. Foli currently reads PDF, UTF-8 TXT and CSV.');
       else await run('index');
-    } else if (!chat.messages.length) assistantMessage({answer: 'Hello. Ask general questions here. To summarize or ask about a document, select it from Your sources in the sidebar first.', answerKind: 'GENERAL', citations: [], warnings: []});
+    } else if (!chat.messages.length) assistantMessage({answer: 'Select a document from Your sources first. I can summarize it, explain its terms, translate passages, or answer questions about it.', answerKind: 'DOCUMENT_REQUIRED', citations: [], warnings: []});
   }
   function renderDocuments() {
     const list = $('documents'); list.replaceChildren(); const query = $('search').value.toLocaleLowerCase();

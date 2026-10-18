@@ -60,7 +60,7 @@ async function main() {
   await page.locator('#foli-question').type('Second line');
   assert.match(await page.locator('#foli-question').inputValue(), /First line\nSecond line/); pass('Shift+Enter inserts a newline');
   await ask('Write a short haiku about careful reading.');
-  assert.match(await page.locator('#foli-log').textContent(), /General explanation/); pass('Unusual read-oriented conversation reaches real Ollama');
+  assert.match(await page.locator('#foli-log').textContent(), /Select a document/); pass('No-source request redirects to document selection');
   await select(data.documents['long-contract-125-pages.pdf'].title);
   assert.match(await page.locator('#foli-coverage-summary').textContent(), /125\/125 readable/);
   assert(!await page.locator('#foli-log').textContent()); pass('Document switch clears previous context and reads all 125 pages');

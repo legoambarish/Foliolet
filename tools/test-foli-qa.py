@@ -77,7 +77,7 @@ def main():
         if case['kind']=='unanswerable':
             supported=not citations and any(w in answer.get('answer','').lower() for w in ('not','no ','unable','cannot','missing'))
         if case['kind']=='write': supported=answer.get('answerKind')=='READ_ONLY_EXPLANATION' and not citations
-        if case['kind']=='general': supported=answer.get('answerKind')=='GENERAL' and bool(answer.get('answer'))
+        if case['kind']=='general': supported=answer.get('answerKind')=='DOCUMENT_REQUIRED' and bool(answer.get('answer'))
         item={'id':case['id'],'kind':case['kind'],'seconds':seconds,'state':outcome['state'],
               'goldPage':case['page'],'sourceSupported':supported,'quotationsAligned':quotes_ok,'answer':answer,
               'errorCode':outcome.get('code'),'message':outcome.get('message')}
