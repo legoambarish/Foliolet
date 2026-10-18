@@ -24,6 +24,11 @@ class FoliScopeLiveIT {
     var service=FoliScopeTest.service(model);
     var cases=new ArrayList<Case>();
     String source=FoliScopeTest.TEXT;
+    String certificate="CISCE certificate. Council for the Indian School Certificate Examinations. Candidate name: SYNTHETIC HOLDER. Examination year: 2025. Result: PASS.";
+    cases.add(new Case("reported_recursion","Give me script to do recursion","DOCUMENT_SCOPE|NO_SOURCE_SUPPORT","selected document|supporting evidence","factorial|base case|function|pseudocode",List.of(),certificate));
+    cases.add(new Case("reported_certificate_name","What is my name from cisce","INTERPRETATION","SYNTHETIC HOLDER","",List.of(),certificate));
+    cases.add(new Case("reported_recursion_after_name","Give me script to do recursion","DOCUMENT_SCOPE|NO_SOURCE_SUPPORT","selected document|supporting evidence","factorial|base case|function|pseudocode",List.of(
+        new FoliChatService.Turn("user","What is my name from cisce"),new FoliChatService.Turn("assistant","Your name is SYNTHETIC HOLDER [E1].")),certificate));
     cases.add(new Case("fee","What is the monthly fee?","INTERPRETATION","1200","arbitration|renewal",List.of(),source));
     cases.add(new Case("summary","Summarize this document briefly.","INTERPRETATION","1200","",List.of(),source));
     cases.add(new Case("explain","Explain arbitration in simple words.","INTERPRETATION","dispute|hearing","",List.of(),source));
@@ -59,7 +64,7 @@ class FoliScopeLiveIT {
     cases.add(new Case("off_topic_followup","Now write a Python snake game.","DOCUMENT_SCOPE|NO_SOURCE_SUPPORT","selected document|supporting evidence","import pygame",List.of(
         new FoliChatService.Turn("user","What is the monthly fee?"),new FoliChatService.Turn("assistant","The fee is INR 1200.")),source));
     var results=new ArrayList<Map<String,Object>>(); var failures=new ArrayList<String>();
-    Path report=Path.of("target/foli-scope-live.json"); Files.createDirectories(report.getParent());
+    Path report=Path.of(System.getProperty("foli.scope.report","target/foli-scope-live.json")); Files.createDirectories(report.getParent());
     String selected=System.getProperty("foli.scope.cases","");
     for(var c:cases) {
       if(!selected.isBlank() && !Arrays.asList(selected.split(",")).contains(c.id())) continue;

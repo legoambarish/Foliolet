@@ -40,6 +40,14 @@ The later full run also rendered the source's INR 600 as “INR 60-0” in a sum
 
 ## Scenario outcomes
 
+### Reported prompts regression (2026-10-18)
+
+The running application was separately verified to use the `Foliolet-p0-performance-trust` JAR. Its compiled `FoliChatService` still contained the old policy that displays unverified answers with a warning, and did not contain the test branch's answer-withholding policy. No running application files or processes were changed.
+
+Three additional real-model cases passed on the isolated test branch: the exact prompt `Give me script to do recursion` returned fixed document-scope guidance with no citations; `What is my name from cisce` answered with the synthetic certificate's candidate name and a matched citation; the recursion request after that name-question history also returned fixed scope guidance. No personal certificate was read. Raw replies and results are retained in `spring-boot-service/target/foli-scope-reported-prompts.json`.
+
+Reproduce with `FOLI_OLLAMA_URL` pointing at an isolated runtime and `./mvnw.cmd "-Dtest=FoliScopeLiveIT" "-Dfoli.scope.cases=reported_recursion,reported_certificate_name,reported_recursion_after_name" "-Dfoli.scope.report=target/foli-scope-reported-prompts.json" test`. The report-path override preserves earlier evidence files.
+
 | Scenario | Returned result | Scope rubric |
 | --- | --- | --- |
 | fee | INTERPRETATION | PASS |
