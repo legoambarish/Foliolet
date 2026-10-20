@@ -11,7 +11,9 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / '.local-data/intake-tests'
-API = 'http://127.0.0.1:8088'
+RUNTIME = ROOT / '.local-data/intake-runtime.json'
+PORTS = json.loads(RUNTIME.read_text(encoding='utf-8-sig')).get('ports', {}) if RUNTIME.exists() else {}
+API = 'http://127.0.0.1:' + str(PORTS.get('api', 8088))
 
 
 def main():
@@ -30,6 +32,14 @@ def main():
     pairing = OUT / 'launcher-pair-private.json'; pairing.write_text(json.dumps(config), encoding='utf8')
     command = [args.powershell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
                str(ROOT / 'tools/start-digilocker-watcher.ps1'), '-PairingFile', str(pairing)]
+    for rejected in ('http://127.0.0.1:1', 'http://localhost:' + str(PORTS.get('api', 8088)), 'https://example.com', API + '/elsewhere'):
+        invalid = dict(config, apiUrl=rejected)
+        pairing.write_text(json.dumps(invalid), encoding='utf8')
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
+        assert result.returncode != 0 and 'Pairing must use this checkout loopback API' in result.stderr
+        assert not (ROOT / '.local-data/intake' / config['sessionId']).exists()
+    print('PASS Wrong-port, hostname, remote and path-bearing pairings are refused before writing companion state', flush=True)
+    pairing.write_text(json.dumps(config), encoding='utf8')
     log = (OUT / 'launcher-process.log').open('w', encoding='utf8')
     process = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
     try:
@@ -46,6 +56,7 @@ def main():
         assert process.wait(timeout=25) != 0, 'Stopped pairing must visibly require re-arming'
         print('PASS Server Stop terminates the launched companion with a clear re-arm message', flush=True)
     finally:
+        http.post(API + '/api/wallet/intake/sessions/' + config['sessionId'] + '/stop', timeout=10)
         if process.poll() is None: process.terminate(); process.wait(timeout=5)
         log.close()
     config['sessionId'] = str(uuid.uuid4()); config['expiresAt'] = '2020-01-01T00:00:00Z'
@@ -54,7 +65,7 @@ def main():
     assert result.returncode != 0 and 'expired' in result.stderr
     assert not (ROOT / '.local-data/intake' / config['sessionId']).exists()
     print('PASS Expired pairing is refused before writing companion state or starting Python', flush=True)
-    (OUT / 'launcher-results.json').write_text(json.dumps({'count': 3, 'result': 'PASS', 'platform': 'Windows', 'synthetic': True}), encoding='utf8')
+    (OUT / 'launcher-results.json').write_text(json.dumps({'count': 4, 'result': 'PASS', 'platform': 'Windows', 'synthetic': True, 'api': API, 'powershell': args.powershell}), encoding='utf8')
 
 
 if __name__ == '__main__': main()

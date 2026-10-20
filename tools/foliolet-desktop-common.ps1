@@ -6,7 +6,6 @@ if ($PSVersionTable.PSVersion.Major -lt 6) {
 }
 $folioletRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $folioletData = Join-Path $folioletRoot '.local-data'
-$folioletUrl = 'http://127.0.0.1:8008/'
 $folioletHash = [Security.Cryptography.SHA256]::Create()
 try { $folioletIdentity = [BitConverter]::ToString($folioletHash.ComputeHash([Text.Encoding]::UTF8.GetBytes($folioletRoot.ToLowerInvariant()))).Replace('-','').Substring(0,20) }
 finally { $folioletHash.Dispose() }
@@ -21,9 +20,31 @@ function Get-FolioletPowerShell {
 
 function Assert-FolioletBranch {
     $branch = (git -C $folioletRoot branch --show-current).Trim()
-    if ($LASTEXITCODE -ne 0 -or ($branch -notlike 'feature/digilocker-assisted-intake*' -and $branch -ne 'feature/ps32-final-winning-audit-20261016-1645' -and $branch -ne 'codex/p0-performance-trust' -and $branch -ne 'design/frontend-refresh-20261017')) {
+    if ($LASTEXITCODE -ne 0 -or ($branch -notlike 'feature/digilocker-assisted-intake*' -and $branch -ne 'feature/ps32-final-winning-audit-20261016-1645' -and $branch -ne 'codex/p0-performance-trust' -and $branch -ne 'design/frontend-refresh-20261017' -and $branch -ne 'codex/askfoli-document-guardrails')) {
         throw 'Use the dedicated DigiLocker feature or PS32 audit checkout. No branch was changed.'
     }
+}
+
+function Assert-FolioletPorts($Ports) {
+    $seen = @()
+    foreach ($name in @('pg','evm','api','ui','receiver','control')) {
+        $value = $Ports.$name
+        if ($null -eq $value -or [string]$value -notmatch '^\d+$' -or [long]$value -lt 1024 -or [long]$value -gt 65535 -or [int]$value -in $seen) { throw 'Runtime ports must be distinct integers between 1024 and 65535.' }
+        $Ports.$name = [int]$value
+        $seen += [int]$value
+    }
+}
+
+function Get-FolioletPorts {
+    $ports = [pscustomobject]@{pg=55438;evm=8548;api=8088;ui=8008;receiver=8001;control=8002}
+    $path = Assert-FolioletPath (Join-Path $folioletData 'intake-runtime.json')
+    if (Test-Path -LiteralPath $path) {
+        $runtime = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        if ($runtime.root -ne $folioletRoot) { throw 'Runtime configuration belongs to another checkout.' }
+        if ($runtime.ports) { $ports = $runtime.ports }
+    }
+    Assert-FolioletPorts $ports
+    return $ports
 }
 
 function Assert-FolioletPath([string]$Path) {
@@ -94,20 +115,20 @@ function Assert-FolioletOwnedPorts {
     $manifest = Join-Path $folioletData 'intake-processes.json'
     $entries = @()
     if (Test-Path -LiteralPath $manifest) { $entries = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json }
-    foreach ($service in @(@{port=8548;name='intake-evm'}, @{port=8088;name='intake-spring'}, @{port=8008;name='intake-django'})) {
+    foreach ($service in @(@{port=$folioletPorts.evm;name='intake-evm'}, @{port=$folioletPorts.api;name='intake-spring'}, @{port=$folioletPorts.ui;name='intake-django'})) {
         foreach ($listener in (Get-FolioletListener $service.port)) {
             $entry = @($entries | Where-Object { $_.name -eq $service.name })
             if ($listener.LocalAddress -ne '127.0.0.1' -or $entry.Count -ne 1 -or -not (Test-FolioletListener $listener $entry[0])) { throw "Port $($service.port) belongs to another process. Close that application or use Foliolet's own Stop button. Nothing was stopped." }
         }
     }
-    foreach ($listener in (Get-FolioletListener 55438)) {
+    foreach ($listener in (Get-FolioletListener $folioletPorts.pg)) {
         $manifest = Join-Path $folioletData 'intake-postgres.json'
-        if (-not (Test-Path -LiteralPath $manifest)) { throw 'Database port 55438 is occupied without this checkout ownership record. Nothing was stopped.' }
+        if (-not (Test-Path -LiteralPath $manifest)) { throw "Database port $($folioletPorts.pg) is occupied without this checkout ownership record. Nothing was stopped." }
         $pg = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
         $expected = Join-Path $folioletData 'postgres-intake'
         $command = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)"
         $pidFile = Join-Path $expected 'postmaster.pid'
-        if ($listener.LocalAddress -ne '127.0.0.1' -or $pg.root -ne $folioletRoot -or [IO.Path]::GetFullPath($pg.data) -ne $expected -or $command.Name -ne 'postgres.exe' -or -not $command.CommandLine -or -not $command.CommandLine.Replace('/','\').Contains($expected) -or -not (Test-Path -LiteralPath $pidFile) -or [int](Get-Content -LiteralPath $pidFile -TotalCount 1) -ne $listener.OwningProcess) { throw 'Database port 55438 belongs to another process. Nothing was stopped.' }
+        if ($listener.LocalAddress -ne '127.0.0.1' -or $pg.root -ne $folioletRoot -or [IO.Path]::GetFullPath($pg.data) -ne $expected -or $command.Name -ne 'postgres.exe' -or -not $command.CommandLine -or -not $command.CommandLine.Replace('/','\').Contains($expected) -or -not (Test-Path -LiteralPath $pidFile) -or [int](Get-Content -LiteralPath $pidFile -TotalCount 1) -ne $listener.OwningProcess) { throw "Database port $($folioletPorts.pg) belongs to another process. Nothing was stopped." }
     }
 }
 
@@ -122,15 +143,18 @@ function Get-FolioletModel([string]$Url) {
 }
 
 function Test-FolioletReady {
-    foreach ($port in @(55438,8548,8088,8008)) { if (-not @(Get-FolioletListener $port).Count) { return $false } }
+    foreach ($port in @($folioletPorts.pg,$folioletPorts.evm,$folioletPorts.api,$folioletPorts.ui)) { if (-not @(Get-FolioletListener $port).Count) { return $false } }
     try {
-        $chain = Invoke-RestMethod 'http://127.0.0.1:8548' -Method Post -ContentType 'application/json' -Body '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' -TimeoutSec 4
+        $chain = Invoke-RestMethod "http://127.0.0.1:$($folioletPorts.evm)" -Method Post -ContentType 'application/json' -Body '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' -TimeoutSec 4
         if ($chain.result -ne '0x539') { return $false }
         $springReady = $false
-        try { $null = Invoke-WebRequest 'http://127.0.0.1:8088/api/wallet' -UseBasicParsing -TimeoutSec 4 }
+        try { $null = Invoke-WebRequest "http://127.0.0.1:$($folioletPorts.api)/api/wallet" -UseBasicParsing -TimeoutSec 4 }
         catch { if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -in @(401,403)) { $springReady = $true } }
         if (-not $springReady) { return $false }
         $page = Invoke-WebRequest ($folioletUrl + 'login/') -UseBasicParsing -TimeoutSec 5
         return [int]$page.StatusCode -eq 200 -and $page.Content -match 'csrfmiddlewaretoken' -and $page.Content -match 'Foliolet'
     } catch { return $false }
 }
+
+$folioletPorts = Get-FolioletPorts
+$folioletUrl = "http://127.0.0.1:$($folioletPorts.ui)/"

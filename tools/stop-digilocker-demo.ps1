@@ -1,6 +1,24 @@
 $ErrorActionPreference='Stop'
 $intakeRoot=(Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
+. (Join-Path $PSScriptRoot 'foliolet-desktop-common.ps1')
+Assert-FolioletBranch
+Assert-FolioletOwnedPorts
 $intakeManifest=Join-Path $intakeRoot '.local-data\intake-processes.json'
+# The receiver is a detached supervisor, not a child in the app process manifest.
+# Its authenticated control API checks this checkout's private key and workspace.
+if (@(Get-FolioletListener $folioletPorts.control).Count) {
+    $env:FOLIOLET_RECEIVER_PORT=[string]$folioletPorts.receiver
+    $env:FOLIOLET_CONTROL_PORT=[string]$folioletPorts.control
+    & (Join-Path $intakeRoot '.venv\Scripts\python.exe') (Join-Path $PSScriptRoot 'share-tunnel.py') stop
+    if ($LASTEXITCODE -ne 0) { throw 'Public receiver shutdown failed; no application services were stopped.' }
+    $intakeReceiverDeadline=(Get-Date).AddSeconds(15)
+    while (@(Get-FolioletListener $folioletPorts.receiver).Count -or @(Get-FolioletListener $folioletPorts.control).Count) {
+        if ((Get-Date) -gt $intakeReceiverDeadline) { throw 'Public receiver ports did not close; no application services were stopped.' }
+        Start-Sleep -Milliseconds 200
+    }
+} elseif (@(Get-FolioletListener $folioletPorts.receiver).Count) {
+    throw 'Receiver port is occupied without its authenticated control endpoint; nothing was stopped.'
+}
 function Stop-IntakeChildren([int]$ParentId) {
     foreach ($intakeChild in @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$ParentId")) {
         if ($intakeChild.Name -eq 'conhost.exe') { continue } # Windows tears down its console with the owned parent.

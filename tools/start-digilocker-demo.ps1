@@ -5,6 +5,12 @@ if ($intakeModelOrigin.Scheme -ne 'http' -or $intakeModelOrigin.Host -notin @('1
 $intakeRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 . (Join-Path $PSScriptRoot 'foliolet-desktop-common.ps1')
 Assert-FolioletBranch
+# Explicit command-line ports win; otherwise retain this checkout's saved ports.
+foreach ($portSetting in @(@{arg='PgPort';key='pg'},@{arg='EvmPort';key='evm'},@{arg='ApiPort';key='api'},@{arg='UiPort';key='ui'})) {
+    if ($PSBoundParameters.ContainsKey($portSetting.arg)) { $folioletPorts.($portSetting.key) = Get-Variable -Name $portSetting.arg -ValueOnly }
+    else { Set-Variable -Name $portSetting.arg -Value $folioletPorts.($portSetting.key) }
+}
+Assert-FolioletPorts $folioletPorts
 if (-not $RuntimeRoot) { $RuntimeRoot = $intakeRoot }
 $RuntimeRoot = (Resolve-Path -LiteralPath $RuntimeRoot).Path
 $intakePython = Join-Path $intakeRoot '.venv\Scripts\python.exe'
@@ -19,6 +25,8 @@ $intakeManifest = Join-Path $intakeData 'intake-processes.json'
 foreach ($intakePort in @($PgPort, $EvmPort, $ApiPort, $UiPort)) {
     if (Get-NetTCPConnection -State Listen -LocalPort $intakePort -ErrorAction SilentlyContinue) { throw "Port $intakePort is already in use. No process was stopped or reused." }
 }
+# Persist before starting any process so partial startup is recoverable on the same ports.
+Write-FolioletJson (Join-Path $intakeData 'intake-runtime.json') @{root=$intakeRoot;runtimeRoot=$RuntimeRoot;modelUrl=$OllamaUrl;ports=$folioletPorts}
 function Intake-Status([string]$Message) { Write-Host ('[' + (Get-Date -Format 'HH:mm:ss') + '] ' + $Message) }
 function Intake-Wait([int]$Port, [int]$Seconds=60) {
     $intakeDeadline = (Get-Date).AddSeconds($Seconds)
@@ -79,7 +87,6 @@ $env:FOLI_LAYOUT_PYTHON=$intakePython; $env:FOLI_LAYOUT_SCRIPT=(Join-Path $intak
 $env:FOLI_TEMP_DIR=(Join-Path $intakeData 'foli\tmp')
 $env:LOGGING_LEVEL_ORG_APACHE_PDFBOX='OFF'; $env:LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_AI='OFF'
 $env:SERVER_TOMCAT_ACCESSLOG_ENABLED='false'
-@{root=$intakeRoot;runtimeRoot=$RuntimeRoot;modelUrl=$OllamaUrl} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $intakeData 'intake-runtime.json') -Encoding utf8
 Intake-Launch 'intake-spring' (Get-Command java).Source @("-Xmx${MaxHeapMb}m", '-jar', (Join-Path $intakeRoot 'spring-boot-service\target\dms-0.0.1-SNAPSHOT.jar')) (Join-Path $intakeRoot 'spring-boot-service')
 Intake-Wait $ApiPort 90
 & node (Join-Path $intakeRoot 'tools\provision-digilocker-trust.cjs')
@@ -87,6 +94,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Isolated registry trust provisioning failed' }
 $env:SPRING_BOOT_API_BASE_URL="http://127.0.0.1:$ApiPort"; $env:PUBLIC_EVM_RPC_URL="http://127.0.0.1:$EvmPort"
 # Keep the private UI local; publish selected disclosure links through the receiver.
 $env:FOLIOLET_SHARE_MODE='quick'
+$env:FOLIOLET_RECEIVER_PORT=[string]$folioletPorts.receiver
+$env:FOLIOLET_CONTROL_PORT=[string]$folioletPorts.control
 if (-not $env:CLOUDFLARED_PATH) {
     $intakeCloudflared=Join-Path $RuntimeRoot '.local-tools\cloudflared\cloudflared.exe'
     if (Test-Path -LiteralPath $intakeCloudflared) { $env:CLOUDFLARED_PATH=$intakeCloudflared }

@@ -1,12 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
   // Fact editor: add/remove rows. The last row is cleared instead of removed.
   const rows = document.getElementById('fact-rows');
-  document.getElementById('add-fact')?.addEventListener('click', () => {
-    const row = rows.firstElementChild.cloneNode(true);
+  const clearEvidence = row => {
+    row.querySelectorAll('.scan-note, [data-source-evidence]').forEach(node => node.remove());
+    row.classList.remove('scanned');
+  };
+  const clearRow = row => {
     row.querySelectorAll('input').forEach(input => { input.value = ''; });
     row.querySelector('select').value = 'string';
-    row.querySelector('.scan-note')?.remove();
-    row.classList.remove('scanned');
+    clearEvidence(row);
+  };
+  document.getElementById('add-fact')?.addEventListener('click', () => {
+    const row = rows.firstElementChild.cloneNode(true);
+    clearRow(row);
     rows.appendChild(row);
     row.querySelector('input').focus();
   });
@@ -16,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = event.target.closest('.edit-row');
       (row.previousElementSibling || row.nextElementSibling).querySelector('input').focus();
       row.remove();
-    } else rows.querySelectorAll('input').forEach(input => { input.value = ''; });
+    } else clearRow(rows.firstElementChild);
   });
 
   // Scan for fields: an AI model proposes facts, which land in the same editable rows a person
@@ -27,10 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const blank = row => [...row.querySelectorAll('input')].every(input => !input.value.trim());
     const addRow = () => {
       const row = rows.firstElementChild.cloneNode(true);
-      row.querySelectorAll('input').forEach(input => { input.value = ''; });
-      row.querySelector('select').value = 'string';
-      row.querySelector('.scan-note')?.remove();
-      row.classList.remove('scanned');
+      clearRow(row);
       rows.appendChild(row);
       return row;
     };
@@ -39,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
       row.querySelector('[name=claim_value]').value = field.value;
       row.querySelector('[name=claim_type]').value = field.type;
       row.querySelector('[name=claim_path]').value = field.path;
-      row.querySelector('.scan-note')?.remove();
+      clearEvidence(row);
       const note = document.createElement('p'), tag = document.createElement('strong');
       note.className = 'help scan-note';
       tag.textContent = 'AI suggested. ';

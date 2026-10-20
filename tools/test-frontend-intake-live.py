@@ -12,7 +12,7 @@ import requests
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / '.local-data/refresh-live-ui'
+OUT = Path(os.environ.get('INTAKE_TEST_RESULTS', str(ROOT / '.local-data/refresh-live-ui')))
 OUT.mkdir(parents=True, exist_ok=True)
 UI = os.environ.get('INTAKE_TEST_UI', 'http://127.0.0.1:8038')
 API = os.environ.get('INTAKE_TEST_API', 'http://127.0.0.1:8068')
@@ -81,7 +81,7 @@ with sync_playwright() as pw:
             assert all(f['support']['quality'] == 'SUPPORTED' for f in fields)
             source = page.locator('.scan-note a').first.get_attribute('href')
             response = context.request.get(UI + source)
-            assert response.status == 200 and 'image/png' in response.headers['content-type']
+            assert response.status == 200 and 'image/png' in response.headers['content-type'], f'Source preview returned HTTP {response.status}'
             passed('Real native PDF yields 12 exact fields, literal leading-zero IDs, and source-page preview')
             old_attempt = current['attempts']
             page.locator('#retry-intake').click()
@@ -94,6 +94,15 @@ with sync_playwright() as pw:
                 page.wait_for_timeout(1500)
             assert current['fields'] == fields, 'The original baseline changed'
             passed('Real reread completes and preserves the original server baseline')
+            page.locator('#add-fact').click()
+            manual = page.locator('#fact-rows .edit-row').last
+            assert manual.locator('[name=claim_value]').input_value() == ''
+            assert manual.locator('.scan-note, [data-source-evidence]').count() == 0
+            assert manual.locator('details').count() == 1
+            assert page.locator('#fact-rows [data-source-evidence]').count() == 12
+            manual.locator('.remove-fact').click()
+            expect(page.locator('[name=claim_value]')).to_have_count(12)
+            passed('Real uploaded PDF: Add a fact has no inherited source evidence and preserves all 12 extracted facts')
         else:
             expect(page.locator('.use-reviewed-fact')).to_have_count(12, timeout=30000)
             assert page.locator('[name=claim_value]').first.input_value() == ''

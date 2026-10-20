@@ -31,7 +31,8 @@ if ($intakeConfig.expiresAt) {
     $intakeExpiry=if ($intakeConfig.expiresAt -is [DateTime]) { [DateTimeOffset]::new($intakeConfig.expiresAt) } else { [DateTimeOffset]::Parse($intakeConfig.expiresAt) }
     if ($intakeExpiry -le [DateTimeOffset]::UtcNow) { throw 'This pairing expired. Enable a new folder intake session in Foliolet and retry.' }
 } elseif ($intakeConfig.lifetime -ne 'app') { throw 'Pairing must specify app lifetime or a valid expiry' }
-if ($intakeConfig.apiUrl -ne 'http://127.0.0.1:8088') { throw 'Pairing must use this checkout loopback API on 8088' }
+if ($intakeConfig.apiUrl -cne "http://127.0.0.1:$($folioletPorts.api)") { throw "Pairing must use this checkout loopback API on $($folioletPorts.api)" }
+Assert-FolioletOwnedPorts
 $intakeAppArguments=@()
 # Windows PowerShell 5.1 emits a parsed JSON array as one pipeline object.
 # Assign first so filtering enumerates the individual service records on 5.1 and 7.

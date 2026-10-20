@@ -4,12 +4,13 @@ Run frontend-preview/render.py .local-data/refresh-ui first. No real records or
 services are contacted. Complements Java workflow and live PDF/OCR tests.
 """
 import json
+import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-PREVIEW = ROOT / '.local-data/refresh-ui'
-OUT = ROOT / '.local-data/refresh-ui-results'
+PREVIEW = Path(os.environ.get('FOLIOLET_PREVIEW', str(ROOT / '.local-data/refresh-ui')))
+OUT = Path(os.environ.get('FOLIOLET_PREVIEW_RESULTS', str(ROOT / '.local-data/refresh-ui-results')))
 OUT.mkdir(parents=True, exist_ok=True)
 ORIGIN = 'http://127.0.0.1:8919'
 checks = []
@@ -62,6 +63,27 @@ with sync_playwright() as pw:
     page.wait_for_function("document.querySelector('[name=claim_value]').value === '91'")
     assert values.count() == 1
     passed('Current supported field populates the actual redesigned review template')
+
+    original = page.locator('#fact-rows .edit-row').first
+    assert original.locator('[data-source-evidence]').text_content().strip().endswith('Mathematics 91')
+    page.locator('#add-fact').click()
+    manual = page.locator('#fact-rows .edit-row').last
+    assert all(not value for value in manual.locator('input').evaluate_all('(nodes) => nodes.map(n => n.value)'))
+    assert manual.locator('select').input_value() == 'string'
+    assert manual.locator('.scan-note, [data-source-evidence]').count() == 0
+    assert manual.locator('details').count() == 1  # Keep the Advanced field-path editor.
+    assert 'Mathematics 91' in original.text_content()
+    manual.locator('.remove-fact').click()
+    original.locator('.remove-fact').click()
+    assert values.count() == 1 and values.first.input_value() == ''
+    assert original.locator('.scan-note, [data-source-evidence]').count() == 0
+    assert original.locator('select').input_value() == 'string'
+    assert original.locator('details').count() == 1
+    page.locator('#add-fact').click()
+    assert page.locator('#fact-rows [data-source-evidence]').count() == 0
+    passed('Adding a manual fact and clearing the last fact remove stale evidence while preserving the field-path editor')
+    page.reload()
+    page.wait_for_function("document.querySelector('[name=claim_value]').value === '91'")
 
     def reread(fields):
         state['attempts'] += 1

@@ -73,7 +73,7 @@ try {
         Run-Step 'python-check' $python @((Join-Path $PSScriptRoot 'check-foliolet-dependencies.py')) 30
     }
     Write-FolioletJson $dependencyRecord @{requirements=$requirementsHash}
-    $env:NODE_PATH=(Join-Path $folioletRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $folioletRoot 'node_modules')
+    $env:NODE_PATH=(Join-Path $folioletRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $folioletRoot 'node_modules') + ';' + (Join-Path $runtimeRoot 'spring-boot-service\node_modules') + ';' + (Join-Path $runtimeRoot 'node_modules')
     try { Run-Step 'node-check' (Get-Command node.exe).Source @('-e','for(const n of ["ethers","ganache","solc","qrcode-generator"]) require(n)') 30 }
     catch {
         Status 'starting' 'Preparing the local document-proof tools...' 27
@@ -100,7 +100,7 @@ try {
     }
     if (@(Get-FolioletListener 11444).Count -and -not (Get-FolioletModel 'http://127.0.0.1:11444')) { throw 'The local assistant port 11444 is occupied by an unavailable or incompatible service. No services were stopped.' }
     # Recover a partial start only after every occupied application port passed ownership checks.
-    if (@(Get-FolioletListener 55438).Count -or @(Get-FolioletListener 8548).Count -or @(Get-FolioletListener 8088).Count -or @(Get-FolioletListener 8008).Count) {
+    if (@(Get-FolioletListener $folioletPorts.pg).Count -or @(Get-FolioletListener $folioletPorts.evm).Count -or @(Get-FolioletListener $folioletPorts.api).Count -or @(Get-FolioletListener $folioletPorts.ui).Count) {
         Status 'starting' 'Resuming the saved Foliolet instance...' 32
         Run-Script 'stop' 'stop-digilocker-demo.ps1' @() 120
     }

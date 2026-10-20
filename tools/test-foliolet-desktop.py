@@ -9,6 +9,7 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import socket
 from pathlib import Path
 import subprocess
 import sys
@@ -21,6 +22,10 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / '.local-data' / 'desktop-tests'
 ENGINE = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
 CHECKS = []
+RUNTIME = json.loads((ROOT / '.local-data/intake-runtime.json').read_text(encoding='utf-8-sig'))
+PORTS = RUNTIME.get('ports', {'ui':8008,'api':8088,'evm':8548,'pg':55438,'receiver':8001,'control':8002})
+UI = 'http://127.0.0.1:' + str(PORTS['ui'])
+API = 'http://127.0.0.1:' + str(PORTS['api'])
 
 
 def pass_check(name):
@@ -60,6 +65,30 @@ def processes():
     return {item['name']: (item['pid'], item['started']) for item in value}
 
 
+def receiver_status():
+    sys.path.insert(0, str(ROOT / 'django-service'))
+    from dashboard import tunnel_manager
+    cfg = dict(tunnel_manager.config(), port=PORTS['receiver'], control=PORTS['control'])
+    return tunnel_manager.rpc('status', cfg)
+
+
+def process_running(pid):
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    kernel.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
+    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+    handle = kernel.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return False
+    try:
+        code = ctypes.c_uint32()
+        assert kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+        return code.value == 259
+    finally:
+        kernel.CloseHandle(handle)
+
+
 def main():
     assert os.name == 'nt'
     OUT.mkdir(parents=True, exist_ok=True)
@@ -91,44 +120,71 @@ def main():
     pass_check('Concurrent startup is refused without creating duplicate service processes')
 
     assert baseline == snapshot(), 'Runtime data changed during testing; stop before the restart checks and use an idle demo'
+    public_before = receiver_status()
+    assert public_before['state'] == 'ready'
     run('start-foliolet.ps1', '-Stop', '-StatusPath', str(OUT / 'stop.json'))
     assert baseline == snapshot()
     pass_check('One-action Stop retains every recorded original, signing/encryption key and registry pin')
+    for port in PORTS.values():
+        with socket.socket() as client:
+            client.settimeout(1)
+            assert client.connect_ex(('127.0.0.1', port)) != 0, f'Port {port} still listening after Stop'
+    pass_check('Stop closes configured app, database, public receiver and control ports')
+    for key in ('supervisorPid', 'tunnelPid'):
+        assert public_before[key] and not process_running(public_before[key]), f'{key} still running after Stop'
+    pass_check('Stop terminates the original detached supervisor and Cloudflare process')
+    run('start-foliolet.ps1', '-Stop', '-StatusPath', str(OUT / 'stop-again.json'))
+    pass_check('Repeated Stop succeeds with the receiver and services already stopped')
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200); self.end_headers(); self.wfile.write(b'owned by the test')
         def log_message(self, *args):
             pass
-    server = ThreadingHTTPServer(('127.0.0.1', 8008), Handler)
+    server = ThreadingHTTPServer(('127.0.0.1', PORTS['ui']), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
     try:
         run('start-foliolet.ps1', '-StatusPath', str(OUT / 'occupied.json'), expected=1)
         assert 'another process' in json.loads((OUT / 'occupied.json').read_text())['message']
         http = requests.Session(); http.trust_env = False
-        assert http.get('http://127.0.0.1:8008/', timeout=5).text == 'owned by the test'
+        assert http.get(UI + '/', timeout=5).text == 'owned by the test'
         assert baseline == snapshot()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=3)
     pass_check('Foreign occupied port is refused without stopping it or changing retained application state')
 
-    run('launch-foliolet.ps1', '-NoBrowser', '-SmokeTest', '-CapturePath', str(OUT / 'cold start.png'), timeout=300)
-    result = json.loads((ROOT / '.local-data/desktop-ui-result.json').read_text())
-    assert result['state'] == 'ready' and not result['browserOpened']
-    assert (OUT / 'cold start.png').stat().st_size > 1000
+    if '--headless' in sys.argv:
+        run('start-foliolet.ps1', '-StatusPath', str(OUT / 'cold-start.json'), timeout=360)
+        result = json.loads((OUT / 'cold-start.json').read_text())
+        assert result['state'] == 'ready' and result['url'] == UI + '/'
+    else:
+        run('launch-foliolet.ps1', '-NoBrowser', '-SmokeTest', '-CapturePath', str(OUT / 'cold start.png'), timeout=360)
+        result = json.loads((ROOT / '.local-data/desktop-ui-result.json').read_text())
+        assert result['state'] == 'ready' and not result['browserOpened']
+        assert (OUT / 'cold start.png').stat().st_size > 1000
     run('start-foliolet.ps1', '-CheckOnly', '-StatusPath', str(OUT / 'cold-health.json'))
     assert baseline == snapshot()
-    pass_check('Real desktop window starts all services from stopped state with no terminals and retains prior data')
+    assert json.loads((ROOT / '.local-data/intake-runtime.json').read_text(encoding='utf-8-sig'))['ports'] == PORTS
+    pass_check('Cold launcher start retains saved ports, originals, keys and registry pins')
 
     before = processes()
-    run('launch-foliolet.ps1', '-NoBrowser', '-SmokeTest', '-CapturePath', str(OUT / 'warm start.png'))
+    if '--headless' in sys.argv:
+        run('start-foliolet.ps1', '-StatusPath', str(OUT / 'warm-start.json'))
+    else:
+        run('launch-foliolet.ps1', '-NoBrowser', '-SmokeTest', '-CapturePath', str(OUT / 'warm start.png'))
     assert before == processes()
     pass_check('Warm desktop launch shows ready state and preserves service PIDs')
 
     http = requests.Session(); http.trust_env = False
-    login = http.get('http://127.0.0.1:8008/login/', timeout=10)
+    login = http.get(UI + '/login/', timeout=10)
     assert login.status_code == 200 and 'csrfmiddlewaretoken' in login.text
-    assert http.get('http://127.0.0.1:8088/api/wallet', timeout=10).status_code == 401
+    assert http.get(API + '/api/wallet', timeout=10).status_code == 401
+    for port in (PORTS['receiver'], PORTS['control']):
+        with socket.create_connection(('127.0.0.1', port), timeout=3): pass
+    pass_check('Public receiver and control listener return after cold restart')
+    public_after = receiver_status()
+    assert public_after['state'] == 'ready' and public_after['instance'] != public_before['instance']
+    pass_check('Cold restart establishes a new ready public tunnel instance')
     assert all(item['result'] == 'PASS' for item in CHECKS)
     pass_check('Readiness checks actual login UI and protected backend after a cold restart')
     (OUT / 'results.json').write_text(json.dumps({'generatedAt': datetime.now(timezone.utc).isoformat(),

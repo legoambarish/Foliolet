@@ -212,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (field.citation.provenance.includes('OCR')) note.append('OCR may misread characters; check the original. ');
       if (field.citation.documentId.startsWith('wallet:')) note.append(sourceLink(field));
       const details = document.createElement('details'), summary = document.createElement('summary'), quote = document.createElement('p');
+      details.dataset.sourceEvidence = '';
       summary.textContent = 'Source evidence'; quote.className = 'help wrap-any'; quote.textContent = field.evidence;
       details.append(summary, quote); row.append(details);
       row.appendChild(note); rows.appendChild(row);
