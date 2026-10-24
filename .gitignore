@@ -75,3 +75,5 @@ tools/local-watcher/*config*.json
 tools/local-watcher/agent-state.json
 
 spring-boot-service/src/main/resources/application.yaml
+
+RUNONMAC.md
