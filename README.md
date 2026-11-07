@@ -8,10 +8,9 @@ whole-document fine-print review. Start it with the [Foli runbook](docs/FOLI_IMP
 see the [measured evaluation](docs/FOLI_EVALUATION_2026-10-15.md), or follow the
 [complete demonstration](docs/FOLI_DEMO.md).
 
-### Try the Demo here (we're using a free tier render plan to deploy this, so the site will be slow, please be patient): https://foliolet-demo.onrender.com 
 
 
-#### Note: The demo only showcases the selective disclosure feature, if you'd like to see the several other features, clone the repo and build the project locally, or watch the demo video covering all the features: https://youtu.be/2wcb9xYbyjo?si=kZTnx8xc-DqeQJaw
+#### Note: Clone the repo and build the project locally, or watch the demo video covering all the features: https://youtu.be/2wcb9xYbyjo?si=kZTnx8xc-DqeQJaw
 
 
 <img src="./images/loginfolioletimg.png" alt="a login view in dark mode on the foliolet dashboard"> 
